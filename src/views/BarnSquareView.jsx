@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Search, Plus, ArrowRightLeft, Pencil, Edit2, Trash2, X, Loader2, ChevronRight, Syringe } from 'lucide-react';
+import { Search, Plus, ArrowRightLeft, Pencil, Edit2, Trash2, X, Loader2, ChevronRight, Wheat, History } from 'lucide-react';
 import GoatCard from '../components/GoatCard';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import PenFeedingFormModal from '../components/PenFeedingFormModal';
+import PenFeedingHistoryModal from '../components/PenFeedingHistoryModal';
 
 export default function BarnSquareView({
   goats = [],
@@ -9,13 +11,11 @@ export default function BarnSquareView({
   onRequireAdmin,
   onSelectGoat,
   onOpenAddGoat,
-  onOpenLogEvent,
   onTransferGoatArea,
   onAddBarnArea,
   onUpdateBarnArea,
   onDeleteBarnArea
 }) {
-  // ...
   const pens = barnAreas.length > 0 ? barnAreas : [
     { id: 'area-1', letter: 'A', name: 'Pen A' },
     { id: 'area-2', letter: 'B', name: 'Pen B' },
@@ -34,45 +34,34 @@ export default function BarnSquareView({
   const [isManageClosing, setIsManageClosing] = useState(false);
   const [penToDelete, setPenToDelete] = useState(null);
 
+  // Feeding Modals State (Form vs History)
+  const [showFeedingFormModal, setShowFeedingFormModal] = useState(false);
+  const [showFeedingHistoryModal, setShowFeedingHistoryModal] = useState(false);
+  const [editingPenFeeding, setEditingPenFeeding] = useState(null);
+
   // Inline Edit State inside manage modal
   const [editingPenId, setEditingPenId] = useState(null);
   const [editLetter, setEditLetter] = useState('');
   const [editName, setEditName] = useState('');
-  const [editNote, setEditNote] = useState('');
 
-  // Add Pen State inside manage modal
+  // Add New Pen Form State
   const [showAddForm, setShowAddForm] = useState(false);
   const [newLetter, setNewLetter] = useState('');
-  const [newName, setNewName] = useState('');
   const [newNote, setNewNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const selectedPen = pens.find((p) => p.id === selectedPenId) || pens[0];
-  const goatsInSelectedPen = goats.filter((g) => g.area_id === selectedPenId);
 
-  // Search filtered goats
-  const searchedGoats = goats.filter((g) => {
-    if (!searchTerm.trim()) return false;
+  const goatsInSelectedPen = goats.filter((g) => {
+    const inPen = g.area_id === selectedPen.id;
+    if (!searchTerm.trim()) return inPen;
     const q = searchTerm.trim().toLowerCase();
-    return (
+    const matchesSearch =
       g.name.toLowerCase().includes(q) ||
       g.tag_id.toLowerCase().includes(q) ||
-      (g.breed || '').toLowerCase().includes(q)
-    );
+      g.breed.toLowerCase().includes(q);
+    return inPen && matchesSearch;
   });
-
-  const handleTransferSubmit = async (targetAreaId) => {
-    if (!transferringGoat) return;
-    const targetArea = pens.find((p) => p.id === targetAreaId);
-    const sourceArea = pens.find((p) => p.id === transferringGoat.area_id);
-    await onTransferGoatArea(
-      transferringGoat.id,
-      targetAreaId,
-      sourceArea ? sourceArea.name : '',
-      targetArea ? targetArea.name : ''
-    );
-    setTransferringGoat(null);
-  };
 
   const handleCloseManage = () => {
     setIsManageClosing(true);
@@ -81,31 +70,39 @@ export default function BarnSquareView({
       setIsManageClosing(false);
       setEditingPenId(null);
       setShowAddForm(false);
-    }, 450);
+    }, 220);
   };
 
   const handleStartEdit = (pen) => {
     setEditingPenId(pen.id);
-    setEditLetter(pen.letter || '');
-    setEditNote(pen.note || (pen.name && pen.name !== `Pen ${pen.letter}` ? pen.name : ''));
+    setEditLetter(pen.letter);
+    setEditName(pen.name || `Pen ${pen.letter}`);
   };
 
-  const handleSaveEdit = async (pen) => {
+  const handleSaveEdit = async (penId) => {
     setSubmitting(true);
     try {
       if (onUpdateBarnArea) {
-        const newLetter = editLetter.trim().toUpperCase() || pen.letter;
-        const newLabel = editNote.trim();
-        await onUpdateBarnArea(pen.id, {
-          letter: newLetter,
-          name: newLabel ? newLabel : `Pen ${newLetter}`
+        await onUpdateBarnArea(penId, {
+          letter: editLetter.trim().toUpperCase(),
+          name: editName.trim()
         });
       }
       setEditingPenId(null);
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSaveFeedingInfo = async (penId, jsonString) => {
+    if (onUpdateBarnArea) {
+      const pen = pens.find((p) => p.id === penId);
+      await onUpdateBarnArea(penId, {
+        name: pen ? pen.name : 'Pen',
+        feeding_info: jsonString
+      });
     }
   };
 
@@ -114,85 +111,60 @@ export default function BarnSquareView({
     setSubmitting(true);
     try {
       if (onAddBarnArea) {
-        const nextLetter = newLetter.trim().toUpperCase() ||
-          String.fromCharCode(65 + pens.length);
-        const label = newNote.trim();
+        const letter = newLetter.trim().toUpperCase() || String.fromCharCode(65 + pens.length);
         await onAddBarnArea({
-          letter: nextLetter,
-          name: label ? label : `Pen ${nextLetter}`
+          letter,
+          name: newNote.trim() || `Pen ${letter}`
         });
       }
       setNewLetter('');
-      setNewName('');
       setNewNote('');
       setShowAddForm(false);
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleTransferSubmit = async (targetAreaId) => {
+    if (!transferringGoat) return;
+    try {
+      if (onTransferGoatArea) {
+        await onTransferGoatArea(transferringGoat.id, targetAreaId);
+      }
+      setTransferringGoat(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Search Bar */}
-      <div className="search-input-wrapper" style={{ width: '100%' }}>
-        <Search className="search-icon" size={16} />
-        <input
-          type="text"
-          className="form-input"
-          placeholder="Search ear tag ID, name, or breed..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: "'Outfit', sans-serif" }}>
+      <div>
+        <h2 style={{ fontSize: '18px', fontWeight: '800', fontFamily: "'Outfit', sans-serif" }}>Barn Pens & Feeding Rations</h2>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: "'Outfit', sans-serif" }}>
+          Manage barn pen layouts, view custom food & weight rations, and move goats between areas.
+        </p>
       </div>
 
-      {/* Instant Search Results */}
-      {searchTerm.trim() && (
-        <div className="card" style={{ padding: '12px' }}>
-          <h3 style={{ fontSize: '13px', fontWeight: '800', marginBottom: '8px', color: 'var(--text-muted)' }}>
-            Search Results ({searchedGoats.length})
-          </h3>
-          {searchedGoats.length === 0 ? (
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No goats found matching "{searchTerm}".</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {searchedGoats.map((g) => (
-                <GoatCard key={g.id} goat={g} barnAreas={pens} onClick={onSelectGoat} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ORIGINAL 6-PEN GRID WITH BIG LETTER + GOAT COUNT PILL + OPTIONAL NOTE */}
+      {/* BARN PEN CARDS GRID */}
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: '800' }}>Barn Pens</h2>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {onOpenLogEvent && (
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={onOpenLogEvent}
-                style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
-              >
-                <Syringe size={14} /> Record Event
-              </button>
-            )}
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => {
-                if (onRequireAdmin) {
-                  onRequireAdmin(() => setShowManageModal(true));
-                } else {
-                  setShowManageModal(true);
-                }
-              }}
-              style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
-            >
-              <Pencil size={13} /> Edit Pens
-            </button>
-          </div>
+          <h2 style={{ fontSize: '16px', fontWeight: '800', fontFamily: "'Outfit', sans-serif" }}>Barn Pens ({pens.length})</h2>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              if (onRequireAdmin) {
+                onRequireAdmin(() => setShowManageModal(true));
+              } else {
+                setShowManageModal(true);
+              }
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: "'Outfit', sans-serif" }}
+          >
+            <Pencil size={13} /> Edit Pens
+          </button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -209,18 +181,19 @@ export default function BarnSquareView({
                   color: isSelected ? 'white' : 'var(--text-main)',
                   border: isSelected ? '2px solid var(--primary-dark)' : '2px solid var(--border-color)',
                   borderRadius: '16px',
-                  padding: '20px 14px',
+                  padding: '16px 12px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  justify: 'center',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
-                  boxShadow: isSelected ? 'var(--primary-glow)' : 'var(--shadow-sm)'
+                  boxShadow: isSelected ? 'var(--primary-glow)' : 'var(--shadow-sm)',
+                  fontFamily: "'Outfit', sans-serif"
                 }}
               >
                 {/* BIG LETTER */}
-                <span style={{ fontSize: '38px', fontWeight: '800', lineHeight: '1', fontFamily: 'Outfit, sans-serif' }}>
+                <span style={{ fontSize: '36px', fontWeight: '800', lineHeight: '1', fontFamily: "'Outfit', sans-serif" }}>
                   {pen.letter}
                 </span>
 
@@ -229,30 +202,31 @@ export default function BarnSquareView({
                   style={{
                     fontSize: '11px',
                     fontWeight: '800',
-                    marginTop: '6px',
+                    marginTop: '4px',
                     background: isSelected ? 'rgba(255,255,255,0.25)' : '#f1f5f9',
                     color: isSelected ? 'white' : 'var(--text-main)',
                     padding: '2px 9px',
-                    borderRadius: '9999px'
+                    borderRadius: '9999px',
+                    fontFamily: "'Outfit', sans-serif"
                   }}
                 >
                   {penGoats.length} goats
                 </span>
 
-                {/* OPTIONAL SMALL NOTE/SUBTITLE UNDER PILL — only shown if set */}
+                {/* PEN NAME OR NOTE */}
                 {pen.name && pen.name !== `Pen ${pen.letter}` && (
                   <span
                     style={{
-                      fontSize: '10px',
-                      fontWeight: '600',
-                      marginTop: '5px',
-                      color: isSelected ? 'rgba(255,255,255,0.85)' : 'var(--text-muted)',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      marginTop: '6px',
+                      opacity: isSelected ? 0.95 : 0.8,
                       textAlign: 'center',
-                      lineHeight: 1.2,
-                      maxWidth: '100%',
+                      whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                      maxWidth: '100%',
+                      fontFamily: "'Outfit', sans-serif"
                     }}
                   >
                     {pen.name}
@@ -264,21 +238,63 @@ export default function BarnSquareView({
         </div>
       </div>
 
-      {/* SELECTED PEN GOATS DRAWER */}
+      {/* SEARCH BAR WITHIN SELECTED PEN */}
+      <div className="search-input-wrapper">
+        <Search className="search-icon" size={16} />
+        <input
+          type="text"
+          className="form-input"
+          placeholder={`Search goats inside Pen ${selectedPen.letter}...`}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+        />
+      </div>
+
+      {/* SELECTED PEN & GOATS DIRECTORY */}
       {selectedPen && (
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <div className="card" style={{ padding: '16px', fontFamily: "'Outfit', sans-serif" }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>
-                Pen {selectedPen.letter}
+              <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0, fontFamily: "'Outfit', sans-serif" }}>
+                Pen {selectedPen.letter} {selectedPen.name && selectedPen.name !== `Pen ${selectedPen.letter}` ? `• ${selectedPen.name}` : ''}
               </h3>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                {goatsInSelectedPen.length} goats inside pen
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: "'Outfit', sans-serif" }}>
+                {goatsInSelectedPen.length} {goatsInSelectedPen.length === 1 ? 'goat' : 'goats'} inside pen
               </span>
             </div>
-            <button className="btn btn-outline btn-sm" onClick={onOpenAddGoat}>
-              <Plus size={14} /> Register Goat Here
-            </button>
+
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  const action = () => {
+                    setEditingPenFeeding(selectedPen);
+                    setShowFeedingFormModal(true);
+                  };
+                  if (onRequireAdmin) onRequireAdmin(action);
+                  else action();
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '800', fontFamily: "'Outfit', sans-serif", padding: '6px 10px' }}
+              >
+                <Wheat size={13} color="var(--primary)" /> Change Feed
+              </button>
+
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setEditingPenFeeding(selectedPen);
+                  setShowFeedingHistoryModal(true);
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '800', fontFamily: "'Outfit', sans-serif", padding: '6px 10px' }}
+              >
+                <History size={13} color="var(--primary)" /> Feed History
+              </button>
+
+              <button className="btn btn-outline btn-sm" onClick={onOpenAddGoat} style={{ fontSize: '11px', fontFamily: "'Outfit', sans-serif", padding: '6px 10px' }}>
+                <Plus size={13} /> Register Goat
+              </button>
+            </div>
           </div>
 
           {goatsInSelectedPen.length === 0 ? (
@@ -313,13 +329,43 @@ export default function BarnSquareView({
         </div>
       )}
 
+      {/* CHANGE FEED FORM MODAL */}
+      {showFeedingFormModal && editingPenFeeding && (
+        <PenFeedingFormModal
+          pen={editingPenFeeding}
+          onClose={() => {
+            setShowFeedingFormModal(false);
+            setEditingPenFeeding(null);
+          }}
+          onSave={handleSaveFeedingInfo}
+        />
+      )}
+
+      {/* FEEDING HISTORY MODAL */}
+      {showFeedingHistoryModal && editingPenFeeding && (
+        <PenFeedingHistoryModal
+          pen={editingPenFeeding}
+          onClose={() => {
+            setShowFeedingHistoryModal(false);
+            setEditingPenFeeding(null);
+          }}
+          onOpenEditForm={(pen) => {
+            setShowFeedingHistoryModal(false);
+            setEditingPenFeeding(pen);
+            const action = () => setShowFeedingFormModal(true);
+            if (onRequireAdmin) onRequireAdmin(action);
+            else action();
+          }}
+        />
+      )}
+
       {/* MANAGE PENS MODAL (ADD / REMOVE / RENAME) */}
       {showManageModal && (
         <div className={`modal-overlay ${isManageClosing ? 'closing' : ''}`} onClick={handleCloseManage}>
           <div
             className={`modal-content ${isManageClosing ? 'closing' : ''}`}
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '480px' }}
+            style={{ maxWidth: '480px', fontFamily: "'Outfit', sans-serif" }}
           >
             <div className="modal-header">
               <h3 className="modal-title">Manage Barn Pens</h3>
@@ -328,75 +374,72 @@ export default function BarnSquareView({
               </button>
             </div>
 
-            <div className="modal-body">
-              {/* LIST OF EXISTING PENS */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Customize your barn layout. Edit pen names or add new pens.
+              </p>
+
+              {/* LIST OF PENS WITH INLINE EDIT */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
                 {pens.map((pen) => {
                   const count = goats.filter((g) => g.area_id === pen.id).length;
                   const isEditing = editingPenId === pen.id;
 
                   return (
-                    <div key={pen.id} className="pen-row-enter">
+                    <div
+                      key={pen.id}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '12px',
+                        padding: '10px 12px'
+                      }}
+                    >
                       {isEditing ? (
-                        /* INLINE EDIT FORM */
-                        <div className="pen-form-enter" style={{ background: '#f0fdf4', border: '1.5px solid var(--primary-border)', borderRadius: '14px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <p style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>Editing Pen {pen.letter}</p>
-
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <div className="form-group" style={{ margin: 0 }}>
-                              <label className="form-label">Letter</label>
-                              <input
-                                type="text"
-                                className="form-input"
-                                value={editLetter}
-                                onChange={(e) => setEditLetter(e.target.value.toUpperCase())}
-                                placeholder="A"
-                                maxLength={3}
-                                style={{ textAlign: 'center', fontWeight: '900', fontSize: '15px', width: '68px' }}
-                              />
-                            </div>
-                            <div className="form-group" style={{ margin: 0, flex: 1 }}>
-                              <label className="form-label">Label / Description (optional)</label>
-                              <input
-                                type="text"
-                                className="form-input"
-                                value={editNote}
-                                onChange={(e) => setEditNote(e.target.value)}
-                                placeholder="e.g. Nursery, Milking Goats..."
-                              />
-                            </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <input
+                              type="text"
+                              className="form-input"
+                              value={editLetter}
+                              onChange={(e) => setEditLetter(e.target.value.toUpperCase())}
+                              placeholder="Pen Letter (e.g. A)"
+                              maxLength={3}
+                              style={{ width: '60px', textAlign: 'center', fontWeight: '800' }}
+                            />
+                            <input
+                              type="text"
+                              className="form-input"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              placeholder="Pen Name (e.g. Nursery)"
+                              style={{ flex: 1 }}
+                            />
                           </div>
-
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button className="btn btn-primary btn-sm" onClick={() => handleSaveEdit(pen)} disabled={submitting}>
-                              {submitting ? <Loader2 size={13} className="spinner" /> : 'Save Changes'}
-                            </button>
-                            <button className="btn btn-secondary btn-sm" onClick={() => setEditingPenId(null)} disabled={submitting}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-xs"
+                              onClick={() => setEditingPenId(null)}
+                            >
                               Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-xs"
+                              onClick={() => handleSaveEdit(pen.id)}
+                              disabled={submitting}
+                            >
+                              {submitting ? <Loader2 size={12} className="spinner" /> : 'Save'}
                             </button>
                           </div>
                         </div>
                       ) : (
-                        /* PEN ROW CARD */
-                        <div
-                          style={{
-                            background: '#ffffff',
-                            borderRadius: '14px',
-                            padding: '12px 14px',
-                            border: '1px solid var(--border-color)',
-                            boxShadow: 'var(--shadow-sm)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '10px'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                            {/* GREEN LETTER BADGE */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{
-                              width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0,
-                              background: 'var(--primary-gradient)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              width: '36px', height: '36px', borderRadius: '10px',
+                              background: 'var(--primary-gradient)', display: 'grid', placeItems: 'center',
                               fontSize: '18px', fontWeight: '900', color: 'white',
                               boxShadow: '0 4px 10px -2px rgba(5,150,105,0.35)'
                             }}>
@@ -409,7 +452,6 @@ export default function BarnSquareView({
                               </strong>
                               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                                 {count} {count === 1 ? 'goat' : 'goats'}
-                                {pen.note && ` · ${pen.note}`}
                               </span>
                             </div>
                           </div>
@@ -439,8 +481,7 @@ export default function BarnSquareView({
                 })}
               </div>
 
-              {/* ADD NEW PEN FORM (TOGGLE) */}
-              {/* DIVIDER */}
+              {/* ADD NEW PEN FORM */}
               <div style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }} />
 
               {showAddForm ? (
@@ -538,14 +579,16 @@ export default function BarnSquareView({
         </div>
       )}
 
-      {/* DELETE PEN CONFIRMATION */}
+      {/* DELETE PEN CONFIRM MODAL */}
       {penToDelete && (
         <DeleteConfirmModal
-          title={`Delete Pen ${penToDelete.letter}`}
+          title="Delete Barn Pen"
           message={`Are you sure you want to delete Pen ${penToDelete.letter} (${penToDelete.name})?`}
           onClose={() => setPenToDelete(null)}
-          onConfirm={() => {
-            if (onDeleteBarnArea) onDeleteBarnArea(penToDelete.id);
+          onConfirm={async () => {
+            if (onDeleteBarnArea) {
+              await onDeleteBarnArea(penToDelete.id);
+            }
             setPenToDelete(null);
           }}
         />

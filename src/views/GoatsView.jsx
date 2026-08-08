@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Syringe } from 'lucide-react';
+import { Search, ClipboardPlus } from 'lucide-react';
 import GoatCard from '../components/GoatCard';
 
 export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, onOpenLogEvent }) {
@@ -47,7 +47,7 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, on
         ))}
       </div>
 
-      {/* Herd List Count & Log Vaccine Button */}
+      {/* Herd List Count & Record Event Button */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ fontSize: '15px', fontWeight: '800' }}>
           Herd Directory ({filteredGoats.length})
@@ -58,7 +58,7 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, on
             onClick={onOpenLogEvent}
             style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
           >
-            <Syringe size={14} /> Record Event
+            <ClipboardPlus size={14} /> Record Event
           </button>
         )}
       </div>

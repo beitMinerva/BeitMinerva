@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, FileText, Check, Users, Home, CheckSquare, Square, Search } from 'lucide-react';
+import CustomRepeatPicker from './CustomRepeatPicker';
 
 export default function AddEventModal({ goat, goats = [], barnAreas = [], onClose, onSave }) {
   const [isClosing, setIsClosing] = useState(false);
@@ -30,6 +31,7 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
   const [generalTitle, setGeneralTitle] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 16));
   const [repeatFrequency, setRepeatFrequency] = useState('none');
+  const [customRepeatDays, setCustomRepeatDays] = useState('21');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -104,7 +106,10 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
       title: eventTitle,
       date: new Date(date).toISOString(),
       notes: notes.trim(),
-      custom_fields: { repeat_frequency: repeatFrequency }
+      custom_fields: {
+        repeat_frequency: repeatFrequency,
+        custom_repeat_days: parseInt(customRepeatDays) || 21
+      }
     }));
 
     try {
@@ -222,34 +227,91 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
                   </button>
                 </div>
 
-                {/* PEN SELECTION PICKER */}
-                {targetMode === 'PEN' && (
-                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
-                    {barnAreas.map((pen) => {
-                      const isSelected = selectedPenId === pen.id;
-                      const penGoatCount = goats.filter((g) => g.area_id === pen.id).length;
-
-                      return (
-                        <button
-                          key={pen.id}
-                          type="button"
-                          onClick={() => setSelectedPenId(pen.id)}
+                {/* ENTIRE HERD PREVIEW */}
+                {targetMode === 'ALL' && (
+                  <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--primary-dark)', display: 'block', marginBottom: '6px' }}>
+                      Selected Herd ({goats.length} Goats):
+                    </span>
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxHeight: '90px', overflowY: 'auto' }}>
+                      {goats.map((g) => (
+                        <span
+                          key={g.id}
                           style={{
-                            padding: '6px 10px',
-                            borderRadius: '8px',
-                            fontSize: '12px',
+                            fontSize: '10px',
                             fontWeight: '700',
-                            border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-color)',
-                            background: isSelected ? 'var(--primary-gradient)' : '#ffffff',
-                            color: isSelected ? '#ffffff' : 'var(--text-main)',
-                            cursor: 'pointer',
-                            flexShrink: 0
+                            background: '#f1f5f9',
+                            color: 'var(--text-main)',
+                            padding: '2px 8px',
+                            borderRadius: '6px'
                           }}
                         >
-                          Pen {pen.letter} ({penGoatCount})
-                        </button>
-                      );
-                    })}
+                          {g.tag_id} • {g.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* PEN SELECTION PICKER & GOAT LIST */}
+                {targetMode === 'PEN' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+                      {barnAreas.map((pen) => {
+                        const isSelected = selectedPenId === pen.id;
+                        const penGoatCount = goats.filter((g) => g.area_id === pen.id).length;
+
+                        return (
+                          <button
+                            key={pen.id}
+                            type="button"
+                            onClick={() => setSelectedPenId(pen.id)}
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '8px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                              background: isSelected ? 'var(--primary-gradient)' : '#ffffff',
+                              color: isSelected ? '#ffffff' : 'var(--text-main)',
+                              cursor: 'pointer',
+                              flexShrink: 0
+                            }}
+                          >
+                            Pen {pen.letter} ({penGoatCount})
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--primary-dark)', display: 'block', marginBottom: '6px' }}>
+                        Goats in Selected Pen ({goats.filter((g) => g.area_id === selectedPenId).length}):
+                      </span>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxHeight: '90px', overflowY: 'auto' }}>
+                        {goats.filter((g) => g.area_id === selectedPenId).map((g) => (
+                          <span
+                            key={g.id}
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: '700',
+                              background: '#ecfdf5',
+                              color: 'var(--primary-dark)',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--primary-border)'
+                            }}
+                          >
+                            {g.tag_id} • {g.name}
+                          </span>
+                        ))}
+                        {goats.filter((g) => g.area_id === selectedPenId).length === 0 && (
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            No goats assigned to this pen.
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -474,20 +536,15 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
             {/* REPEAT FREQUENCY */}
             <div className="form-group">
               <label className="form-label">Repeat Schedule (Recurring Event)</label>
-              <select
-                className="form-select"
-                value={repeatFrequency}
-                onChange={(e) => setRepeatFrequency(e.target.value)}
+              <CustomRepeatPicker
+                repeatFrequency={repeatFrequency}
+                customRepeatDays={customRepeatDays}
+                onChangeRepeat={(freq, days) => {
+                  setRepeatFrequency(freq);
+                  if (days) setCustomRepeatDays(days);
+                }}
                 disabled={submitting}
-              >
-                <option value="none">One-time event (No repeat)</option>
-                <option value="daily">Repeat Daily</option>
-                <option value="weekly">Repeat Weekly</option>
-                <option value="monthly">Repeat Monthly</option>
-                <option value="every_3_months">Repeat Every 3 Months</option>
-                <option value="every_6_months">Repeat Every 6 Months</option>
-                <option value="yearly">Repeat Yearly (Annual)</option>
-              </select>
+              />
             </div>
 
             {/* NOTES */}

@@ -31,6 +31,10 @@
   --font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+*, *::before, *::after, button, input, select, textarea, label, span, div, h1, h2, h3, h4, h5, h6, p, a, option, strong, b {
+  font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

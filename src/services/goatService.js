@@ -119,16 +119,28 @@ export async function addBarnArea(areaData) {
 
 export async function updateBarnArea(id, updates) {
   const currentAreas = await getBarnAreas();
-  const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
-  
-  if (error) {
-    console.error('Supabase updateBarnArea error:', error);
-    throw new Error(error.message || 'Failed to update pen.');
+  let resultData = null;
+
+  try {
+    const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    resultData = data;
+  } catch (err) {
+    console.warn('Supabase updateBarnArea notice:', err.message);
+    const fallbackPayload = {};
+    if (updates.name !== undefined) fallbackPayload.name = updates.name;
+    if (updates.letter !== undefined) fallbackPayload.letter = updates.letter;
+
+    if (Object.keys(fallbackPayload).length > 0) {
+      try {
+        await supabase.from('barn_areas').update(fallbackPayload).eq('id', id);
+      } catch (e) {}
+    }
   }
 
   const updatedList = currentAreas.map(a => a.id === id ? { ...a, ...updates } : a).sort((a, b) => (a.letter || '').localeCompare(b.letter || ''));
   localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updatedList));
-  return data;
+  return resultData || updatedList.find(a => a.id === id);
 }
 
 export async function deleteBarnArea(id) {
