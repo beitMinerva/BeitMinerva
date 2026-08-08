@@ -1,12 +1,13 @@
 import React from 'react';
-import { Home, ScanLine, Calendar, Users } from 'lucide-react';
+import { Home, ScanLine, Calendar, Users, Settings } from 'lucide-react';
 
 export default function BottomNav({ activeTab, setActiveTab }) {
   const navItems = [
     { id: 'barn', label: 'Barn Areas', icon: Home },
-    { id: 'scanner', label: 'Barcode Scanner', icon: ScanLine },
+    { id: 'scanner', label: 'Scanner', icon: ScanLine },
     { id: 'calendar', label: 'Calendar', icon: Calendar },
-    { id: 'goats', label: 'Herd Directory', icon: Users },
+    { id: 'goats', label: 'Goats', icon: Users },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
