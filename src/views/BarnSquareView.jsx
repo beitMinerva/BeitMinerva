@@ -325,13 +325,9 @@ export default function BarnSquareView({
                 }}
               >
                 {/* DRAG HANDLE ICON */}
-                {isRearranging ? (
+                {isRearranging && (
                   <div style={{ position: 'absolute', top: '8px', right: '8px', opacity: 0.85, color: '#047857' }}>
                     <GripVertical size={16} />
-                  </div>
-                ) : (
-                  <div style={{ position: 'absolute', top: '8px', left: '8px', opacity: 0.4 }}>
-                    <GripVertical size={14} color={isSelected ? '#ffffff' : 'var(--text-muted)'} />
                   </div>
                 )}
 
@@ -613,7 +609,7 @@ export default function BarnSquareView({
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ color: 'var(--text-muted)', cursor: 'grab' }}>
+                            <div style={{ color: 'var(--text-muted)', cursor: 'grab', visibility: 'visible' }}>
                               <GripVertical size={16} />
                             </div>
 
