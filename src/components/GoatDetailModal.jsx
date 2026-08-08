@@ -370,7 +370,7 @@ export default function GoatDetailModal({
                           <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>
                             {new Date(ev.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
-                          {onUpdateEvent && (
+                          {onUpdateEvent && ev.type !== 'Transfer' && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();

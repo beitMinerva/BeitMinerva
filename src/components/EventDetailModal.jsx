@@ -119,7 +119,7 @@ export default function EventDetailModal({ event, goat, onClose, onEdit, onDelet
 
         <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: '6px' }}>
-            {onEdit && (
+            {onEdit && event.type !== 'Transfer' && (
               <button
                 type="button"
                 className="btn btn-secondary"

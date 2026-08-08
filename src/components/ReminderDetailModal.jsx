@@ -101,7 +101,7 @@ export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelet
 
         <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: '6px' }}>
-            {onEdit && (
+            {onEdit && reminder.type !== 'Transfer' && (
               <button
                 type="button"
                 className="btn btn-secondary"

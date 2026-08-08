@@ -702,6 +702,12 @@ export default function CalendarView({
           goat={goats.find((g) => g.id === selectedReminderForDetail.goat_id)}
           onClose={() => setSelectedReminderForDetail(null)}
           onEdit={(rem) => {
+            if (rem.type === 'Transfer') {
+              setSelectedReminderForDetail(null);
+              setReminderToDelete(rem);
+              return;
+            }
+
             if (onRequireAdmin) {
               onRequireAdmin(() => {
                 setSelectedReminderForDetail(null);

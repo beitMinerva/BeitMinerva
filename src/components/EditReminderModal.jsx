@@ -14,7 +14,38 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
     { id: 'General', label: 'General Task / Note', icon: Bell, color: '#059669', bg: '#ecfdf5' },
   ];
 
-  const initialCat = categories.find((c) => c.id === reminder?.type) || categories[0];
+  const resolveCategoryId = () => {
+    const rawType = reminder?.type || reminder?.category || reminder?.event_type || '';
+    const title = String(reminder?.title || '').toLowerCase();
+
+    const explicitType = String(rawType).trim().toLowerCase();
+    if (explicitType === 'vaccination' || explicitType === 'vaccine' || title.includes('vaccination') || title.includes('vaccine')) return 'Vaccination';
+    if (explicitType === 'medication' || explicitType === 'medicine' || title.includes('medication') || title.includes('medicine')) return 'Medication';
+    if (explicitType === 'pregnancy check' || explicitType === 'pregnancy' || explicitType === 'pregnancy & birth' || title.includes('pregnancy') || title.includes('kidding') || title.includes('birth')) return 'Pregnancy Check';
+    if (explicitType === 'milking' || explicitType === 'milking yield' || explicitType === 'milking schedule' || title.includes('milking')) return 'Milking Yield';
+    if (explicitType === 'weight check' || explicitType === 'weight measurement' || explicitType === 'weight' || title.includes('weight')) return 'Weight Check';
+    if (explicitType === 'hoof trimming' || explicitType === 'hoof' || title.includes('hoof')) return 'Hoof Trimming';
+    if (explicitType === 'general' || explicitType === 'general task' || explicitType === 'task' || explicitType === 'note' || title.includes('general')) return 'General';
+
+    return categories.find((c) => c.id === rawType)?.id || categories[0].id;
+  };
+
+  const getInitialReminderTitle = (categoryId) => {
+    const rawTitle = reminder?.title ? reminder.title.replace(/^Scheduled:\s*/, '') : '';
+    if (!rawTitle) return '';
+
+    if (categoryId === 'General' || categoryId === 'Hoof Trimming') {
+      return rawTitle
+        .replace(/^Hoof Trimming(?:\s*&\s*Cutting)?\s*:\s*/, '')
+        .replace(/^General\s*:\s*/, '')
+        .replace(/^.*?:\s*/, '');
+    }
+
+    return '';
+  };
+
+  const initialCatId = resolveCategoryId();
+  const initialCat = categories.find((c) => c.id === initialCatId) || categories[0];
 
   const formatLocalDatetime = (dateStr) => {
     if (!dateStr) return new Date().toISOString().slice(0, 16);
@@ -36,7 +67,7 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
   const isScheduled = reminder?.title?.toLowerCase().startsWith('scheduled');
 
   const [selectedCategory, setSelectedCategory] = useState(initialCat);
-  const [reminderTitle, setReminderTitle] = useState(reminder?.title ? reminder.title.replace(/^Scheduled:\s*/, '').replace(/^.*?:\s*/, '') : '');
+  const [reminderTitle, setReminderTitle] = useState(getInitialReminderTitle(initialCat.id));
   const [reminderDate, setReminderDate] = useState(formatLocalDatetime(reminder?.date));
   const [reminderNotes, setReminderNotes] = useState(reminder?.notes || '');
   const [submitting, setSubmitting] = useState(false);
@@ -50,11 +81,13 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
   // Pregnancy / Birth fields
   const [maleKidsCount, setMaleKidsCount] = useState(String(parsedFields.male_kids ?? '0'));
   const [femaleKidsCount, setFemaleKidsCount] = useState(String(parsedFields.female_kids ?? '0'));
-  const [pregnancyNotes, setPregnancyNotes] = useState(
-    reminder?.type === 'Pregnancy Check'
-      ? (reminder.title || '').replace(/^Kidding.*$/, '').replace(/^Pregnancy Check:\s*/, '') || 'Confirmed pregnant'
-      : 'Confirmed pregnant'
-  );
+  const [pregnancyNotes, setPregnancyNotes] = useState(() => {
+    if (initialCatId === 'Pregnancy Check') {
+      const titleText = String(reminder?.title || '');
+      return titleText.replace(/^Kidding.*$/, '').replace(/^Pregnancy Check:\s*/, '').trim() || 'Confirmed pregnant';
+    }
+    return 'Confirmed pregnant';
+  });
 
   // Milking / Weight simple values
   const [milkYield, setMilkYield] = useState(String(parsedFields.milk_liters ?? '3.5'));
