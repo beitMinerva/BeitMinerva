@@ -274,6 +274,7 @@ export default function App() {
               <CalendarView
                 goats={goats}
                 events={recentEvents}
+                onRequireAdmin={requireAdmin}
                 onAddTimelineEvent={handleSaveEvent}
                 onUpdateTimelineEvent={handleUpdateEvent}
                 onDeleteTimelineEvent={handleDeleteEvent}

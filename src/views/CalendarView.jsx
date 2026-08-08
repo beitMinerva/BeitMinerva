@@ -4,7 +4,14 @@ import ReminderDetailModal from '../components/ReminderDetailModal';
 import EditReminderModal from '../components/EditReminderModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
-export default function CalendarView({ goats = [], events = [], onAddTimelineEvent, onUpdateTimelineEvent, onDeleteTimelineEvent }) {
+export default function CalendarView({
+  goats = [],
+  events = [],
+  onRequireAdmin,
+  onAddTimelineEvent,
+  onUpdateTimelineEvent,
+  onDeleteTimelineEvent
+}) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(new Date().toISOString().split('T')[0]);
   const [showAddReminderModal, setShowAddReminderModal] = useState(false);
@@ -61,9 +68,16 @@ export default function CalendarView({ goats = [], events = [], onAddTimelineEve
   };
 
   const handleDateClick = (dayNum) => {
-    const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-    setSelectedDateStr(formattedDate);
-    setShowAddReminderModal(true);
+    const action = () => {
+      const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+      setSelectedDateStr(formattedDate);
+      setShowAddReminderModal(true);
+    };
+    if (onRequireAdmin) {
+      onRequireAdmin(action);
+    } else {
+      action();
+    }
   };
 
   const handleCreateReminder = async (e) => {
@@ -191,7 +205,16 @@ export default function CalendarView({ goats = [], events = [], onAddTimelineEve
           <h3 style={{ fontSize: '15px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Bell size={16} color="var(--primary)" /> Scheduled Farm Reminders ({events.length})
           </h3>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowAddReminderModal(true)}>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => {
+              if (onRequireAdmin) {
+                onRequireAdmin(() => setShowAddReminderModal(true));
+              } else {
+                setShowAddReminderModal(true);
+              }
+            }}
+          >
             <Plus size={14} /> Add Task
           </button>
         </div>
