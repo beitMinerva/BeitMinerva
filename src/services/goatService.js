@@ -103,8 +103,15 @@ export async function getGoatByTagOrId(identifier) {
   ) || null;
 }
 
+const makeId = () => {
+  const timestamp = Date.now();
+  const suffix = String(timestamp).slice(-6);
+  return `gt-${timestamp}${suffix}`;
+};
+
 export async function addGoat(goatData) {
   const newGoat = {
+    id: makeId(),
     tag_id: goatData.tag_id.toUpperCase().trim(),
     name: goatData.name || 'Unnamed Goat',
     breed: goatData.breed || 'Alpine',
@@ -196,6 +203,7 @@ export async function getTimelineEvents(goatId = null) {
 
 export async function addTimelineEvent(eventData) {
   const newEvent = {
+    id: makeId(),
     goat_id: eventData.goat_id,
     type: eventData.type || 'General Notes',
     title: eventData.title || eventData.type,
