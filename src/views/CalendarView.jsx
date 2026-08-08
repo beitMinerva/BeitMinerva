@@ -249,7 +249,7 @@ export default function CalendarView({
       type: selectedCategory.id,
       title: `Scheduled: ${reminderTitle || selectedCategory.label}`,
       date: new Date(targetDate + 'T09:00:00').toISOString(),
-      notes: `Target: ${g.name} (${g.tag_id}) ${reminderNotes ? `• ${reminderNotes}` : ''}`,
+      notes: `Target: ${g.name} (${g.tag_id}) ${reminderNotes ? `ΓÇó ${reminderNotes}` : ''}`,
       custom_fields: {
         repeat_frequency: reminderRepeat,
         custom_repeat_days: parseInt(reminderCustomDays) || 21
@@ -559,7 +559,7 @@ export default function CalendarView({
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '8px' }}>
                       <span
                         style={{
                           fontSize: '11px',
@@ -573,32 +573,6 @@ export default function CalendarView({
                       >
                         {formatReminderDate(rem.date)}
                       </span>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const action = () => setReminderToEdit(rem);
-                          if (onRequireAdmin) onRequireAdmin(action);
-                          else action();
-                        }}
-                        style={{ background: '#f8fafc', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-muted)', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}
-                        title="Edit Task"
-                      >
-                        <Edit2 size={13} />
-                      </button>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const action = () => setReminderToDelete(rem);
-                          if (onRequireAdmin) onRequireAdmin(action);
-                          else action();
-                        }}
-                        style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '6px', color: '#ef4444', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}
-                        title="Delete Task"
-                      >
-                        <Trash2 size={13} />
-                      </button>
                     </div>
                   </div>
                 );
@@ -699,7 +673,7 @@ export default function CalendarView({
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '8px' }}>
                       <span
                         style={{
                           fontSize: '11px',
@@ -713,32 +687,6 @@ export default function CalendarView({
                       >
                         {formatReminderDate(rem.date)}
                       </span>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const action = () => setReminderToEdit(rem);
-                          if (onRequireAdmin) onRequireAdmin(action);
-                          else action();
-                        }}
-                        style={{ background: '#f8fafc', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-muted)', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}
-                        title="Edit Health Event"
-                      >
-                        <Edit2 size={13} />
-                      </button>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const action = () => setReminderToDelete(rem);
-                          if (onRequireAdmin) onRequireAdmin(action);
-                          else action();
-                        }}
-                        style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '6px', color: '#ef4444', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}
-                        title="Delete Health Event"
-                      >
-                        <Trash2 size={13} />
-                      </button>
                     </div>
                   </div>
                 );
@@ -914,7 +862,7 @@ export default function CalendarView({
                               borderRadius: '6px'
                             }}
                           >
-                            {g.tag_id} • {g.name}
+                            {g.tag_id} ΓÇó {g.name}
                           </span>
                         ))}
                       </div>
@@ -970,7 +918,7 @@ export default function CalendarView({
                                 border: '1px solid var(--primary-border)'
                               }}
                             >
-                              {g.tag_id} • {g.name}
+                              {g.tag_id} ΓÇó {g.name}
                             </span>
                           ))}
                           {goats.filter((g) => g.area_id === selectedPenId).length === 0 && (
