@@ -1,0 +1,493 @@
+import React, { useState, useRef } from 'react';
+import BarcodeSVG from './BarcodeSVG';
+import GoatMetricsChart from './GoatMetricsChart';
+import DeleteConfirmModal from './DeleteConfirmModal';
+import EventDetailModal from './EventDetailModal';
+import { ArrowLeft, Tag, MapPin, Plus, Edit2, Trash2, Bell, ArrowRightLeft, Clock, Syringe, Pill, Milk, Weight, Heart, X, Loader2 } from 'lucide-react';
+import { calculateGoatAge } from '../services/goatService';
+
+export default function GoatDetailModal({
+  goat,
+  barnAreas = [],
+  events = [],
+  onClose,
+  onEdit,
+  onAddEvent,
+  onSaveReminder,
+  onTransferArea,
+  onDeleteEvent
+}) {
+  const [isClosing, setIsClosing] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState(null);
+  const [selectedEventForDetail, setSelectedEventForDetail] = useState(null);
+
+  // REMINDER MODAL STATE DIRECTLY IN GOAT PROFILE
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [isReminderModalClosing, setIsReminderModalClosing] = useState(false);
+  const [reminderCategory, setReminderCategory] = useState('Vaccination');
+  const [reminderDate, setReminderDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reminderTitle, setReminderTitle] = useState('');
+  const [reminderNotes, setReminderNotes] = useState('');
+  const [savingReminder, setSavingReminder] = useState(false);
+
+  const [pullY, setPullY] = useState(0);
+  const touchStartY = useRef(0);
+  const containerRef = useRef(null);
+
+  const area = barnAreas.find((a) => a.id === goat.area_id);
+  const areaName = area ? (area.name || `Pen ${area.letter}`) : 'Unassigned';
+  const ageStr = calculateGoatAge(goat.birth_date);
+  const genderLabel = goat.gender === 'Doe' ? 'Female' : goat.gender === 'Buck' ? 'Male' : (goat.gender || 'Female');
+  const neuteredLabel = goat.neutered_status || 'Intact';
+
+  const reminderCategories = [
+    { id: 'Vaccination', label: 'Vaccination Booster', icon: Syringe, color: '#059669', bg: '#ecfdf5' },
+    { id: 'Medication', label: 'Medication', icon: Pill, color: '#c2410c', bg: '#fff7ed' },
+    { id: 'Milking', label: 'Milking Schedule', icon: Milk, color: '#0369a1', bg: '#f0f9ff' },
+    { id: 'Weight Check', label: 'Weight Check', icon: Weight, color: '#7e22ce', bg: '#faf5ff' },
+    { id: 'Pregnancy Check', label: 'Pregnancy Check', icon: Heart, color: '#be185d', bg: '#fdf2f8' },
+    { id: 'General', label: 'General Task', icon: Bell, color: '#059669', bg: '#ecfdf5' },
+  ];
+
+  const handleAnimatedClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 360);
+  };
+
+  const handleReminderModalClose = () => {
+    setIsReminderModalClosing(true);
+    setTimeout(() => {
+      setShowReminderModal(false);
+      setIsReminderModalClosing(false);
+    }, 220);
+  };
+
+  const handleSaveReminderSubmit = async (e) => {
+    e.preventDefault();
+    setSavingReminder(true);
+    try {
+      if (onSaveReminder) {
+        await onSaveReminder({
+          goat_id: goat.id,
+          type: reminderCategory,
+          title: `Scheduled: ${reminderTitle || reminderCategory}`,
+          date: new Date(reminderDate).toISOString(),
+          notes: `Target: ${goat.name} (${goat.tag_id}) ${reminderNotes ? `• ${reminderNotes}` : ''}`
+        });
+      }
+      handleReminderModalClose();
+      setReminderTitle('');
+      setReminderNotes('');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingReminder(false);
+    }
+  };
+
+  // Touch Swipe / Pull Down Gestures
+  const handleTouchStart = (e) => {
+    if (containerRef.current && containerRef.current.scrollTop <= 5) {
+      touchStartY.current = e.touches[0].clientY;
+    } else {
+      touchStartY.current = 0;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (touchStartY.current > 0) {
+      const delta = e.touches[0].clientY - touchStartY.current;
+      if (delta > 0) {
+        setPullY(delta);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullY > 60) {
+      handleAnimatedClose();
+    } else {
+      setPullY(0);
+    }
+    touchStartY.current = 0;
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'Healthy': return 'badge-healthy';
+      case 'Under Treatment': return 'badge-treatment';
+      case 'Pregnant': return 'badge-pregnant';
+      case 'Dry': return 'badge-dry';
+      case 'Quarantine': return 'badge-quarantine';
+      default: return 'badge-healthy';
+    }
+  };
+
+  const getCategoryBadgeStyle = (type) => {
+    switch (type) {
+      case 'Vaccination': return { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' };
+      case 'Medication': return { bg: '#fff7ed', color: '#c2410c', border: '#ffedd5' };
+      case 'Milking Yield':
+      case 'Milking': return { bg: '#f0f9ff', color: '#0369a1', border: '#e0f2fe' };
+      case 'Weight Check': return { bg: '#faf5ff', color: '#7e22ce', border: '#f3e8ff' };
+      case 'Pregnancy Check': return { bg: '#fdf2f8', color: '#be185d', border: '#fbcfe8' };
+      case 'Transfer': return { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' };
+      default: return { bg: '#f8fafc', color: '#475569', border: '#cbd5e1' };
+    }
+  };
+
+  return (
+    <>
+      <div
+        ref={containerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className={`full-page-animate ${isClosing ? 'full-page-close-animate' : ''}`}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: '#ffffff',
+          zIndex: 100,
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          transform: pullY > 0 ? `translateY(${pullY}px)` : undefined,
+          transition: pullY === 0 ? 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none'
+        }}
+      >
+        {/* PULL DOWN HANDLE BAR */}
+        <div style={{ padding: '8px 0 2px 0', display: 'flex', justifyContent: 'center', background: '#ffffff', cursor: 'grab' }}>
+          <div style={{ width: '42px', height: '5px', borderRadius: '9999px', background: '#cbd5e1' }} />
+        </div>
+
+        {/* FULL PAGE HEADER */}
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            background: '#ffffff',
+            borderBottom: '1px solid var(--border-color)',
+            padding: '8px 16px 12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justify: 'space-between',
+            zIndex: 10
+          }}
+        >
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={handleAnimatedClose}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <ArrowLeft size={16} /> Back to Herd
+          </button>
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => onEdit(goat)}>
+              <Edit2 size={13} /> Edit
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => onAddEvent(goat)}>
+              <Plus size={14} /> Log Event
+            </button>
+          </div>
+        </div>
+
+        {/* FULL PAGE CONTENT HUB */}
+        <div style={{ maxWidth: '600px', width: '100%', margin: '0 auto', padding: '16px 16px 40px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* GOAT TITLE & BARCODE TAG */}
+          <div className="card" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span className="badge" style={{ background: '#f1f5f9', color: '#334155' }}>
+                  <Tag size={12} />
+                  {goat.tag_id}
+                </span>
+                <span className={`badge ${getStatusBadgeClass(goat.status)}`}>
+                  {goat.status}
+                </span>
+              </div>
+
+              <h1 style={{ fontSize: '24px', fontWeight: '800', margin: '0 0 4px 0' }}>{goat.name}</h1>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 6px 0' }}>
+                {goat.breed} • {genderLabel} ({neuteredLabel})
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--primary)', fontWeight: '700' }}>
+                <MapPin size={14} />
+                <span>{areaName}</span>
+              </div>
+            </div>
+
+            {/* 1D Barcode Renderer */}
+            <div style={{ background: 'white', padding: '8px 10px', borderRadius: '10px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+              <BarcodeSVG value={goat.tag_id} width={130} height={36} />
+            </div>
+          </div>
+
+          {/* GOAT SPECS CARDS */}
+          <div className="card" style={{ padding: '14px', background: '#f8fafc' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px', textAlign: 'center' }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', fontWeight: '700' }}>GENDER</span>
+                <strong style={{ fontSize: '13px' }}>{genderLabel}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', fontWeight: '700' }}>STATUS</span>
+                <strong style={{ fontSize: '13px' }}>{neuteredLabel}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', fontWeight: '700' }}>AGE</span>
+                <strong style={{ fontSize: '13px' }}>{ageStr}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', fontWeight: '700' }}>WEIGHT</span>
+                <strong style={{ fontSize: '13px' }}>{goat.weight ? `${goat.weight} kg` : 'N/A'}</strong>
+              </div>
+            </div>
+
+            {goat.notes && (
+              <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--border-color)', fontSize: '12px' }}>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', fontWeight: '700' }}>NOTES & HEALTH DETAILS</span>
+                <p style={{ margin: '2px 0 0 0', color: 'var(--text-main)' }}>{goat.notes}</p>
+              </div>
+            )}
+          </div>
+
+          {/* INTERACTIVE PERFORMANCE METRICS CHART */}
+          <GoatMetricsChart goat={goat} events={events} />
+
+          {/* ACTION BUTTONS */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+            <button className="btn btn-primary btn-sm" onClick={() => onAddEvent(goat)}>
+              <Plus size={14} /> Log Event
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowReminderModal(true)}>
+              <Bell size={14} color="var(--primary)" /> Add Reminder
+            </button>
+            <button className="btn btn-outline btn-sm" onClick={() => onTransferArea(goat)}>
+              <ArrowRightLeft size={14} /> Move Pen
+            </button>
+          </div>
+
+          {/* CLEAN SIMPLE TIMELINE CARDS (NO LEFT BORDER ACCENT) */}
+          <div className="card" style={{ padding: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Clock size={17} color="var(--primary)" /> Timeline History ({events.length})
+              </h3>
+              <button className="btn btn-outline btn-sm" onClick={() => onAddEvent(goat)}>
+                <Plus size={13} /> Add
+              </button>
+            </div>
+
+            {events.length === 0 ? (
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '16px 0', textAlign: 'center' }}>
+                No timeline events recorded for {goat.name}. Click "Log Event" above to record weight progression, milking yields, or vaccinations.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {events.map((ev) => {
+                  const catStyle = getCategoryBadgeStyle(ev.type);
+
+                  return (
+                    <div
+                      key={ev.id}
+                      onClick={() => setSelectedEventForDetail(ev)}
+                      style={{
+                        background: '#ffffff',
+                        borderRadius: '12px',
+                        padding: '12px 14px',
+                        border: '1px solid var(--border-color)',
+                        boxShadow: 'var(--shadow-sm)',
+                        cursor: 'pointer',
+                        transition: 'transform 0.15s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                        <div>
+                          <strong style={{ fontSize: '14px', color: 'var(--text-main)', display: 'block', lineHeight: 1.2 }}>
+                            {ev.title || ev.type}
+                          </strong>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: '800',
+                              color: catStyle.color,
+                              background: catStyle.bg,
+                              padding: '2px 7px',
+                              borderRadius: '6px',
+                              border: `1px solid ${catStyle.border}`,
+                              display: 'inline-block',
+                              marginTop: '4px'
+                            }}
+                          >
+                            {ev.type}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                            {new Date(ev.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                          {onDeleteEvent && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEventToDelete(ev);
+                              }}
+                              style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '6px', color: '#ef4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              title="Delete Timeline Entry"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {ev.notes && (
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '6px 0 0 0', background: '#f8fafc', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {ev.notes}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* TASK REMINDER POP-UP MODAL DIRECTLY IN GOAT PROFILE */}
+      {showReminderModal && (
+        <div className={`modal-overlay ${isReminderModalClosing ? 'closing' : ''}`} onClick={handleReminderModalClose} style={{ zIndex: 110 }}>
+          <div className={`modal-content ${isReminderModalClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Schedule Task Reminder</h3>
+              <button className="close-btn" onClick={handleReminderModalClose} disabled={savingReminder}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveReminderSubmit}>
+              <div className="modal-body">
+                <div className="form-group" style={{ background: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', display: 'block' }}>TARGET GOAT</span>
+                  <strong style={{ fontSize: '13px', color: 'var(--primary-dark)' }}>{goat.name} ({goat.tag_id})</strong>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Reminder Date *</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={reminderDate}
+                    onChange={(e) => setReminderDate(e.target.value)}
+                    required
+                    disabled={savingReminder}
+                  />
+                </div>
+
+                {/* CATEGORY CUSTOM CARDS GRID */}
+                <div className="form-group">
+                  <label className="form-label">Reminder Category</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                    {reminderCategories.map((cat) => {
+                      const Icon = cat.icon;
+                      const isSelected = reminderCategory === cat.id;
+                      return (
+                        <div
+                          key={cat.id}
+                          onClick={() => !savingReminder && setReminderCategory(cat.id)}
+                          style={{
+                            padding: '10px 6px',
+                            borderRadius: '12px',
+                            border: isSelected ? `2px solid ${cat.color}` : '1px solid var(--border-color)',
+                            background: isSelected ? cat.bg : '#ffffff',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            textAlign: 'center'
+                          }}
+                        >
+                          <Icon size={16} color={cat.color} />
+                          <span style={{ fontSize: '11px', fontWeight: '800', color: isSelected ? cat.color : 'var(--text-main)', lineHeight: 1.1 }}>
+                            {cat.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Reminder Title *</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. CD&T Vaccination Booster, Deworming..."
+                    value={reminderTitle}
+                    onChange={(e) => setReminderTitle(e.target.value)}
+                    required
+                    disabled={savingReminder}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Notes & Instructions</label>
+                  <textarea
+                    className="form-textarea"
+                    placeholder="Enter specific instructions or dosages..."
+                    value={reminderNotes}
+                    onChange={(e) => setReminderNotes(e.target.value)}
+                    disabled={savingReminder}
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={handleReminderModalClose} disabled={savingReminder}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={savingReminder}>
+                  {savingReminder ? (
+                    <>
+                      <Loader2 size={16} className="spinner" /> Saving Task...
+                    </>
+                  ) : (
+                    'Save Task Reminder'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EVENT DETAIL VIEW MODAL */}
+      {selectedEventForDetail && (
+        <EventDetailModal
+          event={selectedEventForDetail}
+          goat={goat}
+          onClose={() => setSelectedEventForDetail(null)}
+          onDelete={onDeleteEvent ? (id) => onDeleteEvent(id) : undefined}
+        />
+      )}
+
+      {/* DELETE EVENT CONFIRMATION POPUP MODAL */}
+      {eventToDelete && (
+        <DeleteConfirmModal
+          title="Delete Timeline Record"
+          message={`Are you sure you want to delete "${eventToDelete.title || eventToDelete.type}" from ${goat.name}'s timeline?`}
+          onClose={() => setEventToDelete(null)}
+          onConfirm={() => onDeleteEvent(eventToDelete.id)}
+        />
+      )}
+    </>
+  );
+}
