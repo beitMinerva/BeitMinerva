@@ -4,6 +4,7 @@ import BottomNav from './components/BottomNav';
 import GoatDetailModal from './components/GoatDetailModal';
 import AddGoatModal from './components/AddGoatModal';
 import AddEventModal from './components/AddEventModal';
+import AdminLoginModal from './components/AdminLoginModal';
 import { supabase } from './config/supabase';
 
 import BarnSquareView from './views/BarnSquareView';
@@ -29,12 +30,41 @@ import {
 } from './services/goatService';
 
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [activeTab, setActiveTab] = useState('barn');
   const [goats, setGoats] = useState([]);
   const [barnAreas, setBarnAreas] = useState([]);
   const [recentEvents, setRecentEvents] = useState([]);
   const [selectedGoatEvents, setSelectedGoatEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Auth listener
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    showToast('Signed out. You are now in Guest (read-only) mode.');
+  };
+
+  const requireAdmin = (actionFn) => {
+    if (!session) {
+      showToast('🔒 Please sign in as Admin to perform this action.');
+      setShowLoginModal(true);
+      return false;
+    }
+    actionFn();
+    return true;
+  };
 
   // Modals
   const [selectedGoat, setSelectedGoat] = useState(null);
@@ -182,11 +212,14 @@ export default function App() {
     <div className="app-container">
       {/* Beit Minerva Header */}
       <Header
+        session={session}
         onOpenScanner={() => setActiveTab('scanner')}
-        onOpenAddGoat={() => {
+        onOpenAddGoat={() => requireAdmin(() => {
           setGoatToEdit(null);
           setShowAddGoatModal(true);
-        }}
+        })}
+        onOpenLogin={() => setShowLoginModal(true)}
+        onSignOut={handleSignOut}
       />
 
       {/* Toast Notification */}
@@ -224,10 +257,10 @@ export default function App() {
                 goats={goats}
                 barnAreas={barnAreas}
                 onSelectGoat={(g) => setSelectedGoat(g)}
-                onOpenAddGoat={() => {
+                onOpenAddGoat={() => requireAdmin(() => {
                   setGoatToEdit(null);
                   setShowAddGoatModal(true);
-                }}
+                })}
                 onTransferGoatArea={handleTransferGoatArea}
                 onAddBarnArea={handleAddBarnArea}
                 onUpdateBarnArea={handleUpdateBarnArea}
@@ -254,10 +287,10 @@ export default function App() {
                 goats={goats}
                 barnAreas={barnAreas}
                 onSelectGoat={(g) => setSelectedGoat(g)}
-                onOpenAddGoat={() => {
+                onOpenAddGoat={() => requireAdmin(() => {
                   setGoatToEdit(null);
                   setShowAddGoatModal(true);
-                }}
+                })}
               />
             )}
 
@@ -278,14 +311,14 @@ export default function App() {
           barnAreas={barnAreas}
           events={selectedGoatEvents}
           onClose={() => setSelectedGoat(null)}
-          onEdit={(g) => {
+          onEdit={(g) => requireAdmin(() => {
             setGoatToEdit(g);
             setShowAddGoatModal(true);
-          }}
-          onAddEvent={(g) => {
+          })}
+          onAddEvent={(g) => requireAdmin(() => {
             setGoatForEvent(g);
             setShowAddEventModal(true);
-          }}
+          })}
           onSaveReminder={handleSaveEvent}
           onTransferArea={(g) => {
             setActiveTab('barn');
@@ -317,6 +350,17 @@ export default function App() {
             setGoatForEvent(null);
           }}
           onSave={handleSaveEvent}
+        />
+      )}
+
+      {/* Admin Login Modal */}
+      {showLoginModal && (
+        <AdminLoginModal
+          onClose={() => setShowLoginModal(false)}
+          onLoginSuccess={(s) => {
+            setSession(s);
+            showToast('✅ Signed in as Admin. Full edit access granted.');
+          }}
         />
       )}
     </div>
