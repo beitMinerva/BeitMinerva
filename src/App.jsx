@@ -351,6 +351,7 @@ export default function App() {
             setActiveTab('barn');
             setSelectedGoat(null);
           }}
+          onUpdateEvent={handleUpdateEvent}
           onDeleteEvent={handleDeleteEvent}
           onDeleteGoat={(id) => requireAdmin(() => handleDeleteGoat(id))}
         />

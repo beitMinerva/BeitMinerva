@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Calendar, Clock, FileText, Trash2, Tag } from 'lucide-react';
+import { X, Calendar, Clock, FileText, Trash2, Tag, Edit2 } from 'lucide-react';
 
-export default function EventDetailModal({ event, goat, onClose, onDelete }) {
+export default function EventDetailModal({ event, goat, onClose, onEdit, onDelete }) {
   const [isClosing, setIsClosing] = useState(false);
 
   if (!event) return null;
@@ -42,8 +42,8 @@ export default function EventDetailModal({ event, goat, onClose, onDelete }) {
   const catColor = getCategoryColor(event.type);
 
   return (
-    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} onClick={() => handleAnimatedClose()}>
-      <div className={`modal-content ${isClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} onClick={() => handleAnimatedClose()} style={{ fontFamily: "'Outfit', sans-serif" }}>
+      <div className={`modal-content ${isClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', fontFamily: "'Outfit', sans-serif" }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span
@@ -67,7 +67,7 @@ export default function EventDetailModal({ event, goat, onClose, onDelete }) {
         </div>
 
         <div className="modal-body">
-          <h2 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 12px 0', color: 'var(--text-main)' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 12px 0', color: 'var(--text-main)', fontFamily: "'Outfit', sans-serif" }}>
             {event.title || event.type}
           </h2>
 
@@ -117,18 +117,32 @@ export default function EventDetailModal({ event, goat, onClose, onDelete }) {
         </div>
 
         <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
-          {onDelete ? (
-            <button
-              type="button"
-              className="btn"
-              style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2' }}
-              onClick={() => {
-                handleAnimatedClose(() => onDelete(event.id));
-              }}
-            >
-              <Trash2 size={14} /> Delete Event
-            </button>
-          ) : <div />}
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {onEdit && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  handleAnimatedClose(() => onEdit(event));
+                }}
+              >
+                <Edit2 size={13} /> Edit Event
+              </button>
+            )}
+
+            {onDelete && (
+              <button
+                type="button"
+                className="btn"
+                style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2' }}
+                onClick={() => {
+                  handleAnimatedClose(() => onDelete(event.id));
+                }}
+              >
+                <Trash2 size={14} /> Delete
+              </button>
+            )}
+          </div>
 
           <button type="button" className="btn btn-secondary" onClick={() => handleAnimatedClose()}>
             Close Details

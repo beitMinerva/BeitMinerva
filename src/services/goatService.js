@@ -1,99 +1,53 @@
-import { supabase } from '../config/supabase';
-import { INITIAL_GOATS, INITIAL_TIMELINE_EVENTS, DEFAULT_BARN_AREAS } from './sampleData';
+import { getSupabase } from './supabaseClient';
 
-// Dynamic helper to calculate age string from birth date (e.g. "2 yrs 4 mos" or "5 mos")
-export function calculateGoatAge(birthDateStr) {
-  if (!birthDateStr) return 'Age unknown';
-  const birth = new Date(birthDateStr);
+const supabase = new Proxy({}, {
+  get(target, prop) {
+    const client = getSupabase();
+    if (!client) {
+      return () => Promise.resolve({ data: null, error: new Error('Supabase credentials not configured in Settings.') });
+    }
+    return typeof client[prop] === 'function' ? client[prop].bind(client) : client[prop];
+  }
+});
+
+export function calculateGoatAge(birthDate) {
+  if (!birthDate) return 'Age unknown';
+  const birth = new Date(birthDate);
   const now = new Date();
+  if (isNaN(birth.getTime())) return 'Age unknown';
+
   let years = now.getFullYear() - birth.getFullYear();
   let months = now.getMonth() - birth.getMonth();
-
   if (months < 0) {
     years--;
     months += 12;
   }
-
-  if (years === 0) {
-    return months === 1 ? '1 mo' : `${months} mos`;
-  }
-  if (months === 0) {
-    return years === 1 ? '1 yr' : `${years} yrs`;
-  }
+  if (years === 0 && months === 0) return 'Less than 1 mo';
+  if (years === 0) return `${months} ${months === 1 ? 'month' : 'months'}`;
+  if (months === 0) return `${years} ${years === 1 ? 'yr' : 'yrs'}`;
   return `${years} yrs ${months} mos`;
 }
 
-export function getSupabaseSqlSchema() {
-  return `-- Run in Supabase SQL Editor
-CREATE TABLE IF NOT EXISTS goats (
-  id TEXT PRIMARY KEY,
-  tag_id TEXT NOT NULL,
-  name TEXT,
-  breed TEXT,
-  gender TEXT,
-  neutered_status TEXT,
-  birth_date DATE,
-  weight NUMERIC,
-  status TEXT,
-  area_id TEXT,
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS timeline_events (
-  id TEXT PRIMARY KEY,
-  goat_id TEXT REFERENCES goats(id) ON DELETE CASCADE,
-  type TEXT,
-  title TEXT,
-  date TIMESTAMPTZ,
-  notes TEXT,
-  custom_fields JSONB DEFAULT '[]',
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS barn_areas (
-  id TEXT PRIMARY KEY,
-  letter TEXT,
-  name TEXT,
-  note TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- RLS Policies (allow authenticated users full access, anon read-only)
-ALTER TABLE goats ENABLE ROW LEVEL SECURITY;
-ALTER TABLE timeline_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE barn_areas ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "anon_read_goats" ON goats FOR SELECT TO anon USING (true);
-CREATE POLICY "auth_all_goats" ON goats FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
-CREATE POLICY "anon_read_events" ON timeline_events FOR SELECT TO anon USING (true);
-CREATE POLICY "auth_all_events" ON timeline_events FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
-CREATE POLICY "anon_read_barns" ON barn_areas FOR SELECT TO anon USING (true);
-CREATE POLICY "auth_all_barns" ON barn_areas FOR ALL TO authenticated USING (true) WITH CHECK (true);`;
-}
-
 // ----------------------------------------------------
-// Barn Areas CRUD Operations (Supabase + Local State Persistence)
+// Barn Areas CRUD Operations (Direct Pure Supabase with order_index)
 // ----------------------------------------------------
 export async function getBarnAreas() {
   try {
-    const { data, error } = await supabase.from('barn_areas').select('*').order('letter', { ascending: true });
-    if (!error && data && data.length > 0) return data;
+    const { data, error } = await supabase.from('barn_areas').select('*');
+    if (!error && data && data.length > 0) {
+      const sorted = [...data].sort((a, b) => {
+        if (a.order_index !== undefined && a.order_index !== null && b.order_index !== undefined && b.order_index !== null) {
+          return a.order_index - b.order_index;
+        }
+        return (a.letter || '').localeCompare(b.letter || '');
+      });
+      return sorted;
+    }
   } catch (err) {
     console.warn('Supabase barn_areas query notice:', err.message);
   }
 
-  // Fallback to local storage or DEFAULT_BARN_AREAS (4 preset pens)
-  const saved = localStorage.getItem('beit_minerva_barn_areas');
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      return [...parsed].sort((a, b) => (a.letter || '').localeCompare(b.letter || ''));
-    } catch (e) {}
-  }
-  return DEFAULT_BARN_AREAS;
+  return [];
 }
 
 export async function addBarnArea(areaData) {
@@ -101,9 +55,9 @@ export async function addBarnArea(areaData) {
   const nextLetter = String.fromCharCode(65 + currentAreas.length);
 
   const newArea = {
-    id: `area-${Date.now()}`,
     letter: areaData.letter || nextLetter,
-    name: areaData.name || `Pen ${areaData.letter || nextLetter}`
+    name: areaData.name || `Pen ${areaData.letter || nextLetter}`,
+    order_index: areaData.order_index !== undefined ? areaData.order_index : currentAreas.length
   };
 
   const { data, error } = await supabase.from('barn_areas').insert([newArea]).select().single();
@@ -111,54 +65,29 @@ export async function addBarnArea(areaData) {
     console.error('Supabase addBarnArea error:', error);
     throw new Error(error.message || 'Failed to add pen.');
   }
-
-  const updated = [...currentAreas, data].sort((a, b) => (a.letter || '').localeCompare(b.letter || ''));
-  localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updated));
   return data;
 }
 
 export async function updateBarnArea(id, updates) {
-  const currentAreas = await getBarnAreas();
-  let resultData = null;
-
-  try {
-    const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
-    if (error) throw error;
-    resultData = data;
-  } catch (err) {
-    console.warn('Supabase updateBarnArea notice:', err.message);
-    const fallbackPayload = {};
-    if (updates.name !== undefined) fallbackPayload.name = updates.name;
-    if (updates.letter !== undefined) fallbackPayload.letter = updates.letter;
-
-    if (Object.keys(fallbackPayload).length > 0) {
-      try {
-        await supabase.from('barn_areas').update(fallbackPayload).eq('id', id);
-      } catch (e) {}
-    }
+  const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
+  if (error) {
+    console.error('Supabase updateBarnArea error:', error);
+    throw new Error(error.message || 'Failed to update pen.');
   }
-
-  const updatedList = currentAreas.map(a => a.id === id ? { ...a, ...updates } : a).sort((a, b) => (a.letter || '').localeCompare(b.letter || ''));
-  localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updatedList));
-  return resultData || updatedList.find(a => a.id === id);
+  return data;
 }
 
 export async function deleteBarnArea(id) {
-  const currentAreas = await getBarnAreas();
   const { error } = await supabase.from('barn_areas').delete().eq('id', id);
-
   if (error) {
     console.error('Supabase deleteBarnArea error:', error);
     throw new Error(error.message || 'Failed to delete pen.');
   }
-
-  const updatedList = currentAreas.filter(a => a.id !== id);
-  localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updatedList));
   return true;
 }
 
 // ----------------------------------------------------
-// Goats CRUD Operations (100% Pure Clean Supabase - Female/Male + Neutered Status)
+// Goats CRUD Operations (Direct Pure Supabase Only)
 // ----------------------------------------------------
 export async function getGoats() {
   try {
@@ -181,7 +110,6 @@ export async function getGoatByTagOrId(identifier) {
 
 export async function addGoat(goatData) {
   const newGoat = {
-    id: `gt-${Date.now()}`,
     tag_id: goatData.tag_id.toUpperCase().trim(),
     name: goatData.name || 'Unnamed Goat',
     breed: goatData.breed || 'Alpine',
@@ -190,7 +118,7 @@ export async function addGoat(goatData) {
     birth_date: goatData.birth_date || new Date().toISOString().split('T')[0],
     weight: goatData.weight ? parseFloat(goatData.weight) : 45.0,
     status: goatData.status || 'Healthy',
-    area_id: goatData.area_id || 'area-1',
+    area_id: goatData.area_id || null,
     notes: goatData.notes || '',
     created_at: new Date().toISOString()
   };
@@ -256,7 +184,7 @@ export async function deleteGoat(id) {
 }
 
 // ----------------------------------------------------
-// Timeline Events Operations
+// Timeline Events Operations (Direct Pure Supabase Only)
 // ----------------------------------------------------
 export async function getTimelineEvents(goatId = null) {
   try {
@@ -273,7 +201,6 @@ export async function getTimelineEvents(goatId = null) {
 
 export async function addTimelineEvent(eventData) {
   const newEvent = {
-    id: `ev-${Date.now()}`,
     goat_id: eventData.goat_id,
     type: eventData.type || 'General Notes',
     title: eventData.title || eventData.type,
@@ -291,8 +218,7 @@ export async function addTimelineEvent(eventData) {
 }
 
 export async function addBatchTimelineEvents(eventDataList) {
-  const newEvents = eventDataList.map((eventData, index) => ({
-    id: `ev-${Date.now()}-${index}`,
+  const newEvents = eventDataList.map((eventData) => ({
     goat_id: eventData.goat_id,
     type: eventData.type || 'General Notes',
     title: eventData.title || eventData.type,

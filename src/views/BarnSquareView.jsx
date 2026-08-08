@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, ArrowRightLeft, Pencil, Edit2, Trash2, X, Loader2, ChevronRight, Wheat, History } from 'lucide-react';
+import { Search, Plus, ArrowRightLeft, Pencil, Edit2, Trash2, X, Loader2, Wheat, History, GripVertical, Check, Move } from 'lucide-react';
 import GoatCard from '../components/GoatCard';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import PenFeedingFormModal from '../components/PenFeedingFormModal';
@@ -16,7 +16,7 @@ export default function BarnSquareView({
   onUpdateBarnArea,
   onDeleteBarnArea
 }) {
-  const pens = barnAreas.length > 0 ? barnAreas : [
+  const rawPens = barnAreas.length > 0 ? barnAreas : [
     { id: 'area-1', letter: 'A', name: 'Pen A' },
     { id: 'area-2', letter: 'B', name: 'Pen B' },
     { id: 'area-3', letter: 'C', name: 'Pen C' },
@@ -25,7 +25,30 @@ export default function BarnSquareView({
     { id: 'area-6', letter: 'F', name: 'Pen F' },
   ];
 
-  const [selectedPenId, setSelectedPenId] = useState(pens[0].id);
+  // Custom Pen Order State
+  const [penOrder, setPenOrder] = useState([]);
+
+  // Explicit Layout Rearrange Mode
+  const [isRearranging, setIsRearranging] = useState(false);
+  const [draggedPenIndex, setDraggedPenIndex] = useState(null);
+
+  // Sort pens based on penOrder array
+  const getOrderedPens = () => {
+    if (!penOrder || penOrder.length === 0) return rawPens;
+    const sorted = [...rawPens].sort((a, b) => {
+      const indexA = penOrder.indexOf(a.id);
+      const indexB = penOrder.indexOf(b.id);
+      if (indexA === -1 && indexB === -1) return 0;
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
+    return sorted;
+  };
+
+  const pens = getOrderedPens();
+
+  const [selectedPenId, setSelectedPenId] = useState(pens[0]?.id || 'area-1');
   const [searchTerm, setSearchTerm] = useState('');
   const [transferringGoat, setTransferringGoat] = useState(null);
 
@@ -52,8 +75,39 @@ export default function BarnSquareView({
 
   const selectedPen = pens.find((p) => p.id === selectedPenId) || pens[0];
 
+  const saveNewPenOrder = (newPensList) => {
+    const ids = newPensList.map((p) => p.id);
+    setPenOrder(ids);
+
+    if (onUpdateBarnArea) {
+      newPensList.forEach((pen, index) => {
+        onUpdateBarnArea(pen.id, { order_index: index }).catch((err) => console.error(err));
+      });
+    }
+  };
+
+  const handleDragStart = (e, index) => {
+    setDraggedPenIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedPenIndex === null || draggedPenIndex === targetIndex) return;
+    const newPens = [...pens];
+    const [dragged] = newPens.splice(draggedPenIndex, 1);
+    newPens.splice(targetIndex, 0, dragged);
+    saveNewPenOrder(newPens);
+    setDraggedPenIndex(null);
+  };
+
   const goatsInSelectedPen = goats.filter((g) => {
-    const inPen = g.area_id === selectedPen.id;
+    const inPen = g.area_id === selectedPen?.id;
     if (!searchTerm.trim()) return inPen;
     const q = searchTerm.trim().toLowerCase();
     const matchesSearch =
@@ -144,54 +198,122 @@ export default function BarnSquareView({
       <div>
         <h2 style={{ fontSize: '18px', fontWeight: '800', fontFamily: "'Outfit', sans-serif" }}>Barn Pens & Feeding Rations</h2>
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: "'Outfit', sans-serif" }}>
-          Manage barn pen layouts, view custom food & weight rations, and move goats between areas.
+          Manage barn pen layouts, drag pens to reorder, view custom food & weight rations.
         </p>
       </div>
 
-      {/* BARN PEN CARDS GRID */}
+      {/* BARN PEN CARDS GRID (DRAGGABLE WITH EDIT MODE TOGGLE) */}
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: '800', fontFamily: "'Outfit', sans-serif" }}>Barn Pens ({pens.length})</h2>
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => {
-              if (onRequireAdmin) {
-                onRequireAdmin(() => setShowManageModal(true));
-              } else {
-                setShowManageModal(true);
-              }
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: "'Outfit', sans-serif" }}
-          >
-            <Pencil size={13} /> Edit Pens
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: '800', fontFamily: "'Outfit', sans-serif" }}>
+            Barn Pens ({pens.length})
+          </h2>
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              className={`btn btn-sm ${isRearranging ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => {
+                const action = () => setIsRearranging(!isRearranging);
+                if (onRequireAdmin) onRequireAdmin(action);
+                else action();
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontFamily: "'Outfit', sans-serif",
+                background: isRearranging ? '#059669' : undefined,
+                color: isRearranging ? '#ffffff' : undefined
+              }}
+            >
+              {isRearranging ? (
+                <>
+                  <Check size={14} /> Done Rearranging
+                </>
+              ) : (
+                <>
+                  <Move size={14} /> Drag & Reorder Pens
+                </>
+              )}
+            </button>
+
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                if (onRequireAdmin) {
+                  onRequireAdmin(() => setShowManageModal(true));
+                } else {
+                  setShowManageModal(true);
+                }
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: "'Outfit', sans-serif" }}
+            >
+              <Pencil size={13} /> Edit Pens
+            </button>
+          </div>
         </div>
 
+        {/* REARRANGE INSTRUCTION BANNER */}
+        {isRearranging && (
+          <div style={{ background: '#ecfdf5', border: '1.5px dashed #059669', padding: '10px 12px', borderRadius: '12px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '12px', fontWeight: '800', color: '#047857', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Move size={14} /> Rearrange Mode Active: Click and drag pens to reorder their positions
+            </span>
+            <button
+              className="btn btn-xs btn-primary"
+              onClick={() => setIsRearranging(false)}
+              style={{ background: '#059669', fontSize: '11px', fontWeight: '800' }}
+            >
+              Done
+            </button>
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          {pens.map((pen) => {
+          {pens.map((pen, index) => {
             const penGoats = goats.filter((g) => g.area_id === pen.id);
             const isSelected = pen.id === selectedPenId;
 
             return (
               <div
                 key={pen.id}
-                onClick={() => setSelectedPenId(pen.id)}
+                draggable={isRearranging}
+                onDragStart={(e) => isRearranging && handleDragStart(e, index)}
+                onDragOver={(e) => isRearranging && handleDragOver(e, index)}
+                onDrop={(e) => isRearranging && handleDrop(e, index)}
+                onClick={() => !isRearranging && setSelectedPenId(pen.id)}
                 style={{
-                  background: isSelected ? 'var(--primary-gradient)' : '#ffffff',
-                  color: isSelected ? 'white' : 'var(--text-main)',
-                  border: isSelected ? '2px solid var(--primary-dark)' : '2px solid var(--border-color)',
+                  background: isSelected && !isRearranging ? 'var(--primary-gradient)' : '#ffffff',
+                  color: isSelected && !isRearranging ? 'white' : 'var(--text-main)',
+                  border: isRearranging
+                    ? '2px dashed #059669'
+                    : isSelected
+                    ? '2px solid var(--primary-dark)'
+                    : '2px solid var(--border-color)',
                   borderRadius: '16px',
                   padding: '16px 12px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   justify: 'center',
-                  cursor: 'pointer',
+                  cursor: isRearranging ? 'grab' : 'pointer',
                   transition: 'all 0.15s ease',
-                  boxShadow: isSelected ? 'var(--primary-glow)' : 'var(--shadow-sm)',
-                  fontFamily: "'Outfit', sans-serif"
+                  boxShadow: isSelected && !isRearranging ? 'var(--primary-glow)' : 'var(--shadow-sm)',
+                  fontFamily: "'Outfit', sans-serif",
+                  position: 'relative'
                 }}
               >
+                {/* DRAG HANDLE ICON */}
+                {isRearranging ? (
+                  <div style={{ position: 'absolute', top: '8px', right: '8px', opacity: 0.85, color: '#047857' }}>
+                    <GripVertical size={16} />
+                  </div>
+                ) : (
+                  <div style={{ position: 'absolute', top: '8px', left: '8px', opacity: 0.4 }}>
+                    <GripVertical size={14} color={isSelected ? '#ffffff' : 'var(--text-muted)'} />
+                  </div>
+                )}
+
                 {/* BIG LETTER */}
                 <span style={{ fontSize: '36px', fontWeight: '800', lineHeight: '1', fontFamily: "'Outfit', sans-serif" }}>
                   {pen.letter}
@@ -203,8 +325,8 @@ export default function BarnSquareView({
                     fontSize: '11px',
                     fontWeight: '800',
                     marginTop: '4px',
-                    background: isSelected ? 'rgba(255,255,255,0.25)' : '#f1f5f9',
-                    color: isSelected ? 'white' : 'var(--text-main)',
+                    background: isSelected && !isRearranging ? 'rgba(255,255,255,0.25)' : '#f1f5f9',
+                    color: isSelected && !isRearranging ? 'white' : 'var(--text-main)',
                     padding: '2px 9px',
                     borderRadius: '9999px',
                     fontFamily: "'Outfit', sans-serif"
@@ -220,7 +342,7 @@ export default function BarnSquareView({
                       fontSize: '11px',
                       fontWeight: '700',
                       marginTop: '6px',
-                      opacity: isSelected ? 0.95 : 0.8,
+                      opacity: isSelected && !isRearranging ? 0.95 : 0.8,
                       textAlign: 'center',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
@@ -244,7 +366,7 @@ export default function BarnSquareView({
         <input
           type="text"
           className="form-input"
-          placeholder={`Search goats inside Pen ${selectedPen.letter}...`}
+          placeholder={`Search goats inside Pen ${selectedPen?.letter}...`}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{ fontFamily: "'Outfit', sans-serif" }}
@@ -359,7 +481,7 @@ export default function BarnSquareView({
         />
       )}
 
-      {/* MANAGE PENS MODAL (ADD / REMOVE / RENAME) */}
+      {/* MANAGE PENS MODAL (WITH DRAG AND DROP REORDERING) */}
       {showManageModal && (
         <div className={`modal-overlay ${isManageClosing ? 'closing' : ''}`} onClick={handleCloseManage}>
           <div
@@ -368,7 +490,7 @@ export default function BarnSquareView({
             style={{ maxWidth: '480px', fontFamily: "'Outfit', sans-serif" }}
           >
             <div className="modal-header">
-              <h3 className="modal-title">Manage Barn Pens</h3>
+              <h3 className="modal-title">Edit & Reorder Barn Pens</h3>
               <button className="close-btn" onClick={handleCloseManage}>
                 <X size={18} />
               </button>
@@ -376,23 +498,29 @@ export default function BarnSquareView({
 
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Customize your barn layout. Edit pen names or add new pens.
+                Drag pens to reorder their layout position. Edit pen names or add new pens.
               </p>
 
-              {/* LIST OF PENS WITH INLINE EDIT */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
-                {pens.map((pen) => {
+              {/* REORDERABLE LIST OF PENS */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+                {pens.map((pen, index) => {
                   const count = goats.filter((g) => g.area_id === pen.id).length;
                   const isEditing = editingPenId === pen.id;
 
                   return (
                     <div
                       key={pen.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDrop={(e) => handleDrop(e, index)}
                       style={{
                         background: '#ffffff',
                         border: '1px solid var(--border-color)',
                         borderRadius: '12px',
-                        padding: '10px 12px'
+                        padding: '10px 12px',
+                        boxShadow: 'var(--shadow-sm)',
+                        cursor: 'grab'
                       }}
                     >
                       {isEditing ? (
@@ -436,18 +564,21 @@ export default function BarnSquareView({
                         </div>
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ color: 'var(--text-muted)', cursor: 'grab' }}>
+                              <GripVertical size={16} />
+                            </div>
+
                             <div style={{
-                              width: '36px', height: '36px', borderRadius: '10px',
+                              width: '34px', height: '34px', borderRadius: '10px',
                               background: 'var(--primary-gradient)', display: 'grid', placeItems: 'center',
-                              fontSize: '18px', fontWeight: '900', color: 'white',
-                              boxShadow: '0 4px 10px -2px rgba(5,150,105,0.35)'
+                              fontSize: '16px', fontWeight: '900', color: 'white'
                             }}>
                               {pen.letter}
                             </div>
 
                             <div style={{ minWidth: 0 }}>
-                              <strong style={{ fontSize: '14px', fontWeight: '800', display: 'block', lineHeight: 1.2 }}>
+                              <strong style={{ fontSize: '13px', fontWeight: '800', display: 'block', lineHeight: 1.2 }}>
                                 {pen.name}
                               </strong>
                               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>

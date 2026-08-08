@@ -5,20 +5,30 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
   const [isClosing, setIsClosing] = useState(false);
 
   const categories = [
-    { id: 'Vaccination', label: 'Vaccination Booster', icon: Syringe, color: '#059669', bg: '#ecfdf5' },
+    { id: 'Vaccination', label: 'Vaccination', icon: Syringe, color: '#059669', bg: '#ecfdf5' },
     { id: 'Medication', label: 'Medication', icon: Pill, color: '#c2410c', bg: '#fff7ed' },
-    { id: 'Milking', label: 'Milking Schedule', icon: Milk, color: '#0369a1', bg: '#f0f9ff' },
+    { id: 'Milking Yield', label: 'Milking Yield', icon: Milk, color: '#0369a1', bg: '#f0f9ff' },
     { id: 'Weight Check', label: 'Weight Check', icon: Weight, color: '#7e22ce', bg: '#faf5ff' },
     { id: 'Pregnancy Check', label: 'Pregnancy Check', icon: Heart, color: '#be185d', bg: '#fdf2f8' },
-    { id: 'General', label: 'General Task', icon: Bell, color: '#059669', bg: '#ecfdf5' },
+    { id: 'General', label: 'General Task / Note', icon: Bell, color: '#059669', bg: '#ecfdf5' },
   ];
 
-  const initialCat = categories.find((c) => c.id === reminder.type) || categories[0];
+  const initialCat = categories.find((c) => c.id === reminder?.type) || categories[0];
+
+  const formatLocalDatetime = (dateStr) => {
+    if (!dateStr) return new Date().toISOString().slice(0, 16);
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 16);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const isScheduled = reminder?.title?.toLowerCase().startsWith('scheduled');
 
   const [selectedCategory, setSelectedCategory] = useState(initialCat);
-  const [reminderTitle, setReminderTitle] = useState(reminder.title ? reminder.title.replace(/^Scheduled:\s*/, '') : '');
-  const [reminderDate, setReminderDate] = useState(reminder.date ? new Date(reminder.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-  const [reminderNotes, setReminderNotes] = useState(reminder.notes || '');
+  const [reminderTitle, setReminderTitle] = useState(reminder?.title ? reminder.title.replace(/^Scheduled:\s*/, '') : '');
+  const [reminderDate, setReminderDate] = useState(formatLocalDatetime(reminder?.date));
+  const [reminderNotes, setReminderNotes] = useState(reminder?.notes || '');
   const [submitting, setSubmitting] = useState(false);
 
   const handleAnimatedClose = () => {
@@ -32,11 +42,14 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
     e.preventDefault();
     setSubmitting(true);
 
+    const titlePrefix = isScheduled ? 'Scheduled: ' : '';
+    const cleanTitle = reminderTitle.trim() || selectedCategory.label;
+
     try {
       if (onSave) {
         await onSave(reminder.id, {
           type: selectedCategory.id,
-          title: `Scheduled: ${reminderTitle.trim() || selectedCategory.label}`,
+          title: `${titlePrefix}${cleanTitle}`,
           date: new Date(reminderDate).toISOString(),
           notes: reminderNotes.trim()
         });
@@ -50,10 +63,12 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
   };
 
   return (
-    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} onClick={handleAnimatedClose}>
-      <div className={`modal-content ${isClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} onClick={handleAnimatedClose} style={{ fontFamily: "'Outfit', sans-serif" }}>
+      <div className={`modal-content ${isClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px', fontFamily: "'Outfit', sans-serif" }}>
         <div className="modal-header">
-          <h3 className="modal-title">Edit Task Reminder</h3>
+          <h3 className="modal-title" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            {isScheduled ? 'Edit Scheduled Task' : 'Edit Timeline Health Event'}
+          </h3>
           <button className="close-btn" onClick={handleAnimatedClose} disabled={submitting}>
             <X size={18} />
           </button>
@@ -61,11 +76,11 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            
+            {/* DATE & TIME PICKER (BEIRUT LOCAL TIME) */}
             <div className="form-group">
-              <label className="form-label">Reminder Date *</label>
+              <label className="form-label">Date & Time *</label>
               <input
-                type="date"
+                type="datetime-local"
                 className="form-input"
                 value={reminderDate}
                 onChange={(e) => setReminderDate(e.target.value)}
@@ -76,7 +91,7 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
 
             {/* CATEGORY CUSTOM CARDS GRID */}
             <div className="form-group">
-              <label className="form-label">Reminder Category</label>
+              <label className="form-label">Event Category</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                 {categories.map((cat) => {
                   const Icon = cat.icon;
@@ -109,11 +124,11 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
             </div>
 
             <div className="form-group">
-              <label className="form-label">Reminder Title *</label>
+              <label className="form-label">Title / Description *</label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. CD&T Booster Dose, Deworming..."
+                placeholder="e.g. CD&T Vaccination, Dewormer, Weight Log..."
                 value={reminderTitle}
                 onChange={(e) => setReminderTitle(e.target.value)}
                 required
@@ -122,10 +137,10 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
             </div>
 
             <div className="form-group">
-              <label className="form-label">Notes & Vet Instructions</label>
+              <label className="form-label">Notes & Instructions</label>
               <textarea
                 className="form-textarea"
-                placeholder="Enter specific instructions or dosages..."
+                placeholder="Enter specific instructions or observations..."
                 value={reminderNotes}
                 onChange={(e) => setReminderNotes(e.target.value)}
                 disabled={submitting}
