@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Database, Copy, Check, Server, ShieldCheck, Image, Smartphone, LogOut, User } from 'lucide-react';
+import { Database, Copy, Check, Server } from 'lucide-react';
 import { getSupabaseSqlSchema } from '../services/goatService';
 
-export default function SettingsView({ goats = [], session = null, onSignOut }) {
+export default function SettingsView({ goats = [] }) {
   const [copiedSql, setCopiedSql] = useState(false);
 
   const handleCopySql = () => {
@@ -19,35 +19,6 @@ export default function SettingsView({ goats = [], session = null, onSignOut }) 
           System diagnostics and database deployment script.
         </p>
       </div>
-
-      {/* Signed-in Admin Account Card */}
-      {session && (
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '42px', height: '42px', borderRadius: '12px',
-                background: 'var(--primary-gradient)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 12px -2px rgba(5,150,105,0.3)'
-              }}>
-                <User size={20} color="white" />
-              </div>
-              <div>
-                <strong style={{ fontSize: '14px', fontWeight: '800', display: 'block' }}>Farm Admin</strong>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{session.user?.email}</span>
-              </div>
-            </div>
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={onSignOut}
-              style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#dc2626', borderColor: '#fee2e2' }}
-            >
-              <LogOut size={14} /> Sign Out
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Pure Supabase Connection Status Card */}
       <div className="card">
