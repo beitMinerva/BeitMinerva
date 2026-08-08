@@ -86,18 +86,19 @@ export default function BarnSquareView({
   const handleStartEdit = (pen) => {
     setEditingPenId(pen.id);
     setEditLetter(pen.letter || '');
-    setEditName(pen.name || '');
-    setEditNote(pen.note || '');
+    setEditNote(pen.note || (pen.name && pen.name !== `Pen ${pen.letter}` ? pen.name : ''));
   };
 
   const handleSaveEdit = async (pen) => {
     setSubmitting(true);
     try {
       if (onUpdateBarnArea) {
+        const newLetter = editLetter.trim().toUpperCase() || pen.letter;
+        const newLabel = editNote.trim();
         await onUpdateBarnArea(pen.id, {
-          letter: editLetter.trim().toUpperCase() || pen.letter,
-          name: editName.trim() || pen.name,
-          note: editNote.trim()
+          letter: newLetter,
+          name: newLabel ? newLabel : `Pen ${newLetter}`,
+          note: newLabel
         });
       }
       setEditingPenId(null);
@@ -115,10 +116,11 @@ export default function BarnSquareView({
       if (onAddBarnArea) {
         const nextLetter = newLetter.trim().toUpperCase() ||
           String.fromCharCode(65 + pens.length);
+        const label = newNote.trim();
         await onAddBarnArea({
           letter: nextLetter,
-          name: newName.trim() || `Pen ${nextLetter}`,
-          note: newNote.trim()
+          name: label ? label : `Pen ${nextLetter}`,
+          note: label
         });
       }
       setNewLetter('');

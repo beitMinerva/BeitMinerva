@@ -125,28 +125,25 @@ export async function addBarnArea(areaData) {
 
 export async function updateBarnArea(id, updates) {
   const currentAreas = await getBarnAreas();
-  try {
-    const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
-    if (!error && data) {
-      const updatedList = currentAreas.map(a => a.id === id ? { ...a, ...updates } : a);
-      localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updatedList));
-      return data;
-    }
-  } catch (err) {
-    console.warn('Supabase update barn area notice:', err.message);
+  const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
+  
+  if (error) {
+    console.error('Supabase updateBarnArea error:', error);
+    throw new Error(error.message || 'Failed to update pen.');
   }
 
-  const updatedList = currentAreas.map(a => a.id === id ? { ...a, ...updates } : a);
+  const updatedList = currentAreas.map(a => a.id === id ? { ...a, ...updates } : a).sort((a, b) => (a.letter || '').localeCompare(b.letter || ''));
   localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updatedList));
-  return { id, ...updates };
+  return data;
 }
 
 export async function deleteBarnArea(id) {
   const currentAreas = await getBarnAreas();
-  try {
-    await supabase.from('barn_areas').delete().eq('id', id);
-  } catch (err) {
-    console.warn('Supabase delete barn area notice:', err.message);
+  const { error } = await supabase.from('barn_areas').delete().eq('id', id);
+
+  if (error) {
+    console.error('Supabase deleteBarnArea error:', error);
+    throw new Error(error.message || 'Failed to delete pen.');
   }
 
   const updatedList = currentAreas.filter(a => a.id !== id);
