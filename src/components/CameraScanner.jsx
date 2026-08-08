@@ -1,116 +1,120 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { QrCode, Search, AlertCircle, Camera, RefreshCw } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Camera, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function CameraScanner({ onScanSuccess }) {
-  const [manualCode, setManualCode] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [isScanning, setIsScanning] = useState(false);
   const scannerRef = useRef(null);
+  const [html5Qrcode, setHtml5Qrcode] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
-    let html5QrcodeScanner = null;
-    const elementId = 'reader-element';
+    const elementId = '1d-barcode-reader';
+    
+    // Strict 1D Barcode Formats Configuration
+    const formatsToSupport = [
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.CODABAR
+    ];
+
+    const qrcodeInstance = new Html5Qrcode(elementId, {
+      formatsToSupport,
+      verbose: false
+    });
+    setHtml5Qrcode(qrcodeInstance);
 
     const startScanner = async () => {
       try {
-        setErrorMsg('');
-        html5QrcodeScanner = new Html5Qrcode(elementId);
-        scannerRef.current = html5QrcodeScanner;
+        const config = {
+          fps: 15,
+          // Horizontal 1D Ear Tag Barcode Viewfinder Box
+          qrbox: { width: 280, height: 110 },
+          aspectRatio: 2.2
+        };
 
-        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-
-        await html5QrcodeScanner.start(
+        await qrcodeInstance.start(
           { facingMode: 'environment' },
           config,
           (decodedText) => {
-            if (decodedText) {
-              stopScanner();
-              onScanSuccess(decodedText);
+            if (onScanSuccess) {
+              onScanSuccess(decodedText.trim().toUpperCase());
             }
           },
           (errorMessage) => {
-            // Ignore frame parse errors
+            // Ignore frame decode noise
           }
         );
         setIsScanning(true);
+        setErrorMsg(null);
       } catch (err) {
-        console.warn('Camera scan start error:', err);
-        setErrorMsg('Camera access unavailable or permission denied. Use manual tag lookup below.');
+        console.warn('Camera access warning:', err);
+        setErrorMsg('Unable to access camera. Please check permissions or enter ear tag ID manually below.');
         setIsScanning(false);
       }
     };
 
     startScanner();
 
-    const stopScanner = () => {
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        scannerRef.current.stop().catch((e) => console.error('Stop scanner error:', e));
-      }
-    };
-
     return () => {
-      stopScanner();
+      if (qrcodeInstance.isScanning) {
+        qrcodeInstance.stop().catch((e) => console.warn('Scanner cleanup warning:', e));
+      }
     };
   }, [onScanSuccess]);
 
-  const handleManualSubmit = (e) => {
-    e.preventDefault();
-    if (manualCode.trim()) {
-      onScanSuccess(manualCode.trim());
-    }
-  };
-
   return (
-    <div className="card" style={{ padding: '20px', textAlign: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
-        <Camera size={22} color="#2e7d32" />
-        <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Scan Goat Tag / QR Code</h2>
-      </div>
-
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', width: '100%' }}>
       <div
-        id="reader-element"
         style={{
           width: '100%',
-          maxWidth: '350px',
-          minHeight: '260px',
-          margin: '0 auto 16px auto',
+          maxWidth: '360px',
           borderRadius: '16px',
           overflow: 'hidden',
-          background: '#0f172a',
-          border: '2px dashed var(--primary)'
+          border: '2px solid var(--primary-border)',
+          background: '#000000',
+          position: 'relative',
+          minHeight: '200px',
+          boxShadow: 'var(--shadow-md)'
         }}
-      ></div>
+      >
+        <div id="1d-barcode-reader" style={{ width: '100%' }} />
 
-      {errorMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#ffebee', color: '#c62828', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', marginBottom: '16px', textAlign: 'left' }}>
-          <AlertCircle size={18} style={{ flexShrink: 0 }} />
+        {/* 1D RED LASER ALIGNMENT LINE FOR EAR TAG BARCODES */}
+        {isScanning && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '10%',
+              right: '10%',
+              height: '2px',
+              background: '#ef4444',
+              boxShadow: '0 0 8px #ef4444',
+              pointerEvents: 'none',
+              zIndex: 10,
+              transform: 'translateY(-50%)'
+            }}
+          />
+        )}
+      </div>
+
+      {errorMsg ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#c2410c', background: '#fff7ed', padding: '10px 14px', borderRadius: '10px', fontSize: '12px', border: '1px solid #ffedd5' }}>
+          <AlertCircle size={16} />
           <span>{errorMsg}</span>
         </div>
-      )}
-
-      <div style={{ margin: '20px 0 10px 0', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-        <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '10px' }}>
-          Or enter Tag ID / Barcode manually:
+      ) : (
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Camera size={14} color="var(--primary)" />
+          Align the red laser line over the goat's ear tag 1D barcode.
         </p>
-
-        <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '8px' }}>
-          <div className="search-input-wrapper" style={{ flex: 1 }}>
-            <Search className="search-icon" size={18} />
-            <input
-              type="text"
-              className="form-input"
-              placeholder="e.g. GT-101"
-              value={manualCode}
-              onChange={(e) => setManualCode(e.target.value)}
-              style={{ textTransform: 'uppercase' }}
-            />
-          </div>
-          <button type="submit" className="btn btn-primary">
-            Find
-          </button>
-        </form>
-      </div>
+      )}
     </div>
   );
 }

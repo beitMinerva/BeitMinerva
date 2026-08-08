@@ -1,12 +1,12 @@
 import React from 'react';
-import { Home, QrCode, Calendar, ClipboardList } from 'lucide-react';
+import { Home, ScanLine, Calendar, Users } from 'lucide-react';
 
 export default function BottomNav({ activeTab, setActiveTab }) {
   const navItems = [
-    { id: 'barn', label: 'Barn Grid', icon: Home },
-    { id: 'scanner', label: 'Scanner', icon: QrCode },
+    { id: 'barn', label: 'Barn Areas', icon: Home },
+    { id: 'scanner', label: 'Barcode Scanner', icon: ScanLine },
     { id: 'calendar', label: 'Calendar', icon: Calendar },
-    { id: 'goats', label: 'Goat Herd', icon: ClipboardList },
+    { id: 'goats', label: 'Herd Directory', icon: Users },
   ];
 
   return (
@@ -19,9 +19,8 @@ export default function BottomNav({ activeTab, setActiveTab }) {
             key={item.id}
             className={`nav-item ${isActive ? 'active' : ''}`}
             onClick={() => setActiveTab(item.id)}
-            aria-label={item.label}
           >
-            <Icon size={20} color={isActive ? '#16a34a' : '#64748b'} />
+            <Icon size={20} />
             <span>{item.label}</span>
           </button>
         );

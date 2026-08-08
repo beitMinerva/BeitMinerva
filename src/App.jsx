@@ -18,6 +18,9 @@ import {
   addGoat,
   updateGoat,
   updateGoatArea,
+  addBarnArea,
+  updateBarnArea,
+  deleteBarnArea,
   addTimelineEvent,
   updateTimelineEvent,
   deleteTimelineEvent
@@ -100,6 +103,24 @@ export default function App() {
     await loadData();
     setShowAddGoatModal(false);
     setGoatToEdit(null);
+  };
+
+  const handleAddBarnArea = async (areaData) => {
+    const created = await addBarnArea(areaData);
+    showToast(`Created Pen ${created.letter} (${created.name}).`);
+    await loadData();
+  };
+
+  const handleUpdateBarnArea = async (id, updates) => {
+    await updateBarnArea(id, updates);
+    showToast('Updated pen subtitle name.');
+    await loadData();
+  };
+
+  const handleDeleteBarnArea = async (id) => {
+    await deleteBarnArea(id);
+    showToast('Deleted pen.');
+    await loadData();
   };
 
   const handleSaveEvent = async (eventData) => {
@@ -192,6 +213,9 @@ export default function App() {
                   setShowAddGoatModal(true);
                 }}
                 onTransferGoatArea={handleTransferGoatArea}
+                onAddBarnArea={handleAddBarnArea}
+                onUpdateBarnArea={handleUpdateBarnArea}
+                onDeleteBarnArea={handleDeleteBarnArea}
               />
             )}
 

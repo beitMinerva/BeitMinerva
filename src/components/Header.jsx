@@ -1,5 +1,5 @@
 import React from 'react';
-import { QrCode, Plus } from 'lucide-react';
+import { ScanLine, Plus } from 'lucide-react';
 
 export default function Header({ onOpenScanner, onOpenAddGoat }) {
   return (
@@ -15,14 +15,14 @@ export default function Header({ onOpenScanner, onOpenAddGoat }) {
           className="btn btn-secondary btn-sm"
           onClick={onOpenScanner}
         >
-          <QrCode size={14} />
-          <span>Scan</span>
+          <ScanLine size={15} />
+          <span>Scan Barcode</span>
         </button>
         <button 
           className="btn btn-primary btn-sm"
           onClick={onOpenAddGoat}
         >
-          <Plus size={14} />
+          <Plus size={15} />
           <span>Add Goat</span>
         </button>
       </div>

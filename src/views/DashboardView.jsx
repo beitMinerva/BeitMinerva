@@ -4,7 +4,7 @@ import {
   Heart,
   Activity,
   Syringe,
-  QrCode,
+  ScanLine,
   Plus,
   ArrowRight,
   ShieldCheck,
@@ -30,7 +30,7 @@ export default function DashboardView({
   const pregnantGoats = goats.filter((g) => g.status === 'Pregnant').length;
   const treatmentGoats = goats.filter((g) => g.status === 'Under Treatment' || g.status === 'Quarantine');
 
-  const milkingDoes = goats.filter((g) => g.area_id === 'area-2' || g.gender === 'Doe');
+  const milkingDoes = goats.filter((g) => g.area_id === 'area-2' || g.gender === 'Female');
   const recentlyAddedGoats = [...goats].slice(0, 3);
 
   const todayMilkingEvents = recentEvents.filter(
@@ -68,8 +68,8 @@ export default function DashboardView({
             style={{ background: 'white', color: '#2e7d32', fontWeight: '600' }}
             onClick={onOpenScanner}
           >
-            <QrCode size={16} />
-            <span>Scan Tag</span>
+            <ScanLine size={16} />
+            <span>Scan Ear Tag Barcode</span>
           </button>
           <button
             className="btn"
@@ -163,7 +163,7 @@ export default function DashboardView({
               <div>
                 <strong style={{ fontSize: '13px', display: 'block' }}>Today's Milking Yield</strong>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  {totalTodayMilkYield} Liters recorded ({milkingDoes.length} does)
+                  {totalTodayMilkYield} Liters recorded ({milkingDoes.length} female goats)
                 </span>
               </div>
             </div>

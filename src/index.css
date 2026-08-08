@@ -52,6 +52,18 @@ html, body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* HIDE ALL SCROLLBARS GLOBALLY WHILE KEEPING SMOOTH SCROLLING */
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
 .app-container {
   display: flex;
   flex-direction: column;
@@ -249,7 +261,7 @@ html, body {
 .form-input, .form-select, .form-textarea {
   width: 100%;
   padding: 10px 12px;
-  font-size: 16px;
+  font-size: 14px;
   font-family: 'Outfit', sans-serif;
   border-radius: 10px;
   border: 1px solid var(--border-color);
@@ -263,6 +275,14 @@ html, body {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.14);
+}
+
+.form-input::placeholder,
+.form-select::placeholder,
+.form-textarea::placeholder {
+  font-size: 14px;
+  color: var(--text-light);
+  font-family: 'Outfit', sans-serif;
 }
 
 /* ANIMATED MODAL OVERLAY & POP-UP / SLIDE-UP DRAWER */
@@ -280,7 +300,7 @@ html, body {
 }
 
 .modal-overlay.closing {
-  animation: fadeOutOverlay 0.22s ease-in forwards !important;
+  animation: fadeOutOverlay 0.45s ease-in forwards !important;
 }
 
 @media (min-width: 600px) {
@@ -294,7 +314,7 @@ html, body {
   background: #ffffff;
   width: 100%;
   max-width: 500px;
-  max-height: 88vh;
+  max-height: 90vh;
   border-top-left-radius: 24px;
   border-top-right-radius: 24px;
   display: flex;
@@ -305,7 +325,7 @@ html, body {
 }
 
 .modal-content.closing {
-  animation: slideDownModal 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  animation: slideDownModal 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
 }
 
 @media (min-width: 600px) {
@@ -329,6 +349,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .modal-title {
@@ -339,9 +360,18 @@ html, body {
 
 .modal-body {
   padding: 16px;
-  overflow-y: auto;
+  overflow-y: auto !important;
   flex: 1;
+  max-height: calc(90vh - 120px);
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.modal-body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .modal-footer {
@@ -352,6 +382,7 @@ html, body {
   justify-content: flex-end;
   background: #ffffff;
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  flex-shrink: 0;
 }
 
 .close-btn {
@@ -573,4 +604,24 @@ html, body {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes expandDown {
+  from { opacity: 0; transform: translateY(-6px) scaleY(0.92); max-height: 0; }
+  to   { opacity: 1; transform: translateY(0)   scaleY(1);    max-height: 600px; }
+}
+
+@keyframes collapseUp {
+  from { opacity: 1; transform: translateY(0)   scaleY(1);    max-height: 600px; }
+  to   { opacity: 0; transform: translateY(-6px) scaleY(0.92); max-height: 0; }
+}
+
+.pen-row-enter {
+  animation: fadeInUp 0.35s ease both;
+}
+
+.pen-form-enter {
+  animation: expandDown 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top;
+  overflow: hidden;
 }

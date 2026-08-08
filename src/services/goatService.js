@@ -24,16 +24,83 @@ export function calculateGoatAge(birthDateStr) {
 }
 
 // ----------------------------------------------------
-// Barn Areas Operations (Pure Supabase)
+// Barn Areas CRUD Operations (Supabase + Local State Persistence)
 // ----------------------------------------------------
 export async function getBarnAreas() {
   try {
-    const { data, error } = await supabase.from('barn_areas').select('*').order('id', { ascending: true });
+    const { data, error } = await supabase.from('barn_areas').select('*').order('letter', { ascending: true });
     if (!error && data && data.length > 0) return data;
   } catch (err) {
     console.warn('Supabase barn_areas query notice:', err.message);
   }
+
+  // Fallback to local storage or DEFAULT_BARN_AREAS (4 preset pens)
+  const saved = localStorage.getItem('beit_minerva_barn_areas');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      return [...parsed].sort((a, b) => (a.letter || '').localeCompare(b.letter || ''));
+    } catch (e) {}
+  }
   return DEFAULT_BARN_AREAS;
+}
+
+export async function addBarnArea(areaData) {
+  const currentAreas = await getBarnAreas();
+  const nextLetter = String.fromCharCode(65 + currentAreas.length);
+
+  const newArea = {
+    id: `area-${Date.now()}`,
+    letter: areaData.letter || nextLetter,
+    name: areaData.name || `Pen ${areaData.letter || nextLetter}`,
+    note: areaData.note || ''
+  };
+
+  try {
+    const { data, error } = await supabase.from('barn_areas').insert([newArea]).select().single();
+    if (!error && data) {
+      const updated = [...currentAreas, data].sort((a, b) => (a.letter || '').localeCompare(b.letter || ''));
+      localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updated));
+      return data;
+    }
+  } catch (err) {
+    console.warn('Supabase add barn area notice:', err.message);
+  }
+
+  const updated = [...currentAreas, newArea].sort((a, b) => (a.letter || '').localeCompare(b.letter || ''));
+  localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updated));
+  return newArea;
+}
+
+export async function updateBarnArea(id, updates) {
+  const currentAreas = await getBarnAreas();
+  try {
+    const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
+    if (!error && data) {
+      const updatedList = currentAreas.map(a => a.id === id ? { ...a, ...updates } : a);
+      localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updatedList));
+      return data;
+    }
+  } catch (err) {
+    console.warn('Supabase update barn area notice:', err.message);
+  }
+
+  const updatedList = currentAreas.map(a => a.id === id ? { ...a, ...updates } : a);
+  localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updatedList));
+  return { id, ...updates };
+}
+
+export async function deleteBarnArea(id) {
+  const currentAreas = await getBarnAreas();
+  try {
+    await supabase.from('barn_areas').delete().eq('id', id);
+  } catch (err) {
+    console.warn('Supabase delete barn area notice:', err.message);
+  }
+
+  const updatedList = currentAreas.filter(a => a.id !== id);
+  localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updatedList));
+  return true;
 }
 
 // ----------------------------------------------------
@@ -77,7 +144,6 @@ export async function addGoat(goatData) {
   try {
     const { data, error } = await supabase.from('goats').insert([newGoat]).select().single();
     if (!error && data) {
-      // Log Initial Weight Record
       if (newGoat.weight) {
         await addTimelineEvent({
           goat_id: data.id,
@@ -100,7 +166,6 @@ export async function updateGoat(id, updates) {
   try {
     const { data, error } = await supabase.from('goats').update(updates).eq('id', id).select().single();
     if (!error && data) {
-      // Auto Log Weight Progression event if weight was updated
       if (updates.weight) {
         await addTimelineEvent({
           goat_id: id,
