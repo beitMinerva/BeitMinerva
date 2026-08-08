@@ -4,11 +4,14 @@ import BottomNav from './components/BottomNav';
 import GoatDetailModal from './components/GoatDetailModal';
 import AddGoatModal from './components/AddGoatModal';
 import AddEventModal from './components/AddEventModal';
+import LoginView from './views/LoginView';
+import { supabase } from './config/supabase';
 
 import BarnSquareView from './views/BarnSquareView';
 import ScannerView from './views/ScannerView';
 import CalendarView from './views/CalendarView';
 import GoatsView from './views/GoatsView';
+import SettingsView from './views/SettingsView';
 
 import {
   getGoats,
@@ -27,12 +30,29 @@ import {
 } from './services/goatService';
 
 export default function App() {
+  const [session, setSession] = useState(undefined); // undefined = loading, null = not authed
   const [activeTab, setActiveTab] = useState('barn');
   const [goats, setGoats] = useState([]);
   const [barnAreas, setBarnAreas] = useState([]);
   const [recentEvents, setRecentEvents] = useState([]);
   const [selectedGoatEvents, setSelectedGoatEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Auth state
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+  };
 
   // Modals
   const [selectedGoat, setSelectedGoat] = useState(null);
@@ -176,6 +196,21 @@ export default function App() {
     }
   };
 
+  // Show spinner while checking auth
+  if (session === undefined) {
+    return (
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid var(--primary-light)', borderTop: '3px solid var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Loading...</p>
+      </div>
+    );
+  }
+
+  // Show login if not authenticated
+  if (!session) {
+    return <LoginView onLogin={(s) => setSession(s)} />;
+  }
+
   return (
     <div className="app-container">
       {/* Beit Minerva Header */}
@@ -256,6 +291,14 @@ export default function App() {
                   setGoatToEdit(null);
                   setShowAddGoatModal(true);
                 }}
+              />
+            )}
+
+            {activeTab === 'settings' && (
+              <SettingsView
+                goats={goats}
+                session={session}
+                onSignOut={handleSignOut}
               />
             )}
           </>

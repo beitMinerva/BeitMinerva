@@ -23,6 +23,57 @@ export function calculateGoatAge(birthDateStr) {
   return `${years} yrs ${months} mos`;
 }
 
+export function getSupabaseSqlSchema() {
+  return `-- Run in Supabase SQL Editor
+CREATE TABLE IF NOT EXISTS goats (
+  id TEXT PRIMARY KEY,
+  tag_id TEXT NOT NULL,
+  name TEXT,
+  breed TEXT,
+  gender TEXT,
+  neutered_status TEXT,
+  birth_date DATE,
+  weight NUMERIC,
+  status TEXT,
+  area_id TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS timeline_events (
+  id TEXT PRIMARY KEY,
+  goat_id TEXT REFERENCES goats(id) ON DELETE CASCADE,
+  type TEXT,
+  title TEXT,
+  date TIMESTAMPTZ,
+  notes TEXT,
+  custom_fields JSONB DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS barn_areas (
+  id TEXT PRIMARY KEY,
+  letter TEXT,
+  name TEXT,
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- RLS Policies (allow authenticated users full access, anon read-only)
+ALTER TABLE goats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE timeline_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE barn_areas ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "anon_read_goats" ON goats FOR SELECT TO anon USING (true);
+CREATE POLICY "auth_all_goats" ON goats FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "anon_read_events" ON timeline_events FOR SELECT TO anon USING (true);
+CREATE POLICY "auth_all_events" ON timeline_events FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "anon_read_barns" ON barn_areas FOR SELECT TO anon USING (true);
+CREATE POLICY "auth_all_barns" ON barn_areas FOR ALL TO authenticated USING (true) WITH CHECK (true);`;
+}
+
 // ----------------------------------------------------
 // Barn Areas CRUD Operations (Supabase + Local State Persistence)
 // ----------------------------------------------------
