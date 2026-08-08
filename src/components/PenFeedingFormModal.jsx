@@ -27,31 +27,19 @@ export default function PenFeedingFormModal({ pen, onClose, onSave }) {
     e.preventDefault();
     setSubmitting(true);
 
-    const newRation = {
+    const feedingData = {
       food_type: foodType.trim(),
       daily_weight: dailyWeight.trim(),
       composition: composition.trim(),
       schedule: schedule.trim(),
       notes: notes.trim(),
-      updated_at: new Date().toISOString()
-    };
-
-    const newHistoryEntry = {
-      id: `feed-log-${Date.now()}`,
-      date: new Date().toISOString(),
-      food_type: foodType.trim(),
-      daily_weight: dailyWeight.trim(),
-      composition: composition.trim(),
-      notes: notes.trim()
-    };
-
-    const updatedPayload = {
-      current: newRation,
-      history: [newHistoryEntry, ...historyList].slice(0, 30)
+      date: new Date().toISOString()
     };
 
     try {
-      await onSave(pen.id, JSON.stringify(updatedPayload));
+      if (onSave) {
+        await onSave(pen.id, feedingData);
+      }
       handleClose();
     } catch (err) {
       console.error(err);

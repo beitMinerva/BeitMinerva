@@ -30,6 +30,10 @@ import {
   addPenMilkEntry,
   updatePenMilkEntry,
   deletePenMilkEntry,
+  getPenFeedingEntries,
+  addPenFeedingEntry,
+  updatePenFeedingEntry,
+  deletePenFeedingEntry,
   addTimelineEvent,
   addBatchTimelineEvents,
   updateTimelineEvent,
@@ -44,6 +48,7 @@ export default function App() {
   const [barnAreas, setBarnAreas] = useState([]);
   const [recentEvents, setRecentEvents] = useState([]);
   const [penMilkEntries, setPenMilkEntries] = useState([]);
+  const [penFeedingEntries, setPenFeedingEntries] = useState([]);
   const [selectedPenForNewGoat, setSelectedPenForNewGoat] = useState(null);
   const [selectedGoatEvents, setSelectedGoatEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,16 +90,18 @@ export default function App() {
 
   const loadData = async () => {
     try {
-      const [goatsData, areasData, eventsData, milkEntriesData] = await Promise.all([
+      const [goatsData, areasData, eventsData, milkEntriesData, feedingEntriesData] = await Promise.all([
         getGoats(),
         getBarnAreas(),
         getTimelineEvents(),
-        getPenMilkEntries()
+        getPenMilkEntries(),
+        getPenFeedingEntries()
       ]);
       setGoats(goatsData);
       setBarnAreas(areasData);
       setRecentEvents(eventsData);
       setPenMilkEntries(milkEntriesData);
+      setPenFeedingEntries(feedingEntriesData);
 
       // Check for due tasks & send Web Push Notifications
       checkUpcomingTasksAndNotify(eventsData, goatsData);
@@ -225,6 +232,45 @@ export default function App() {
     }
   };
 
+  const handleSavePenFeedingEntry = async (barnAreaId, feedingData, entryId = null) => {
+    try {
+      if (entryId) {
+        const updated = await updatePenFeedingEntry(entryId, {
+          food_type: feedingData.food_type,
+          daily_weight: Number(feedingData.daily_weight) || 0,
+          composition: feedingData.composition || '',
+          schedule: feedingData.schedule || '',
+          notes: feedingData.notes || ''
+        });
+        setPenFeedingEntries((prev) => prev.map((item) => (item.id === entryId ? updated : item)));
+        showToast('Updated pen feeding entry.');
+        return updated;
+      }
+
+      const created = await addPenFeedingEntry({
+        barn_area_id: barnAreaId,
+        ...feedingData
+      });
+      setPenFeedingEntries((prev) => [created, ...prev]);
+      showToast('Saved pen feeding entry.');
+      return created;
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`);
+      throw err;
+    }
+  };
+
+  const handleDeletePenFeedingEntry = async (entryId) => {
+    try {
+      await deletePenFeedingEntry(entryId);
+      setPenFeedingEntries((prev) => prev.filter((item) => item.id !== entryId));
+      showToast('Deleted pen feeding entry.');
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`);
+      throw err;
+    }
+  };
+
   const handleSaveEvent = async (eventData) => {
     try {
       if (Array.isArray(eventData)) {
@@ -324,6 +370,7 @@ export default function App() {
                 barnAreas={barnAreas}
                 events={recentEvents}
                 penMilkEntries={penMilkEntries}
+                penFeedingEntries={penFeedingEntries}
                 onRequireAdmin={requireAdmin}
                 onSelectGoat={(g) => setSelectedGoat(g)}
                 onOpenAddGoat={(penId) => requireAdmin(() => {
@@ -337,6 +384,8 @@ export default function App() {
                 onDeleteBarnArea={handleDeleteBarnArea}
                 onSavePenMilkEntry={handleSavePenMilkEntry}
                 onDeletePenMilkEntry={handleDeletePenMilkEntry}
+                onSavePenFeedingEntry={handleSavePenFeedingEntry}
+                onDeletePenFeedingEntry={handleDeletePenFeedingEntry}
               />
             )}
 

@@ -45,6 +45,7 @@ export async function addBarnArea(areaData) {
   const nextLetter = String.fromCharCode(65 + currentAreas.length);
 
   const newArea = {
+    id: areaData.id || makeId('ba'),
     letter: areaData.letter || nextLetter,
     name: areaData.name || `Pen ${areaData.letter || nextLetter}`,
     order_index: areaData.order_index !== undefined ? areaData.order_index : currentAreas.length
@@ -59,17 +60,12 @@ export async function addBarnArea(areaData) {
 }
 
 export async function updateBarnArea(id, updates) {
-  try {
-    const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
-    if (error) {
-      console.warn('Supabase updateBarnArea notice:', error.message);
-      return null;
-    }
-    return data;
-  } catch (err) {
-    console.warn('Supabase updateBarnArea notice:', err.message);
-    return null;
+  const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
+  if (error) {
+    console.error('Supabase updateBarnArea error:', error);
+    throw new Error(error.message || 'Failed to update pen area.');
   }
+  return data;
 }
 
 export async function getPenMilkEntries() {
@@ -123,6 +119,63 @@ export async function deletePenMilkEntry(id) {
   return true;
 }
 
+// ----------------------------------------------------
+// Pen Feeding Entries CRUD Operations
+// ----------------------------------------------------
+export async function getPenFeedingEntries() {
+  try {
+    const { data, error } = await supabase.from('pen_feeding_entries').select('*').order('date', { ascending: false });
+    if (!error && data) return data;
+  } catch (err) {
+    console.warn('Supabase pen_feeding_entries query notice:', err.message);
+  }
+  return [];
+}
+
+export async function addPenFeedingEntry(entryData) {
+  const newEntry = {
+    id: `pfe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    barn_area_id: entryData.barn_area_id,
+    date: entryData.date || new Date().toISOString(),
+    food_type: entryData.food_type || '',
+    daily_weight: Number(entryData.daily_weight) || 0,
+    composition: entryData.composition || '',
+    schedule: entryData.schedule || '',
+    notes: entryData.notes || ''
+  };
+
+  const { data, error } = await supabase.from('pen_feeding_entries').insert([newEntry]).select().single();
+  if (error) {
+    console.error('Supabase addPenFeedingEntry error:', error);
+    throw new Error(error.message || 'Failed to save pen feeding entry.');
+  }
+  return data;
+}
+
+export async function updatePenFeedingEntry(id, updates) {
+  const { data, error } = await supabase
+    .from('pen_feeding_entries')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Supabase updatePenFeedingEntry error:', error);
+    throw new Error(error.message || 'Failed to update pen feeding entry.');
+  }
+  return data;
+}
+
+export async function deletePenFeedingEntry(id) {
+  const { error } = await supabase.from('pen_feeding_entries').delete().eq('id', id);
+  if (error) {
+    console.error('Supabase deletePenFeedingEntry error:', error);
+    throw new Error(error.message || 'Failed to delete pen feeding entry.');
+  }
+  return true;
+}
+
 export async function deleteBarnArea(id) {
   const { error } = await supabase.from('barn_areas').delete().eq('id', id);
   if (error) {
@@ -154,10 +207,10 @@ export async function getGoatByTagOrId(identifier) {
   ) || null;
 }
 
-const makeId = () => {
+const makeId = (prefix = 'gt') => {
   const timestamp = Date.now();
-  const suffix = String(timestamp).slice(-6);
-  return `gt-${timestamp}${suffix}`;
+  const random = Math.random().toString(36).substring(2, 8);
+  return `${prefix}-${timestamp}-${random}`;
 };
 
 export async function addGoat(goatData) {
@@ -254,7 +307,7 @@ export async function getTimelineEvents(goatId = null) {
 
 export async function addTimelineEvent(eventData) {
   const newEvent = {
-    id: makeId(),
+    id: eventData.id || makeId('evt'),
     goat_id: eventData.goat_id,
     type: eventData.type || 'General Notes',
     title: eventData.title || eventData.type,
@@ -273,6 +326,7 @@ export async function addTimelineEvent(eventData) {
 
 export async function addBatchTimelineEvents(eventDataList) {
   const newEvents = eventDataList.map((eventData) => ({
+    id: eventData.id || makeId('evt'),
     goat_id: eventData.goat_id,
     type: eventData.type || 'General Notes',
     title: eventData.title || eventData.type,

@@ -18,7 +18,10 @@ export default function BarnSquareView({
   onDeleteBarnArea,
   penMilkEntries = [],
   onSavePenMilkEntry,
-  onDeletePenMilkEntry
+  onDeletePenMilkEntry,
+  penFeedingEntries = [],
+  onSavePenFeedingEntry,
+  onDeletePenFeedingEntry
 }) {
   const rawPens = barnAreas.length > 0 ? barnAreas : [
     { id: 'area-1', letter: 'A', name: 'Pen A' },
@@ -166,13 +169,9 @@ export default function BarnSquareView({
     }
   };
 
-  const handleSaveFeedingInfo = async (penId, jsonString) => {
-    if (onUpdateBarnArea) {
-      const pen = pens.find((p) => p.id === penId);
-      await onUpdateBarnArea(penId, {
-        name: pen ? pen.name : 'Pen',
-        feeding_info: jsonString
-      });
+  const handleSaveFeedingInfo = async (penId, feedingData) => {
+    if (onSavePenFeedingEntry) {
+      await onSavePenFeedingEntry(penId, feedingData);
     }
   };
 
@@ -495,6 +494,9 @@ export default function BarnSquareView({
       {showFeedingHistoryModal && editingPenFeeding && (
         <PenFeedingHistoryModal
           pen={editingPenFeeding}
+          feedingEntries={penFeedingEntries}
+          onSaveFeedingEntry={onSavePenFeedingEntry}
+          onDeleteFeedingEntry={onDeletePenFeedingEntry}
           onClose={() => {
             setShowFeedingHistoryModal(false);
             setEditingPenFeeding(null);

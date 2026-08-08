@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Wheat, Scale, Clock, Sparkles, History, Calendar, Milk, TrendingUp, Filter, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { X, Wheat, Scale, Clock, Sparkles, History, Calendar, Milk, TrendingUp, Filter, Pencil, Trash2, Loader2, FileText } from 'lucide-react';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { isMilkingEvent, getEventMetricValue } from '../utils/metricEventUtils';
 
@@ -103,10 +103,38 @@ function PenMilkChart({ entries = [] }) {
   );
 }
 
-export default function PenFeedingHistoryModal({ pen, onClose, onOpenEditForm, goats = [], milkingEntries = [], mode = 'feed', onSaveMilkEntry, onDeleteMilkEntry }) {
+export default function PenFeedingHistoryModal({
+  pen,
+  onClose,
+  onOpenEditForm,
+  goats = [],
+  milkingEntries = [],
+  feedingEntries = [],
+  mode = 'feed',
+  onSaveMilkEntry,
+  onDeleteMilkEntry,
+  onSaveFeedingEntry,
+  onDeleteFeedingEntry
+}) {
   const parsed = parsePenFeeding(pen?.feeding_info || pen?.note);
-  const currentRation = parsed.current;
-  const historyList = parsed.history;
+
+  const dbFeedingEntries = useMemo(() => {
+    if (!Array.isArray(feedingEntries) || feedingEntries.length === 0) return [];
+    return [...feedingEntries]
+      .filter((e) => e.barn_area_id === pen?.id)
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  }, [feedingEntries, pen?.id]);
+
+  const latestDbEntry = dbFeedingEntries[0];
+  const currentRation = latestDbEntry ? {
+    food_type: latestDbEntry.food_type || '',
+    daily_weight: latestDbEntry.daily_weight ? `${latestDbEntry.daily_weight} kg` : '',
+    composition: latestDbEntry.composition || '',
+    schedule: latestDbEntry.schedule || '',
+    notes: latestDbEntry.notes || ''
+  } : parsed.current;
+
+  const historyList = dbFeedingEntries.length > 0 ? dbFeedingEntries : parsed.history;
   const isMilkingMode = mode === 'milking' || mode === 'pen-milk';
 
   const [isClosing, setIsClosing] = useState(false);
@@ -119,6 +147,59 @@ export default function PenFeedingHistoryModal({ pen, onClose, onOpenEditForm, g
   const [submittingMilk, setSubmittingMilk] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [entryToDelete, setEntryToDelete] = useState(null);
+
+  const [editingFeedingEntry, setEditingFeedingEntry] = useState(null);
+  const [feedingFoodType, setFeedingFoodType] = useState('');
+  const [feedingWeight, setFeedingWeight] = useState('');
+  const [feedingComposition, setFeedingComposition] = useState('');
+  const [feedingSchedule, setFeedingSchedule] = useState('');
+  const [feedingNotes, setFeedingNotes] = useState('');
+  const [feedingEntryToDelete, setFeedingEntryToDelete] = useState(null);
+  const [submittingFeeding, setSubmittingFeeding] = useState(false);
+
+  const handleStartEditFeedingEntry = (item) => {
+    setEditingFeedingEntry(item);
+    setFeedingFoodType(item.food_type || '');
+    setFeedingWeight(item.daily_weight || '');
+    setFeedingComposition(item.composition || '');
+    setFeedingSchedule(item.schedule || '');
+    setFeedingNotes(item.notes || '');
+  };
+
+  const handleCancelEditFeedingEntry = () => {
+    setEditingFeedingEntry(null);
+  };
+
+  const handleSaveEditedFeedingEntry = async (e) => {
+    e.preventDefault();
+    if (!editingFeedingEntry || !onSaveFeedingEntry) return;
+    setSubmittingFeeding(true);
+    try {
+      await onSaveFeedingEntry(pen.id, {
+        food_type: feedingFoodType.trim(),
+        daily_weight: feedingWeight,
+        composition: feedingComposition.trim(),
+        schedule: feedingSchedule.trim(),
+        notes: feedingNotes.trim(),
+        date: editingFeedingEntry.date || new Date().toISOString()
+      }, editingFeedingEntry.id);
+      setEditingFeedingEntry(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmittingFeeding(false);
+    }
+  };
+
+  const confirmDeleteFeedingEntry = async () => {
+    if (!feedingEntryToDelete || !onDeleteFeedingEntry) return;
+    try {
+      await onDeleteFeedingEntry(feedingEntryToDelete.id);
+      setFeedingEntryToDelete(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const penMilkEntries = useMemo(() => {
     if (!isMilkingMode) return [];
@@ -436,8 +517,9 @@ export default function PenFeedingHistoryModal({ pen, onClose, onOpenEditForm, g
                 )}
 
                 {currentRation.notes && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>
-                    💡 {currentRation.notes}
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'flex-start', gap: '6px', marginTop: '4px', background: '#ffffff', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <FileText size={13} color="var(--primary)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <span>{currentRation.notes}</span>
                   </div>
                 )}
               </div>
@@ -473,18 +555,30 @@ export default function PenFeedingHistoryModal({ pen, onClose, onOpenEditForm, g
                           gap: '4px'
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                           <strong style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-main)' }}>
                             {item.food_type}
                           </strong>
-                          <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
-                            {formatDateLabel(item.date)}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                              {formatDateLabel(item.date)}
+                            </span>
+                            {item.id && (
+                              <div style={{ display: 'flex', gap: '6px', marginLeft: '2px' }}>
+                                <button type="button" onClick={() => handleStartEditFeedingEntry(item)} style={{ background: 'transparent', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 0 }} title="Edit Feed Log">
+                                  <Pencil size={13} />
+                                </button>
+                                <button type="button" onClick={() => setFeedingEntryToDelete(item)} style={{ background: 'transparent', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: 0 }} title="Delete Feed Log">
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         {item.daily_weight && (
                           <span style={{ fontSize: '11px', color: 'var(--primary-dark)', fontWeight: '700' }}>
-                            Weight: {item.daily_weight}
+                            Weight: {item.daily_weight} {typeof item.daily_weight === 'number' || !String(item.daily_weight).includes('kg') ? 'kg' : ''}
                           </span>
                         )}
 
@@ -495,8 +589,8 @@ export default function PenFeedingHistoryModal({ pen, onClose, onOpenEditForm, g
                         )}
 
                         {item.notes && (
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                            Notes: {item.notes}
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <FileText size={10} color="var(--primary)" /> {item.notes}
                           </span>
                         )}
                       </div>
@@ -514,6 +608,66 @@ export default function PenFeedingHistoryModal({ pen, onClose, onOpenEditForm, g
           </button>
         </div>
       </div>
+
+      {/* EDIT FEEDING ENTRY MODAL */}
+      {editingFeedingEntry && (
+        <div className="modal-overlay" onClick={handleCancelEditFeedingEntry} style={{ zIndex: 130, fontFamily: "'Outfit', sans-serif" }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', padding: '18px', fontFamily: "'Outfit', sans-serif" }}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title" style={{ fontFamily: "'Outfit', sans-serif", margin: 0 }}>Edit Feed Log</h3>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Update feeding record for Pen {pen?.letter}</span>
+              </div>
+              <button className="close-btn" onClick={handleCancelEditFeedingEntry} disabled={submittingFeeding}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedFeedingEntry} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+              <div>
+                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Food Name / Feed Type *</label>
+                <input type="text" className="form-input" value={feedingFoodType} onChange={(e) => setFeedingFoodType(e.target.value)} placeholder="Alfalfa Hay, Grain Mix..." disabled={submittingFeeding} required />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Daily Weight (kg)</label>
+                  <input type="number" step="0.1" className="form-input" value={feedingWeight} onChange={(e) => setFeedingWeight(e.target.value)} placeholder="e.g. 15.0" disabled={submittingFeeding} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Schedule / Timing</label>
+                  <input type="text" className="form-input" value={feedingSchedule} onChange={(e) => setFeedingSchedule(e.target.value)} placeholder="Twice daily..." disabled={submittingFeeding} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Composition / Formula</label>
+                <input type="text" className="form-input" value={feedingComposition} onChange={(e) => setFeedingComposition(e.target.value)} placeholder="70% Alfalfa, 30% Grain" disabled={submittingFeeding} />
+              </div>
+              <div>
+                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Notes</label>
+                <input type="text" className="form-input" value={feedingNotes} onChange={(e) => setFeedingNotes(e.target.value)} placeholder="Ration notes..." disabled={submittingFeeding} />
+              </div>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={handleCancelEditFeedingEntry} disabled={submittingFeeding}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary btn-sm" disabled={submittingFeeding}>
+                  {submittingFeeding ? <><Loader2 size={14} className="spinner" /> Saving...</> : 'Save Feed Log'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE FEEDING CONFIRM MODAL */}
+      {feedingEntryToDelete && (
+        <DeleteConfirmModal
+          title="Delete Feed Log"
+          message="Are you sure you want to delete this feeding record?"
+          onClose={() => setFeedingEntryToDelete(null)}
+          onConfirm={confirmDeleteFeedingEntry}
+        />
+      )}
 
       {editingEntry && (
         <div className="modal-overlay" onClick={handleCancelEditEntry} style={{ zIndex: 130, fontFamily: "'Outfit', sans-serif" }}>
