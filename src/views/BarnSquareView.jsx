@@ -97,8 +97,7 @@ export default function BarnSquareView({
         const newLabel = editNote.trim();
         await onUpdateBarnArea(pen.id, {
           letter: newLetter,
-          name: newLabel ? newLabel : `Pen ${newLetter}`,
-          note: newLabel
+          name: newLabel ? newLabel : `Pen ${newLetter}`
         });
       }
       setEditingPenId(null);
@@ -119,8 +118,7 @@ export default function BarnSquareView({
         const label = newNote.trim();
         await onAddBarnArea({
           letter: nextLetter,
-          name: label ? label : `Pen ${nextLetter}`,
-          note: label
+          name: label ? label : `Pen ${nextLetter}`
         });
       }
       setNewLetter('');

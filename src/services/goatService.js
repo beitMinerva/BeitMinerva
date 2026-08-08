@@ -103,24 +103,18 @@ export async function addBarnArea(areaData) {
   const newArea = {
     id: `area-${Date.now()}`,
     letter: areaData.letter || nextLetter,
-    name: areaData.name || `Pen ${areaData.letter || nextLetter}`,
-    note: areaData.note || ''
+    name: areaData.name || `Pen ${areaData.letter || nextLetter}`
   };
 
-  try {
-    const { data, error } = await supabase.from('barn_areas').insert([newArea]).select().single();
-    if (!error && data) {
-      const updated = [...currentAreas, data].sort((a, b) => (a.letter || '').localeCompare(b.letter || ''));
-      localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updated));
-      return data;
-    }
-  } catch (err) {
-    console.warn('Supabase add barn area notice:', err.message);
+  const { data, error } = await supabase.from('barn_areas').insert([newArea]).select().single();
+  if (error) {
+    console.error('Supabase addBarnArea error:', error);
+    throw new Error(error.message || 'Failed to add pen.');
   }
 
-  const updated = [...currentAreas, newArea].sort((a, b) => (a.letter || '').localeCompare(b.letter || ''));
+  const updated = [...currentAreas, data].sort((a, b) => (a.letter || '').localeCompare(b.letter || ''));
   localStorage.setItem('beit_minerva_barn_areas', JSON.stringify(updated));
-  return newArea;
+  return data;
 }
 
 export async function updateBarnArea(id, updates) {
