@@ -9,31 +9,32 @@ export default function GoatMetricsChart({ goat, events = [] }) {
 
   // Extract date & value pairs for selected metric
   const chartData = useMemo(() => {
+    if (!goat) return [];
     let rawPoints = [];
 
     if (metric === 'weight') {
-      const weightEvents = events.filter(
-        (e) => e.type === 'Weight Check' || e.title.toLowerCase().includes('weight') || e.title.toLowerCase().includes('kg')
+      const weightEvents = (events || []).filter(
+        (e) => e.type === 'Weight Check' || (e.title && (e.title.toLowerCase().includes('weight') || e.title.toLowerCase().includes('kg')))
       );
       
       rawPoints = weightEvents.map((e) => {
-        const numMatch = e.title.match(/(\d+(\.\d+)?)/);
-        const val = numMatch ? parseFloat(numMatch[1]) : (goat.weight || 45);
+        const numMatch = e.title ? e.title.match(/(\d+(\.\d+)?)/) : null;
+        const val = numMatch ? parseFloat(numMatch[1]) : (goat?.weight || 45);
         return { date: new Date(e.date), timestamp: new Date(e.date).getTime(), val, label: `${val} kg` };
       });
 
       // Always include current goat weight if available
-      if (goat.weight && !rawPoints.some(p => p.val === goat.weight)) {
+      if (goat?.weight && !rawPoints.some(p => p.val === goat.weight)) {
         const createTime = new Date(goat.created_at || Date.now()).getTime();
         rawPoints.unshift({ date: new Date(createTime), timestamp: createTime, val: goat.weight, label: `${goat.weight} kg` });
       }
     } else if (metric === 'milking') {
-      const milkEvents = events.filter(
-        (e) => e.type === 'Milking Yield' || e.type === 'Milking' || e.title.toLowerCase().includes('milk') || e.title.toLowerCase().includes('l')
+      const milkEvents = (events || []).filter(
+        (e) => e.type === 'Milking Yield' || e.type === 'Milking' || (e.title && (e.title.toLowerCase().includes('milk') || e.title.toLowerCase().includes('l')))
       );
 
       rawPoints = milkEvents.map((e) => {
-        const numMatch = e.title.match(/(\d+(\.\d+)?)/);
+        const numMatch = e.title ? e.title.match(/(\d+(\.\d+)?)/) : null;
         const val = numMatch ? parseFloat(numMatch[1]) : 3.0;
         return { date: new Date(e.date), timestamp: new Date(e.date).getTime(), val, label: `${val} L` };
       });
@@ -71,7 +72,9 @@ export default function GoatMetricsChart({ goat, events = [] }) {
     }
 
     return sorted;
-  }, [metric, timeRange, startDate, endDate, events, goat.weight, goat.created_at]);
+  }, [metric, timeRange, startDate, endDate, events, goat?.weight, goat?.created_at]);
+
+  if (!goat) return null;
 
   return (
     <div style={{ background: '#ffffff', padding: '14px', borderRadius: '14px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
