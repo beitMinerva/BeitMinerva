@@ -1,86 +1,101 @@
-import React, { useState } from 'react';
-import { Database, Copy, Check, Server } from 'lucide-react';
-import { getSupabaseSqlSchema } from '../services/goatService';
+import React from 'react';
+import { User, LogIn, LogOut, ShieldCheck, Info } from 'lucide-react';
 
-export default function SettingsView({ goats = [] }) {
-  const [copiedSql, setCopiedSql] = useState(false);
-
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(getSupabaseSqlSchema());
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 3000);
-  };
-
+export default function SettingsView({ goats = [], session = null, onOpenLogin, onSignOut }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div>
-        <h2 style={{ fontSize: '20px', fontWeight: '800' }}>System & Developer Settings</h2>
+        <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Settings & Access</h2>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          System diagnostics and database deployment script.
+          Manage admin access and farm overview information.
         </p>
       </div>
 
-      {/* Pure Supabase Connection Status Card */}
-      <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#e8f5e9', color: '#2e7d32', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Server size={22} />
-          </div>
-          <div>
-            <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>Direct Supabase Database</h3>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Environment variable configured (`src/config/supabase.js`)
-            </span>
-          </div>
-        </div>
+      {/* ACCOUNT ACCESS CARD */}
+      <div className="card" style={{ padding: '16px' }}>
+        <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <User size={18} color="var(--primary)" />
+          Account & Access Level
+        </h3>
 
-        <div style={{ background: 'var(--bg-subtle)', padding: '12px', borderRadius: '10px', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Database Connection:</span>
-            <strong style={{ color: '#2e7d32' }}>● Active Supabase Client</strong>
+        {session ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid var(--primary-border)',
+              borderRadius: '12px',
+              padding: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                  <ShieldCheck size={16} color="var(--primary-dark)" />
+                  <strong style={{ fontSize: '14px', color: 'var(--primary-dark)' }}>Admin Access Granted</strong>
+                </div>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {session.user?.email || 'Logged in as Admin'}
+                </span>
+              </div>
+            </div>
+
+            <button
+              className="btn btn-secondary btn-full"
+              onClick={onSignOut}
+              style={{ color: '#dc2626', borderColor: '#fee2e2', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            >
+              <LogOut size={16} />
+              <span>Log Out Admin</span>
+            </button>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid var(--border-color)',
+              borderRadius: '12px',
+              padding: '12px'
+            }}>
+              <strong style={{ fontSize: '13px', display: 'block', marginBottom: '2px' }}>Guest Mode (Read-Only)</strong>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                You can browse all farm records. Sign in to add or edit data.
+              </span>
+            </div>
+
+            <button
+              className="btn btn-primary btn-full"
+              onClick={onOpenLogin}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            >
+              <LogIn size={16} />
+              <span>Admin Sign In</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* FARM SUMMARY CARD */}
+      <div className="card" style={{ padding: '16px' }}>
+        <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Info size={18} color="var(--primary)" />
+          Farm Overview
+        </h3>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px dashed var(--border-color)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Farm Name:</span>
+            <strong>Beit Minerva</strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px dashed var(--border-color)' }}>
             <span style={{ color: 'var(--text-muted)' }}>Total Goats Registered:</span>
             <strong>{goats.length} Goats</strong>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Photo Storage:</span>
-            <strong>Supabase Storage (`goat-photos`)</strong>
+            <span style={{ color: 'var(--text-muted)' }}>Database Status:</span>
+            <strong style={{ color: 'var(--primary)' }}>● Connected to Supabase</strong>
           </div>
         </div>
-      </div>
-
-      {/* SQL Setup Helper for Deployment */}
-      <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Database size={20} color="#0284c7" />
-            <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>Supabase SQL Schema</h3>
-          </div>
-          <button className="btn btn-outline btn-sm" onClick={handleCopySql}>
-            {copiedSql ? <Check size={14} color="#2e7d32" /> : <Copy size={14} />}
-            <span>{copiedSql ? 'Copied!' : 'Copy SQL'}</span>
-          </button>
-        </div>
-
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
-          Run this SQL script in your Supabase project SQL Editor to automatically create tables for `goats`, `timeline_events`, and `barn_areas`.
-        </p>
-
-        <pre
-          style={{
-            background: '#0f172a',
-            color: '#38bdf8',
-            padding: '12px',
-            borderRadius: '10px',
-            fontSize: '11px',
-            maxHeight: '160px',
-            overflowY: 'auto',
-            fontFamily: 'monospace'
-          }}
-        >
-          {getSupabaseSqlSchema()}
-        </pre>
       </div>
     </div>
   );

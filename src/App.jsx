@@ -212,14 +212,11 @@ export default function App() {
     <div className="app-container">
       {/* Beit Minerva Header */}
       <Header
-        session={session}
         onOpenScanner={() => setActiveTab('scanner')}
         onOpenAddGoat={() => requireAdmin(() => {
           setGoatToEdit(null);
           setShowAddGoatModal(true);
         })}
-        onOpenLogin={() => setShowLoginModal(true)}
-        onSignOut={handleSignOut}
       />
 
       {/* Toast Notification */}
@@ -295,7 +292,12 @@ export default function App() {
             )}
 
             {activeTab === 'settings' && (
-              <SettingsView goats={goats} />
+              <SettingsView
+                goats={goats}
+                session={session}
+                onOpenLogin={() => setShowLoginModal(true)}
+                onSignOut={handleSignOut}
+              />
             )}
           </>
         )}
