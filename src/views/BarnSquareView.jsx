@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, ArrowRightLeft, Pencil, Edit2, Trash2, X, Loader2, ChevronRight } from 'lucide-react';
+import { Search, Plus, ArrowRightLeft, Pencil, Edit2, Trash2, X, Loader2, ChevronRight, Syringe } from 'lucide-react';
 import GoatCard from '../components/GoatCard';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
@@ -9,6 +9,7 @@ export default function BarnSquareView({
   onRequireAdmin,
   onSelectGoat,
   onOpenAddGoat,
+  onOpenLogEvent,
   onTransferGoatArea,
   onAddBarnArea,
   onUpdateBarnArea,
@@ -168,19 +169,30 @@ export default function BarnSquareView({
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: '800' }}>Barn Pens</h2>
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => {
-              if (onRequireAdmin) {
-                onRequireAdmin(() => setShowManageModal(true));
-              } else {
-                setShowManageModal(true);
-              }
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
-          >
-            <Pencil size={13} /> Edit Pens
-          </button>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {onOpenLogEvent && (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={onOpenLogEvent}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
+              >
+                <Syringe size={14} /> Log Vaccine
+              </button>
+            )}
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                if (onRequireAdmin) {
+                  onRequireAdmin(() => setShowManageModal(true));
+                } else {
+                  setShowManageModal(true);
+                }
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
+            >
+              <Pencil size={13} /> Edit Pens
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>

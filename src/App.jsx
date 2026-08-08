@@ -277,6 +277,10 @@ export default function App() {
                   setGoatToEdit(null);
                   setShowAddGoatModal(true);
                 })}
+                onOpenLogEvent={() => requireAdmin(() => {
+                  setGoatForEvent(null);
+                  setShowAddEventModal(true);
+                })}
                 onTransferGoatArea={handleTransferGoatArea}
                 onAddBarnArea={handleAddBarnArea}
                 onUpdateBarnArea={handleUpdateBarnArea}
@@ -307,6 +311,10 @@ export default function App() {
                 onOpenAddGoat={() => requireAdmin(() => {
                   setGoatToEdit(null);
                   setShowAddGoatModal(true);
+                })}
+                onOpenLogEvent={() => requireAdmin(() => {
+                  setGoatForEvent(null);
+                  setShowAddEventModal(true);
                 })}
               />
             )}

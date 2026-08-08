@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Syringe } from 'lucide-react';
 import GoatCard from '../components/GoatCard';
 
-export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat }) {
+export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, onOpenLogEvent }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('All');
 
@@ -47,11 +47,20 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat }) 
         ))}
       </div>
 
-      {/* Herd List Count */}
+      {/* Herd List Count & Log Vaccine Button */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ fontSize: '15px', fontWeight: '800' }}>
-          Goat Herd Directory ({filteredGoats.length})
+          Herd Directory ({filteredGoats.length})
         </h2>
+        {onOpenLogEvent && (
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={onOpenLogEvent}
+            style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
+          >
+            <Syringe size={14} /> Log Vaccine
+          </button>
+        )}
       </div>
 
       {/* Goat Cards */}
