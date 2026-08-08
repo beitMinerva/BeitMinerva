@@ -6,6 +6,7 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal';
 export default function BarnSquareView({
   goats = [],
   barnAreas = [],
+  onRequireAdmin,
   onSelectGoat,
   onOpenAddGoat,
   onTransferGoatArea,
@@ -13,7 +14,7 @@ export default function BarnSquareView({
   onUpdateBarnArea,
   onDeleteBarnArea
 }) {
-  // Use barnAreas from Supabase/local storage if available, otherwise fallback to default pens
+  // ...
   const pens = barnAreas.length > 0 ? barnAreas : [
     { id: 'area-1', letter: 'A', name: 'Pen A' },
     { id: 'area-2', letter: 'B', name: 'Pen B' },
@@ -169,7 +170,13 @@ export default function BarnSquareView({
           <h2 style={{ fontSize: '16px', fontWeight: '800' }}>Barn Pens</h2>
           <button
             className="btn btn-secondary btn-sm"
-            onClick={() => setShowManageModal(true)}
+            onClick={() => {
+              if (onRequireAdmin) {
+                onRequireAdmin(() => setShowManageModal(true));
+              } else {
+                setShowManageModal(true);
+              }
+            }}
             style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
           >
             <Pencil size={13} /> Edit Pens
@@ -276,7 +283,13 @@ export default function BarnSquareView({
                   <button
                     className="btn btn-outline btn-sm"
                     title="Move Goat"
-                    onClick={() => setTransferringGoat(g)}
+                    onClick={() => {
+                      if (onRequireAdmin) {
+                        onRequireAdmin(() => setTransferringGoat(g));
+                      } else {
+                        setTransferringGoat(g);
+                      }
+                    }}
                     style={{ padding: '8px 10px', flexShrink: 0 }}
                   >
                     <ArrowRightLeft size={14} />

@@ -253,6 +253,7 @@ export default function App() {
               <BarnSquareView
                 goats={goats}
                 barnAreas={barnAreas}
+                onRequireAdmin={requireAdmin}
                 onSelectGoat={(g) => setSelectedGoat(g)}
                 onOpenAddGoat={() => requireAdmin(() => {
                   setGoatToEdit(null);
