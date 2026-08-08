@@ -1,14 +1,4 @@
-import { getSupabase } from './supabaseClient';
-
-const supabase = new Proxy({}, {
-  get(target, prop) {
-    const client = getSupabase();
-    if (!client) {
-      return () => Promise.resolve({ data: null, error: new Error('Supabase credentials not configured in Settings.') });
-    }
-    return typeof client[prop] === 'function' ? client[prop].bind(client) : client[prop];
-  }
-});
+import { supabase } from '../config/supabase';
 
 export function calculateGoatAge(birthDate) {
   if (!birthDate) return 'Age unknown';
@@ -69,12 +59,17 @@ export async function addBarnArea(areaData) {
 }
 
 export async function updateBarnArea(id, updates) {
-  const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
-  if (error) {
-    console.error('Supabase updateBarnArea error:', error);
-    throw new Error(error.message || 'Failed to update pen.');
+  try {
+    const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
+    if (error) {
+      console.warn('Supabase updateBarnArea notice:', error.message);
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.warn('Supabase updateBarnArea notice:', err.message);
+    return null;
   }
-  return data;
 }
 
 export async function deleteBarnArea(id) {

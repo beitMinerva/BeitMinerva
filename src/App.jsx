@@ -12,6 +12,7 @@ import ScannerView from './views/ScannerView';
 import CalendarView from './views/CalendarView';
 import GoatsView from './views/GoatsView';
 import SettingsView from './views/SettingsView';
+import { checkUpcomingTasksAndNotify } from './services/notificationService';
 
 import {
   getGoats,
@@ -86,6 +87,9 @@ export default function App() {
       setGoats(goatsData);
       setBarnAreas(areasData);
       setRecentEvents(eventsData);
+
+      // Check for due tasks & send Web Push Notifications
+      checkUpcomingTasksAndNotify(eventsData, goatsData);
     } catch (err) {
       console.error('Error loading data:', err);
     } finally {

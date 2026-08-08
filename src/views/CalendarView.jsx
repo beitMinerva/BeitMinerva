@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Bell, Syringe, Pill, Milk, Weight, Heart, X, Loader2, Trash2, Edit2, RotateCw, Users, Home, CheckSquare, Square, Search, Filter, History } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Bell, Syringe, Pill, Milk, Weight, Heart, Scissors, X, Loader2, Trash2, Edit2, RotateCw, Users, Home, CheckSquare, Square, Search, Filter, History } from 'lucide-react';
 import ReminderDetailModal from '../components/ReminderDetailModal';
 import EditReminderModal from '../components/EditReminderModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
@@ -35,6 +35,7 @@ export function getRepeatLabel(event) {
     case 'daily': return 'Daily';
     case 'weekly': return 'Weekly';
     case 'monthly': return 'Monthly';
+    case 'every_2_months': return 'Every 2 Months';
     case 'every_3_months': return 'Every 3 Months';
     case 'every_6_months': return 'Every 6 Months';
     case 'yearly': return 'Yearly';
@@ -98,6 +99,11 @@ export function doesEventOccurOnDate(event, targetDateStr) {
 
   if (frequency === 'monthly') {
     return targetDate.getDate() === startDate.getDate();
+  }
+
+  if (frequency === 'every_2_months') {
+    const monthsDiff = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + (targetDate.getMonth() - startDate.getMonth());
+    return targetDate.getDate() === startDate.getDate() && monthsDiff >= 0 && monthsDiff % 2 === 0;
   }
 
   if (frequency === 'every_3_months') {

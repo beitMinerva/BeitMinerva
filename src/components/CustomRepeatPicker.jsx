@@ -15,6 +15,7 @@ export default function CustomRepeatPicker({
     { id: 'daily', label: 'Every Day', desc: 'Repeats daily', icon: Clock },
     { id: 'weekly', label: 'Every Week', desc: 'Repeats every 7 days', icon: CalendarDays },
     { id: 'monthly', label: 'Every Month', desc: 'Repeats monthly on date', icon: Calendar },
+    { id: 'every_2_months', label: 'Every 2 Months', desc: 'Recommended for Hoof Trimming', icon: RotateCw },
     { id: 'every_3_months', label: 'Every 3 Months', desc: 'Quarterly schedule', icon: RotateCw },
     { id: 'every_6_months', label: 'Every 6 Months', desc: 'Bi-annual schedule', icon: RefreshCw },
     { id: 'yearly', label: 'Every Year', desc: 'Annual booster / checkup', icon: Sparkles },

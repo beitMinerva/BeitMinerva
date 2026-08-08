@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, FileText, Check, Users, Home, CheckSquare, Square, Search, Plus, Trash2, Sparkles } from 'lucide-react';
+import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, FileText, Scissors, Check, Users, Home, CheckSquare, Square, Search, Plus, Trash2, Sparkles, RotateCw } from 'lucide-react';
+import CustomRepeatPicker from './CustomRepeatPicker';
 
 export default function AddEventModal({ goat, goats = [], barnAreas = [], onClose, onSave }) {
   const [isClosing, setIsClosing] = useState(false);
 
   const categories = [
+    { id: 'Hoof Trimming', label: 'Hoof Trimming / Cutting', icon: Scissors, color: '#b45309', bg: '#fef3c7', border: '#fde68a' },
     { id: 'Vaccination', label: 'Vaccination', icon: Syringe, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
     { id: 'Medication', label: 'Medication', icon: Pill, color: '#c2410c', bg: '#fff7ed', border: '#ffedd5' },
     { id: 'Milking Yield', label: 'Milking Yield', icon: Milk, color: '#0369a1', bg: '#f0f9ff', border: '#e0f2fe' },
@@ -24,6 +26,10 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
   const [selectedCategory, setSelectedCategory] = useState(categories[0]);
   const [milkYieldLiters, setMilkYieldLiters] = useState('3.5');
   const [weightKg, setWeightKg] = useState(goat?.weight || '45.0');
+
+  // Recurrence / Repeat Frequency
+  const [repeatFrequency, setRepeatFrequency] = useState('every_2_months');
+  const [customRepeatDays, setCustomRepeatDays] = useState('60');
 
   // Dynamic multi-medicine / vaccine list with empty optional dosage by default
   const [medicines, setMedicines] = useState([
@@ -49,6 +55,9 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
 
   const handleSelectCategory = (cat) => {
     setSelectedCategory(cat);
+    if (cat.id === 'Hoof Trimming') {
+      setRepeatFrequency('every_2_months');
+    }
     // Reset medicine list when switching categories
     setMedicines([{ id: `med-${Date.now()}`, name: '', dosage: '' }]);
   };
@@ -101,8 +110,8 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const targetGoatsList = getTargetGoats();
 
+    const targetGoatsList = getTargetGoats();
     if (targetGoatsList.length === 0) {
       alert('Please select at least one goat for this event.');
       return;
@@ -110,23 +119,23 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
 
     setSubmitting(true);
 
-    let eventTitle = selectedCategory.label;
+    let eventTitle = '';
     const males = parseInt(maleKidsCount) || 0;
     const females = parseInt(femaleKidsCount) || 0;
     const totalKids = males + females;
 
-    if (selectedCategory.id === 'Milking Yield') {
-      const val = parseFloat(milkYieldLiters) || 0;
-      eventTitle = `Milking Yield: ${val} L`;
+    if (selectedCategory.id === 'Hoof Trimming') {
+      eventTitle = 'Hoof Trimming & Cutting';
+    } else if (selectedCategory.id === 'Milking Yield') {
+      eventTitle = `Milking Yield: ${milkYieldLiters} L`;
     } else if (selectedCategory.id === 'Weight Check') {
-      const val = parseFloat(weightKg) || 0;
-      eventTitle = `Weight Logged: ${val} kg`;
+      eventTitle = `Weight Logged: ${weightKg} kg`;
     } else if (selectedCategory.id === 'Vaccination' || selectedCategory.id === 'Medication') {
-      const medSummary = medicines
-        .filter((m) => m.name.trim())
+      const validMeds = medicines.filter((m) => m.name.trim().length > 0);
+      const medSummary = validMeds
         .map((m) => {
-          const doseStr = m.dosage.trim();
-          return doseStr ? `${m.name.trim()} (${doseStr} ml)` : m.name.trim();
+          const doseStr = m.dosage.trim() ? ` (${m.dosage.trim()})` : '';
+          return `${m.name.trim()}${doseStr}`;
         })
         .join(', ');
       eventTitle = `${selectedCategory.id}: ${medSummary || 'Log'}`;
@@ -150,7 +159,9 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
         male_kids: males,
         female_kids: females,
         total_kids: totalKids,
-        medicines_list: medicines
+        medicines_list: medicines,
+        repeat_frequency: repeatFrequency,
+        custom_repeat_days: customRepeatDays
       }
     }));
 
@@ -272,155 +283,80 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
                       gap: '4px'
                     }}
                   >
-                    <CheckSquare size={13} /> Select Specific
+                    <CheckSquare size={13} /> Custom Select
                   </button>
                 </div>
 
-                {/* ENTIRE HERD PREVIEW */}
-                {targetMode === 'ALL' && (
-                  <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                    <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--primary-dark)', display: 'block', marginBottom: '6px' }}>
-                      Selected Herd ({goats.length} Goats):
-                    </span>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxHeight: '90px', overflowY: 'auto' }}>
-                      {goats.map((g) => (
-                        <span
-                          key={g.id}
+                {targetMode === 'PEN' && (
+                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+                    {barnAreas.map((pen) => {
+                      const count = goats.filter((g) => g.area_id === pen.id).length;
+                      const isSel = selectedPenId === pen.id;
+                      return (
+                        <button
+                          key={pen.id}
+                          type="button"
+                          onClick={() => setSelectedPenId(pen.id)}
                           style={{
-                            fontSize: '10px',
-                            fontWeight: '700',
-                            background: '#f1f5f9',
-                            color: 'var(--text-main)',
-                            padding: '2px 8px',
-                            borderRadius: '6px'
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            border: isSel ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                            background: isSel ? 'var(--primary)' : '#ffffff',
+                            color: isSel ? '#ffffff' : 'var(--text-main)',
+                            fontWeight: '800',
+                            fontSize: '11px',
+                            whiteSpace: 'nowrap',
+                            cursor: 'pointer'
                           }}
                         >
-                          {g.tag_id} • {g.name}
-                        </span>
-                      ))}
-                    </div>
+                          Pen {pen.letter} ({count})
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
-                {/* PEN SELECTION PICKER & GOAT LIST */}
-                {targetMode === 'PEN' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
-                      {barnAreas.map((pen) => {
-                        const isSelected = selectedPenId === pen.id;
-                        const penGoatCount = goats.filter((g) => g.area_id === pen.id).length;
-
-                        return (
-                          <button
-                            key={pen.id}
-                            type="button"
-                            onClick={() => setSelectedPenId(pen.id)}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '8px',
-                              fontSize: '11px',
-                              fontWeight: '700',
-                              border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-color)',
-                              background: isSelected ? 'var(--primary-gradient)' : '#ffffff',
-                              color: isSelected ? '#ffffff' : 'var(--text-main)',
-                              cursor: 'pointer',
-                              flexShrink: 0
-                            }}
-                          >
-                            Pen {pen.letter} ({penGoatCount})
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div style={{ background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--primary-dark)', display: 'block', marginBottom: '6px' }}>
-                        Goats in Selected Pen ({goats.filter((g) => g.area_id === selectedPenId).length}):
-                      </span>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxHeight: '90px', overflowY: 'auto' }}>
-                        {goats.filter((g) => g.area_id === selectedPenId).map((g) => (
-                          <span
-                            key={g.id}
-                            style={{
-                              fontSize: '10px',
-                              fontWeight: '700',
-                              background: '#ecfdf5',
-                              color: 'var(--primary-dark)',
-                              padding: '2px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--primary-border)'
-                            }}
-                          >
-                            {g.tag_id} • {g.name}
-                          </span>
-                        ))}
-                        {goats.filter((g) => g.area_id === selectedPenId).length === 0 && (
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                            No goats assigned to this pen.
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* CUSTOM GOAT CHECKBOX SELECTION LIST */}
                 {targetMode === 'CUSTOM' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Search tag ID or name..."
-                        value={goatSearchTerm}
-                        onChange={(e) => setGoatSearchTerm(e.target.value)}
-                        style={{ padding: '6px 10px', fontSize: '12px' }}
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={handleSelectAllCustom}
-                        style={{ padding: '6px 8px', fontSize: '11px', flexShrink: 0 }}
-                      >
-                        Select All
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={handleDeselectAllCustom}
-                        style={{ padding: '6px 8px', fontSize: '11px', flexShrink: 0 }}
-                      >
-                        Clear
-                      </button>
+                      <div className="search-input-wrapper" style={{ flex: 1, margin: 0 }}>
+                        <Search size={13} className="search-icon" />
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Search goats..."
+                          value={goatSearchTerm}
+                          onChange={(e) => setGoatSearchTerm(e.target.value)}
+                          style={{ padding: '6px 10px 6px 28px', fontSize: '11px' }}
+                        />
+                      </div>
+
+                      <button type="button" className="btn btn-xs btn-outline" onClick={handleSelectAllCustom}>Select All</button>
+                      <button type="button" className="btn btn-xs btn-outline" onClick={handleDeselectAllCustom}>Clear</button>
                     </div>
 
-                    <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', background: '#ffffff', padding: '8px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ maxHeight: '140px', overflowY: 'auto', background: '#ffffff', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '6px' }}>
                       {searchedGoats.map((g) => {
-                        const isChecked = selectedGoatIds.includes(g.id);
-
+                        const isSel = selectedGoatIds.includes(g.id);
                         return (
                           <div
                             key={g.id}
                             onClick={() => toggleGoatSelection(g.id)}
                             style={{
-                              padding: '6px 8px',
-                              borderRadius: '8px',
-                              border: isChecked ? '1px solid var(--primary-border)' : '1px solid var(--border-color)',
-                              background: isChecked ? 'var(--primary-light)' : '#f8fafc',
-                              cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '11px'
+                              justifyContent: 'space-between',
+                              padding: '6px 8px',
+                              borderRadius: '6px',
+                              background: isSel ? 'var(--primary-light)' : 'transparent',
+                              cursor: 'pointer',
+                              marginBottom: '2px'
                             }}
                           >
-                            <div style={{ color: isChecked ? 'var(--primary)' : 'var(--text-light)' }}>
-                              {isChecked ? <CheckSquare size={14} /> : <Square size={14} />}
-                            </div>
-                            <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <strong style={{ display: 'block', fontSize: '11px' }}>{g.tag_id}</strong>
-                              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{g.name}</span>
-                            </div>
+                            <span style={{ fontSize: '11px', fontWeight: '800', color: isSel ? 'var(--primary-dark)' : 'var(--text-main)' }}>
+                              {g.tag_id} - {g.name}
+                            </span>
+                            {isSel ? <CheckSquare size={13} color="var(--primary)" /> : <Square size={13} color="var(--text-muted)" />}
                           </div>
                         );
                       })}
@@ -430,134 +366,95 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
               </div>
             )}
 
-            {/* EVENT CATEGORY CARDS SELECTOR */}
+            {/* EVENT CATEGORY SELECTOR */}
             <div className="form-group">
-              <label className="form-label">Select Event Category</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+              <label className="form-label">Event Category *</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
                 {categories.map((cat) => {
                   const Icon = cat.icon;
                   const isSelected = selectedCategory.id === cat.id;
 
                   return (
-                    <div
+                    <button
                       key={cat.id}
-                      onClick={() => !submitting && handleSelectCategory(cat)}
+                      type="button"
+                      onClick={() => handleSelectCategory(cat)}
                       style={{
-                        padding: '10px 8px',
-                        borderRadius: '12px',
-                        border: isSelected ? `2px solid ${cat.color}` : '1px solid var(--border-color)',
-                        background: isSelected ? cat.bg : '#ffffff',
-                        cursor: 'pointer',
                         display: 'flex',
-                        flexDirection: 'column',
                         alignItems: 'center',
                         gap: '6px',
-                        textAlign: 'center',
-                        transition: 'all 0.18s ease',
-                        position: 'relative'
+                        padding: '10px 8px',
+                        borderRadius: '12px',
+                        border: isSelected ? `2px solid ${cat.color}` : '1.5px solid var(--border-color)',
+                        background: isSelected ? cat.bg : '#ffffff',
+                        color: isSelected ? cat.color : 'var(--text-main)',
+                        fontWeight: isSelected ? '800' : '600',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        textAlign: 'left'
                       }}
                     >
-                      {isSelected && (
-                        <div style={{ position: 'absolute', top: '4px', right: '4px', background: cat.color, borderRadius: '50%', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Check size={10} color="#ffffff" />
-                        </div>
-                      )}
-                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: isSelected ? '#ffffff' : cat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon size={16} color={cat.color} />
-                      </div>
-                      <span style={{ fontSize: '11px', fontWeight: '800', color: isSelected ? cat.color : 'var(--text-main)', lineHeight: 1.1 }}>
-                        {cat.label}
-                      </span>
-                    </div>
+                      <Icon size={16} color={cat.color} />
+                      <span style={{ lineHeight: 1.2 }}>{cat.label}</span>
+                    </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* PREDEFINED CATEGORY STRUCTURED FIELDS */}
-            {selectedCategory.id === 'Milking Yield' && (
-              <div className="form-group" style={{ background: '#f0f9ff', padding: '12px', borderRadius: '12px', border: '1px solid #e0f2fe' }}>
-                <label className="form-label" style={{ color: '#0369a1' }}>Milk Yield (Liters) *</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  className="form-input"
-                  placeholder="e.g. 3.5"
-                  value={milkYieldLiters}
-                  onChange={(e) => setMilkYieldLiters(e.target.value)}
-                  required
-                  disabled={submitting}
-                />
+            {/* CATEGORY SPECIFIC FIELDS */}
+            {selectedCategory.id === 'Hoof Trimming' && (
+              <div style={{ background: '#fef3c7', border: '1.5px solid #fde68a', padding: '12px', borderRadius: '14px', marginBottom: '14px' }}>
+                <span style={{ fontSize: '12px', fontWeight: '800', color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <Scissors size={15} /> Hoof Trimming & Maintenance
+                </span>
+                <p style={{ fontSize: '11px', color: '#92400e', margin: 0 }}>
+                  Trimming hooves prevents infection and foot rot. Recommended schedule: Every 2 months.
+                </p>
               </div>
             )}
 
-            {selectedCategory.id === 'Weight Check' && (
-              <div className="form-group" style={{ background: '#faf5ff', padding: '12px', borderRadius: '12px', border: '1px solid #f3e8ff' }}>
-                <label className="form-label" style={{ color: '#7e22ce' }}>Measured Weight (kg) *</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  className="form-input"
-                  placeholder="e.g. 48.5"
-                  value={weightKg}
-                  onChange={(e) => setWeightKg(e.target.value)}
-                  required
-                  disabled={submitting}
-                />
-              </div>
-            )}
-
-            {/* MULTI-MEDICINE & MULTI-VACCINE DYNAMIC LIST FORM */}
             {(isVaccination || isMedication) && (
-              <div className="form-group" style={{ background: medTheme.bg, padding: '12px', borderRadius: '12px', border: `1px solid ${medTheme.border}`, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label className="form-label" style={{ color: medTheme.color, margin: 0, fontWeight: '800' }}>
-                    {isVaccination ? 'Vaccines Administered *' : 'Medications Administered *'}
-                  </label>
+              <div style={{ background: medTheme.bg, border: `1.5px solid ${medTheme.border}`, padding: '12px', borderRadius: '14px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '800', color: medTheme.color }}>
+                    {isVaccination ? 'Vaccines List' : 'Medicines List'}
+                  </span>
                   <button
                     type="button"
-                    className="btn btn-secondary btn-xs"
+                    className="btn btn-xs btn-outline"
                     onClick={handleAddMedicineRow}
-                    style={{ fontSize: '11px', fontWeight: '800', background: '#ffffff', color: medTheme.color, border: `1px solid ${medTheme.border}`, padding: '3px 8px' }}
+                    style={{ background: '#ffffff', fontSize: '11px', fontWeight: '800', color: medTheme.color, borderColor: medTheme.border }}
                   >
-                    <Plus size={12} /> Add Another {isVaccination ? 'Vaccine' : 'Medicine'}
+                    <Plus size={12} /> Add Another
                   </button>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {medicines.map((med, index) => (
+                  {medicines.map((med, idx) => (
                     <div key={med.id} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <div style={{ flex: 2 }}>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder={isVaccination ? 'e.g. CD&T Booster, Rabies' : 'e.g. Dewormer, Penicillin'}
-                          value={med.name}
-                          onChange={(e) => handleMedicineChange(med.id, 'name', e.target.value)}
-                          required={index === 0}
-                          disabled={submitting}
-                          style={{ padding: '7px 10px', fontSize: '12px' }}
-                        />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="Dose (optional)"
-                          value={med.dosage}
-                          onChange={(e) => handleMedicineChange(med.id, 'dosage', e.target.value)}
-                          disabled={submitting}
-                          style={{ padding: '7px 10px', fontSize: '12px' }}
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder={isVaccination ? 'Vaccine Name (e.g. CD&T)' : 'Medicine Name (e.g. Penicillin)'}
+                        value={med.name}
+                        onChange={(e) => handleMedicineChange(med.id, 'name', e.target.value)}
+                        style={{ flex: 2, background: '#ffffff' }}
+                      />
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Dose (optional)"
+                        value={med.dosage}
+                        onChange={(e) => handleMedicineChange(med.id, 'dosage', e.target.value)}
+                        style={{ flex: 1, background: '#ffffff' }}
+                      />
                       {medicines.length > 1 && (
                         <button
                           type="button"
                           onClick={() => handleRemoveMedicineRow(med.id)}
-                          style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '8px', color: '#ef4444', padding: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                          title="Remove row"
+                          style={{ background: '#fee2e2', border: 'none', borderRadius: '8px', color: '#ef4444', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         >
                           <Trash2 size={13} />
                         </button>
@@ -568,79 +465,101 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
               </div>
             )}
 
-            {/* PREGNANCY CHECK & BIRTH / KIDDING FORM FIELDS */}
+            {selectedCategory.id === 'Milking Yield' && (
+              <div className="form-group">
+                <label className="form-label">Milk Yield (Liters) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  className="form-input"
+                  value={milkYieldLiters}
+                  onChange={(e) => setMilkYieldLiters(e.target.value)}
+                  placeholder="3.5"
+                  required
+                />
+              </div>
+            )}
+
+            {selectedCategory.id === 'Weight Check' && (
+              <div className="form-group">
+                <label className="form-label">Weight (kg) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  className="form-input"
+                  value={weightKg}
+                  onChange={(e) => setWeightKg(e.target.value)}
+                  placeholder="45.0"
+                  required
+                />
+              </div>
+            )}
+
             {selectedCategory.id === 'Pregnancy Check' && (
-              <div className="form-group" style={{ background: '#fdf2f8', padding: '12px', borderRadius: '12px', border: '1px solid #fbcfe8', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div>
-                  <label className="form-label" style={{ color: '#be185d' }}>Pregnancy Status / Stage Notes</label>
+              <div style={{ background: '#fdf2f8', border: '1px solid #fbcfe8', padding: '12px', borderRadius: '12px', marginBottom: '12px' }}>
+                <div className="form-group" style={{ marginBottom: '10px' }}>
+                  <label className="form-label" style={{ color: '#be185d' }}>Pregnancy Status / Notes</label>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="e.g. Confirmed pregnant - Due late September"
                     value={pregnancyNotes}
                     onChange={(e) => setPregnancyNotes(e.target.value)}
-                    disabled={submitting}
+                    placeholder="e.g. Confirmed pregnant, due in April"
                   />
                 </div>
 
-                <div style={{ borderTop: '1px solid #fbcfe8', paddingTop: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <label className="form-label" style={{ color: '#be185d', margin: 0, fontWeight: '800', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Sparkles size={16} color="#be185d" /> Kids Born / Delivered (If Birthing Event)
-                    </label>
-                    {totalKidsCount > 0 && (
-                      <span style={{ fontSize: '11px', fontWeight: '800', background: '#be185d', color: 'white', padding: '2px 8px', borderRadius: '9999px' }}>
-                        {totalKidsCount} {totalKidsCount === 1 ? 'Kid' : 'Kids'} Total
-                      </span>
-                    )}
+                <div style={{ borderTop: '1px dashed #fbcfe8', margin: '10px 0' }} />
+                <label className="form-label" style={{ color: '#be185d', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Sparkles size={14} color="#be185d" /> Kids Born (if birthing event)
+                </label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Male Kids</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="form-input"
+                      value={maleKidsCount}
+                      onChange={(e) => setMaleKidsCount(e.target.value)}
+                    />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '11px', color: '#be185d' }}>Male Kids</label>
-                      <input
-                        type="number"
-                        min="0"
-                        className="form-input"
-                        placeholder="0"
-                        value={maleKidsCount}
-                        onChange={(e) => setMaleKidsCount(e.target.value)}
-                        disabled={submitting}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '11px', color: '#be185d' }}>Female Kids</label>
-                      <input
-                        type="number"
-                        min="0"
-                        className="form-input"
-                        placeholder="0"
-                        value={femaleKidsCount}
-                        onChange={(e) => setFemaleKidsCount(e.target.value)}
-                        disabled={submitting}
-                      />
-                    </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Female Kids</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="form-input"
+                      value={femaleKidsCount}
+                      onChange={(e) => setFemaleKidsCount(e.target.value)}
+                    />
                   </div>
                 </div>
+
+                {totalKidsCount > 0 && (
+                  <p style={{ fontSize: '11px', fontWeight: '800', color: '#be185d', marginTop: '8px', margin: 0 }}>
+                    ✨ Total {totalKidsCount} mini goats will be logged!
+                  </p>
+                )}
               </div>
             )}
 
             {selectedCategory.id === 'General' && (
               <div className="form-group">
-                <label className="form-label">Activity Summary *</label>
+                <label className="form-label">Task Title / Summary *</label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="e.g. Hoof trimming, Pasture move..."
                   value={generalTitle}
                   onChange={(e) => setGeneralTitle(e.target.value)}
+                  placeholder="e.g. Barn cleaning, Deworming..."
                   required
-                  disabled={submitting}
                 />
               </div>
             )}
 
-            {/* DATE & TIME PICKER */}
+            {/* DATE & RECURRENCE PICKER */}
             <div className="form-group">
               <label className="form-label">Date & Time *</label>
               <input
@@ -649,19 +568,29 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
-                disabled={submitting}
               />
             </div>
 
-            {/* NOTES */}
             <div className="form-group">
-              <label className="form-label">Additional Notes & Vet Instructions</label>
+              <label className="form-label">Recurrence / Repeat Schedule</label>
+              <CustomRepeatPicker
+                repeatFrequency={repeatFrequency}
+                customRepeatDays={customRepeatDays}
+                onChangeRepeat={(freq, days) => {
+                  setRepeatFrequency(freq);
+                  setCustomRepeatDays(days);
+                }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Additional Notes</label>
               <textarea
-                className="form-textarea"
-                placeholder="Enter specific instructions or observations..."
+                className="form-input"
+                rows="2"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                disabled={submitting}
+                placeholder="Optional event details..."
               />
             </div>
           </div>
@@ -671,13 +600,7 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Loader2 size={16} className="spinner" /> Saving...
-                </>
-              ) : (
-                'Save Health Event'
-              )}
+              {submitting ? <Loader2 size={16} className="spinner" /> : `Log Event (${activeTargetCount})`}
             </button>
           </div>
         </form>
