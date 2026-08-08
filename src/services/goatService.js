@@ -234,6 +234,15 @@ export async function updateGoatArea(goatId, newAreaId, oldAreaName = '', newAre
   return updatedGoat;
 }
 
+export async function deleteGoat(id) {
+  const { error } = await supabase.from('goats').delete().eq('id', id);
+  if (error) {
+    console.error('Supabase deleteGoat error:', error);
+    throw new Error(error.message || 'Failed to delete goat record.');
+  }
+  return true;
+}
+
 // ----------------------------------------------------
 // Timeline Events Operations
 // ----------------------------------------------------

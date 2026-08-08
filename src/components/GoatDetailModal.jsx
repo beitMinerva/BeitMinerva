@@ -15,9 +15,11 @@ export default function GoatDetailModal({
   onAddEvent,
   onSaveReminder,
   onTransferArea,
-  onDeleteEvent
+  onDeleteEvent,
+  onDeleteGoat
 }) {
   const [isClosing, setIsClosing] = useState(false);
+  const [showDeleteGoatModal, setShowDeleteGoatModal] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState(null);
 
@@ -186,6 +188,16 @@ export default function GoatDetailModal({
           </button>
 
           <div style={{ display: 'flex', gap: '6px' }}>
+            {onDeleteGoat && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowDeleteGoatModal(true)}
+                style={{ color: '#dc2626', borderColor: '#fee2e2', padding: '6px 9px' }}
+                title="Delete Goat Record"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
             <button className="btn btn-secondary btn-sm" onClick={() => onEdit(goat)}>
               <Edit2 size={13} /> Edit
             </button>
@@ -486,6 +498,19 @@ export default function GoatDetailModal({
           message={`Are you sure you want to delete "${eventToDelete.title || eventToDelete.type}" from ${goat.name}'s timeline?`}
           onClose={() => setEventToDelete(null)}
           onConfirm={() => onDeleteEvent(eventToDelete.id)}
+        />
+      )}
+
+      {/* DELETE GOAT CONFIRMATION MODAL */}
+      {showDeleteGoatModal && (
+        <DeleteConfirmModal
+          title={`Delete ${goat.name}`}
+          message={`Are you sure you want to permanently delete ${goat.name} (${goat.tag_id})? This will remove all their records and timeline history.`}
+          onClose={() => setShowDeleteGoatModal(false)}
+          onConfirm={() => {
+            setShowDeleteGoatModal(false);
+            if (onDeleteGoat) onDeleteGoat(goat.id);
+          }}
         />
       )}
     </>

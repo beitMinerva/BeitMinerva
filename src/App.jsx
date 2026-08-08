@@ -20,6 +20,7 @@ import {
   getGoatByTagOrId,
   addGoat,
   updateGoat,
+  deleteGoat,
   updateGoatArea,
   addBarnArea,
   updateBarnArea,
@@ -134,6 +135,17 @@ export default function App() {
       await loadData();
       setShowAddGoatModal(false);
       setGoatToEdit(null);
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`);
+    }
+  };
+
+  const handleDeleteGoat = async (goatId) => {
+    try {
+      await deleteGoat(goatId);
+      showToast('Deleted goat record.');
+      setSelectedGoat(null);
+      await loadData();
     } catch (err) {
       showToast(`❌ Error: ${err.message}`);
     }
@@ -329,6 +341,7 @@ export default function App() {
             setSelectedGoat(null);
           }}
           onDeleteEvent={handleDeleteEvent}
+          onDeleteGoat={(id) => requireAdmin(() => handleDeleteGoat(id))}
         />
       )}
 
