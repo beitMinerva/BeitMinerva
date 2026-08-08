@@ -72,6 +72,57 @@ export async function updateBarnArea(id, updates) {
   }
 }
 
+export async function getPenMilkEntries() {
+  try {
+    const { data, error } = await supabase.from('pen_milk_entries').select('*').order('date', { ascending: false });
+    if (!error && data) return data;
+  } catch (err) {
+    console.warn('Supabase pen_milk_entries query notice:', err.message);
+  }
+  return [];
+}
+
+export async function addPenMilkEntry(entryData) {
+  const newEntry = {
+    id: `pme-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    barn_area_id: entryData.barn_area_id,
+    date: entryData.date || new Date().toISOString(),
+    amount_liters: Number(entryData.amount_liters) || 0,
+    notes: entryData.notes || ''
+  };
+
+  const { data, error } = await supabase.from('pen_milk_entries').insert([newEntry]).select().single();
+  if (error) {
+    console.error('Supabase addPenMilkEntry error:', error);
+    throw new Error(error.message || 'Failed to save pen milk entry.');
+  }
+  return data;
+}
+
+export async function updatePenMilkEntry(id, updates) {
+  const { data, error } = await supabase
+    .from('pen_milk_entries')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Supabase updatePenMilkEntry error:', error);
+    throw new Error(error.message || 'Failed to update pen milk entry.');
+  }
+  return data;
+}
+
+export async function deletePenMilkEntry(id) {
+  const { error } = await supabase.from('pen_milk_entries').delete().eq('id', id);
+  if (error) {
+    console.error('Supabase deletePenMilkEntry error:', error);
+    throw new Error(error.message || 'Failed to delete pen milk entry.');
+  }
+  return true;
+}
+
 export async function deleteBarnArea(id) {
   const { error } = await supabase.from('barn_areas').delete().eq('id', id);
   if (error) {

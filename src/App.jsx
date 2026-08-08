@@ -26,6 +26,10 @@ import {
   addBarnArea,
   updateBarnArea,
   deleteBarnArea,
+  getPenMilkEntries,
+  addPenMilkEntry,
+  updatePenMilkEntry,
+  deletePenMilkEntry,
   addTimelineEvent,
   addBatchTimelineEvents,
   updateTimelineEvent,
@@ -39,6 +43,7 @@ export default function App() {
   const [goats, setGoats] = useState([]);
   const [barnAreas, setBarnAreas] = useState([]);
   const [recentEvents, setRecentEvents] = useState([]);
+  const [penMilkEntries, setPenMilkEntries] = useState([]);
   const [selectedPenForNewGoat, setSelectedPenForNewGoat] = useState(null);
   const [selectedGoatEvents, setSelectedGoatEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,14 +85,16 @@ export default function App() {
 
   const loadData = async () => {
     try {
-      const [goatsData, areasData, eventsData] = await Promise.all([
+      const [goatsData, areasData, eventsData, milkEntriesData] = await Promise.all([
         getGoats(),
         getBarnAreas(),
-        getTimelineEvents()
+        getTimelineEvents(),
+        getPenMilkEntries()
       ]);
       setGoats(goatsData);
       setBarnAreas(areasData);
       setRecentEvents(eventsData);
+      setPenMilkEntries(milkEntriesData);
 
       // Check for due tasks & send Web Push Notifications
       checkUpcomingTasksAndNotify(eventsData, goatsData);
@@ -179,6 +186,43 @@ export default function App() {
       showToast('Pen deleted.');
       await loadData();
     } catch (err) { showToast(`❌ Error: ${err.message}`); }
+  };
+
+  const handleSavePenMilkEntry = async (barnAreaId, milkEntry, entryId = null) => {
+    try {
+      if (entryId) {
+        const updated = await updatePenMilkEntry(entryId, {
+          date: milkEntry.date,
+          amount_liters: Number(milkEntry.amount_liters) || 0,
+          notes: milkEntry.notes || ''
+        });
+        setPenMilkEntries((prev) => prev.map((item) => (item.id === entryId ? updated : item)));
+        showToast('Updated pen milk entry.');
+        return updated;
+      }
+
+      const created = await addPenMilkEntry({
+        barn_area_id: barnAreaId,
+        ...milkEntry
+      });
+      setPenMilkEntries((prev) => [created, ...prev]);
+      showToast('Saved pen milk entry.');
+      return created;
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`);
+      throw err;
+    }
+  };
+
+  const handleDeletePenMilkEntry = async (entryId) => {
+    try {
+      await deletePenMilkEntry(entryId);
+      setPenMilkEntries((prev) => prev.filter((item) => item.id !== entryId));
+      showToast('Deleted pen milk entry.');
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`);
+      throw err;
+    }
   };
 
   const handleSaveEvent = async (eventData) => {
@@ -278,6 +322,8 @@ export default function App() {
               <BarnSquareView
                 goats={goats}
                 barnAreas={barnAreas}
+                events={recentEvents}
+                penMilkEntries={penMilkEntries}
                 onRequireAdmin={requireAdmin}
                 onSelectGoat={(g) => setSelectedGoat(g)}
                 onOpenAddGoat={(penId) => requireAdmin(() => {
@@ -289,6 +335,8 @@ export default function App() {
                 onAddBarnArea={handleAddBarnArea}
                 onUpdateBarnArea={handleUpdateBarnArea}
                 onDeleteBarnArea={handleDeleteBarnArea}
+                onSavePenMilkEntry={handleSavePenMilkEntry}
+                onDeletePenMilkEntry={handleDeletePenMilkEntry}
               />
             )}
 

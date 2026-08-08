@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, ArrowRightLeft, Pencil, Edit2, Trash2, X, Loader2, Wheat, History, GripVertical, Check, Move } from 'lucide-react';
+import { Search, Plus, ArrowRightLeft, Pencil, Edit2, Trash2, X, Loader2, Wheat, History, GripVertical, Check, Move, Milk } from 'lucide-react';
 import GoatCard from '../components/GoatCard';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import PenFeedingFormModal from '../components/PenFeedingFormModal';
@@ -8,13 +8,17 @@ import PenFeedingHistoryModal from '../components/PenFeedingHistoryModal';
 export default function BarnSquareView({
   goats = [],
   barnAreas = [],
+  events = [],
   onRequireAdmin,
   onSelectGoat,
   onOpenAddGoat,
   onTransferGoatArea,
   onAddBarnArea,
   onUpdateBarnArea,
-  onDeleteBarnArea
+  onDeleteBarnArea,
+  penMilkEntries = [],
+  onSavePenMilkEntry,
+  onDeletePenMilkEntry
 }) {
   const rawPens = barnAreas.length > 0 ? barnAreas : [
     { id: 'area-1', letter: 'A', name: 'Pen A' },
@@ -60,7 +64,9 @@ export default function BarnSquareView({
   // Feeding Modals State (Form vs History)
   const [showFeedingFormModal, setShowFeedingFormModal] = useState(false);
   const [showFeedingHistoryModal, setShowFeedingHistoryModal] = useState(false);
+  const [showMilkingHistoryModal, setShowMilkingHistoryModal] = useState(false);
   const [editingPenFeeding, setEditingPenFeeding] = useState(null);
+  const [viewingPenMilking, setViewingPenMilking] = useState(null);
 
   // Inline Edit State inside manage modal
   const [editingPenId, setEditingPenId] = useState(null);
@@ -74,6 +80,21 @@ export default function BarnSquareView({
   const [submitting, setSubmitting] = useState(false);
 
   const selectedPen = pens.find((p) => p.id === selectedPenId) || pens[0];
+
+  const goatsInSelectedPen = goats.filter((g) => {
+    const inPen = g.area_id === selectedPen?.id;
+    if (!searchTerm.trim()) return inPen;
+    const q = searchTerm.trim().toLowerCase();
+    const matchesSearch =
+      g.name.toLowerCase().includes(q) ||
+      g.tag_id.toLowerCase().includes(q) ||
+      g.breed.toLowerCase().includes(q);
+    return inPen && matchesSearch;
+  });
+
+  const penMilkingEntries = (penMilkEntries || [])
+    .filter((entry) => entry.barn_area_id === selectedPen?.id)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const saveNewPenOrder = (newPensList) => {
     const ids = newPensList.map((p) => p.id);
@@ -105,17 +126,6 @@ export default function BarnSquareView({
     saveNewPenOrder(newPens);
     setDraggedPenIndex(null);
   };
-
-  const goatsInSelectedPen = goats.filter((g) => {
-    const inPen = g.area_id === selectedPen?.id;
-    if (!searchTerm.trim()) return inPen;
-    const q = searchTerm.trim().toLowerCase();
-    const matchesSearch =
-      g.name.toLowerCase().includes(q) ||
-      g.tag_id.toLowerCase().includes(q) ||
-      g.breed.toLowerCase().includes(q);
-    return inPen && matchesSearch;
-  });
 
   const handleOpenAddGoat = () => {
     if (onOpenAddGoat) {
@@ -164,6 +174,11 @@ export default function BarnSquareView({
         feeding_info: jsonString
       });
     }
+  };
+
+  const handleSaveMilkEntry = async (penId, milkEntry) => {
+    if (!onSavePenMilkEntry) return;
+    await onSavePenMilkEntry(penId, milkEntry);
   };
 
   const handleAddPen = async (e) => {
@@ -419,6 +434,17 @@ export default function BarnSquareView({
                 <History size={13} color="var(--primary)" /> Feed History
               </button>
 
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setViewingPenMilking(selectedPen);
+                  setShowMilkingHistoryModal(true);
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '800', fontFamily: "'Outfit', sans-serif", padding: '6px 10px' }}
+              >
+                <Milk size={13} color="var(--primary)" /> Milking History
+              </button>
+
               <button className="btn btn-outline btn-sm" onClick={handleOpenAddGoat} style={{ fontSize: '11px', fontFamily: "'Outfit', sans-serif", padding: '6px 10px' }}>
                 <Plus size={13} /> Register Goat
               </button>
@@ -483,6 +509,22 @@ export default function BarnSquareView({
             const action = () => setShowFeedingFormModal(true);
             if (onRequireAdmin) onRequireAdmin(action);
             else action();
+          }}
+        />
+      )}
+
+      {/* PEN MILKING HISTORY MODAL */}
+      {showMilkingHistoryModal && viewingPenMilking && (
+        <PenFeedingHistoryModal
+          pen={viewingPenMilking}
+          mode="milking"
+          goats={goats}
+          milkingEntries={penMilkingEntries}
+          onSaveMilkEntry={handleSaveMilkEntry}
+          onDeleteMilkEntry={onDeletePenMilkEntry}
+          onClose={() => {
+            setShowMilkingHistoryModal(false);
+            setViewingPenMilking(null);
           }}
         />
       )}
