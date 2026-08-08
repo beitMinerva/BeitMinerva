@@ -278,6 +278,25 @@ export async function addTimelineEvent(eventData) {
   return data;
 }
 
+export async function addBatchTimelineEvents(eventDataList) {
+  const newEvents = eventDataList.map((eventData, index) => ({
+    id: `ev-${Date.now()}-${index}`,
+    goat_id: eventData.goat_id,
+    type: eventData.type || 'General Notes',
+    title: eventData.title || eventData.type,
+    date: eventData.date || new Date().toISOString(),
+    notes: eventData.notes || '',
+    custom_fields: eventData.custom_fields || []
+  }));
+
+  const { data, error } = await supabase.from('timeline_events').insert(newEvents).select();
+  if (error) {
+    console.error('Supabase addBatchTimelineEvents error:', error);
+    throw new Error(error.message || 'Failed to save batch timeline events.');
+  }
+  return data;
+}
+
 export async function updateTimelineEvent(eventId, updates) {
   const { data, error } = await supabase.from('timeline_events').update(updates).eq('id', eventId).select().single();
   if (error) {

@@ -26,6 +26,7 @@ import {
   updateBarnArea,
   deleteBarnArea,
   addTimelineEvent,
+  addBatchTimelineEvents,
   updateTimelineEvent,
   deleteTimelineEvent
 } from './services/goatService';
@@ -177,8 +178,13 @@ export default function App() {
 
   const handleSaveEvent = async (eventData) => {
     try {
-      await addTimelineEvent(eventData);
-      showToast(`Logged ${eventData.type} event.`);
+      if (Array.isArray(eventData)) {
+        await addBatchTimelineEvents(eventData);
+        showToast(`Logged event for ${eventData.length} goats.`);
+      } else {
+        await addTimelineEvent(eventData);
+        showToast(`Logged ${eventData.type} event.`);
+      }
       await loadData();
       if (selectedGoat) {
         const updatedEvents = await getTimelineEvents(selectedGoat.id);
@@ -359,9 +365,11 @@ export default function App() {
       )}
 
       {/* Add Timeline Event Modal */}
-      {showAddEventModal && goatForEvent && (
+      {showAddEventModal && (
         <AddEventModal
           goat={goatForEvent}
+          goats={goats}
+          barnAreas={barnAreas}
           onClose={() => {
             setShowAddEventModal(false);
             setGoatForEvent(null);
