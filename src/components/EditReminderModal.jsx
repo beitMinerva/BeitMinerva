@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, Bell } from 'lucide-react';
+import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, Bell, Scissors, Sparkles, Plus, Trash2 } from 'lucide-react';
 
 export default function EditReminderModal({ reminder, goats = [], onClose, onSave }) {
   const [isClosing, setIsClosing] = useState(false);
 
   const categories = [
+    { id: 'Hoof Trimming', label: 'Hoof Trimming', icon: Scissors, color: '#0f766e', bg: '#f0fdfa' },
     { id: 'Vaccination', label: 'Vaccination', icon: Syringe, color: '#059669', bg: '#ecfdf5' },
     { id: 'Medication', label: 'Medication', icon: Pill, color: '#c2410c', bg: '#fff7ed' },
     { id: 'Milking Yield', label: 'Milking Yield', icon: Milk, color: '#0369a1', bg: '#f0f9ff' },
     { id: 'Weight Check', label: 'Weight Check', icon: Weight, color: '#7e22ce', bg: '#faf5ff' },
-    { id: 'Pregnancy Check', label: 'Pregnancy Check', icon: Heart, color: '#be185d', bg: '#fdf2f8' },
+    { id: 'Pregnancy Check', label: 'Pregnancy & Birth', icon: Heart, color: '#be185d', bg: '#fdf2f8' },
     { id: 'General', label: 'General Task / Note', icon: Bell, color: '#059669', bg: '#ecfdf5' },
   ];
 
@@ -23,35 +24,101 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
+  // Parse existing custom_fields
+  const parsedFields = (() => {
+    try {
+      if (typeof reminder?.custom_fields === 'object' && reminder.custom_fields) return reminder.custom_fields;
+      if (typeof reminder?.custom_fields === 'string') return JSON.parse(reminder.custom_fields);
+    } catch (e) {}
+    return {};
+  })();
+
   const isScheduled = reminder?.title?.toLowerCase().startsWith('scheduled');
 
   const [selectedCategory, setSelectedCategory] = useState(initialCat);
-  const [reminderTitle, setReminderTitle] = useState(reminder?.title ? reminder.title.replace(/^Scheduled:\s*/, '') : '');
+  const [reminderTitle, setReminderTitle] = useState(reminder?.title ? reminder.title.replace(/^Scheduled:\s*/, '').replace(/^.*?:\s*/, '') : '');
   const [reminderDate, setReminderDate] = useState(formatLocalDatetime(reminder?.date));
   const [reminderNotes, setReminderNotes] = useState(reminder?.notes || '');
   const [submitting, setSubmitting] = useState(false);
 
+  // Vaccination / Medication medicine list
+  const initMedicines = parsedFields.medicines_list?.length
+    ? parsedFields.medicines_list.map((m, i) => ({ ...m, id: m.id || `med-${i}` }))
+    : [{ id: 'med-1', name: '', dosage: '' }];
+  const [medicines, setMedicines] = useState(initMedicines);
+
+  // Pregnancy / Birth fields
+  const [maleKidsCount, setMaleKidsCount] = useState(String(parsedFields.male_kids ?? '0'));
+  const [femaleKidsCount, setFemaleKidsCount] = useState(String(parsedFields.female_kids ?? '0'));
+  const [pregnancyNotes, setPregnancyNotes] = useState(
+    reminder?.type === 'Pregnancy Check'
+      ? (reminder.title || '').replace(/^Kidding.*$/, '').replace(/^Pregnancy Check:\s*/, '') || 'Confirmed pregnant'
+      : 'Confirmed pregnant'
+  );
+
+  // Milking / Weight simple values
+  const [milkYield, setMilkYield] = useState(String(parsedFields.milk_liters ?? '3.5'));
+  const [weightKg, setWeightKg] = useState(String(parsedFields.weight_kg ?? ''));
+
+  const handleAddMedicine = () => {
+    setMedicines((prev) => [...prev, { id: `med-${Date.now()}`, name: '', dosage: '' }]);
+  };
+  const handleRemoveMedicine = (id) => {
+    setMedicines((prev) => prev.filter((m) => m.id !== id));
+  };
+  const handleMedicineChange = (id, field, value) => {
+    setMedicines((prev) => prev.map((m) => m.id === id ? { ...m, [field]: value } : m));
+  };
+
   const handleAnimatedClose = () => {
     setIsClosing(true);
-    setTimeout(() => {
-      onClose();
-    }, 220);
+    setTimeout(() => { onClose(); }, 220);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
+    const males = parseInt(maleKidsCount) || 0;
+    const females = parseInt(femaleKidsCount) || 0;
+    const totalKids = males + females;
     const titlePrefix = isScheduled ? 'Scheduled: ' : '';
-    const cleanTitle = reminderTitle.trim() || selectedCategory.label;
+
+    let eventTitle = reminderTitle.trim();
+    let customFields = { ...parsedFields };
+
+    if (selectedCategory.id === 'Vaccination' || selectedCategory.id === 'Medication') {
+      const medSummary = medicines
+        .filter((m) => m.name.trim())
+        .map((m) => m.dosage.trim() ? `${m.name.trim()} (${m.dosage.trim()})` : m.name.trim())
+        .join(', ');
+      eventTitle = `${selectedCategory.id}: ${medSummary || reminderTitle.trim() || 'Log'}`;
+      customFields = { ...customFields, medicines_list: medicines };
+    } else if (selectedCategory.id === 'Pregnancy Check') {
+      if (totalKids > 0) {
+        eventTitle = `Kidding / Birth: ${totalKids} Kids (${males} Male, ${females} Female)`;
+      } else {
+        eventTitle = `Pregnancy Check: ${pregnancyNotes || 'Healthy pregnancy'}`;
+      }
+      customFields = { ...customFields, male_kids: males, female_kids: females, total_kids: totalKids };
+    } else if (selectedCategory.id === 'Milking Yield') {
+      eventTitle = `Milking Yield: ${parseFloat(milkYield) || 0} L`;
+      customFields = { ...customFields, milk_liters: parseFloat(milkYield) || 0 };
+    } else if (selectedCategory.id === 'Weight Check') {
+      eventTitle = `Weight Logged: ${parseFloat(weightKg) || 0} kg`;
+      customFields = { ...customFields, weight_kg: parseFloat(weightKg) || 0 };
+    } else {
+      eventTitle = reminderTitle.trim() || selectedCategory.label;
+    }
 
     try {
       if (onSave) {
         await onSave(reminder.id, {
           type: selectedCategory.id,
-          title: `${titlePrefix}${cleanTitle}`,
+          title: `${titlePrefix}${eventTitle}`,
           date: new Date(reminderDate).toISOString(),
-          notes: reminderNotes.trim()
+          notes: reminderNotes.trim(),
+          custom_fields: customFields
         });
       }
       handleAnimatedClose();
@@ -61,6 +128,14 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
       setSubmitting(false);
     }
   };
+
+  const isVaccination = selectedCategory.id === 'Vaccination';
+  const isMedication = selectedCategory.id === 'Medication';
+  const medTheme = isVaccination
+    ? { bg: '#ecfdf5', border: '#a7f3d0', color: '#047857' }
+    : { bg: '#fff7ed', border: '#ffedd5', color: '#c2410c' };
+
+  const totalKidsCount = (parseInt(maleKidsCount) || 0) + (parseInt(femaleKidsCount) || 0);
 
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} onClick={handleAnimatedClose} style={{ fontFamily: "'Outfit', sans-serif" }}>
@@ -76,7 +151,7 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {/* DATE & TIME PICKER (BEIRUT LOCAL TIME) */}
+            {/* DATE & TIME PICKER */}
             <div className="form-group">
               <label className="form-label">Date & Time *</label>
               <input
@@ -123,18 +198,134 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Title / Description *</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g. CD&T Vaccination, Dewormer, Weight Log..."
-                value={reminderTitle}
-                onChange={(e) => setReminderTitle(e.target.value)}
-                required
-                disabled={submitting}
-              />
-            </div>
+            {/* VACCINATION / MEDICATION MEDICINE LIST */}
+            {(isVaccination || isMedication) && (
+              <div className="form-group" style={{ background: medTheme.bg, padding: '12px', borderRadius: '12px', border: `1px solid ${medTheme.border}`, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="form-label" style={{ color: medTheme.color, margin: 0, fontWeight: '800' }}>
+                    {isVaccination ? 'Vaccines Administered *' : 'Medications Administered *'}
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-xs"
+                    onClick={handleAddMedicine}
+                    style={{ fontSize: '11px', fontWeight: '800', background: '#ffffff', color: medTheme.color, border: `1px solid ${medTheme.border}`, padding: '3px 8px' }}
+                  >
+                    <Plus size={12} /> Add Another
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {medicines.map((med, index) => (
+                    <div key={med.id} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <div style={{ flex: 2 }}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder={isVaccination ? 'e.g. CD&T Booster, Rabies' : 'e.g. Dewormer, Penicillin'}
+                          value={med.name}
+                          onChange={(e) => handleMedicineChange(med.id, 'name', e.target.value)}
+                          required={index === 0}
+                          disabled={submitting}
+                          style={{ padding: '7px 10px', fontSize: '12px' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Dose (optional)"
+                          value={med.dosage}
+                          onChange={(e) => handleMedicineChange(med.id, 'dosage', e.target.value)}
+                          disabled={submitting}
+                          style={{ padding: '7px 10px', fontSize: '12px' }}
+                        />
+                      </div>
+                      {medicines.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMedicine(med.id)}
+                          style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '8px', color: '#ef4444', padding: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                          title="Remove row"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PREGNANCY CHECK & BIRTH / KIDDING */}
+            {selectedCategory.id === 'Pregnancy Check' && (
+              <div className="form-group" style={{ background: '#fdf2f8', padding: '12px', borderRadius: '12px', border: '1px solid #fbcfe8', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>
+                  <label className="form-label" style={{ color: '#be185d' }}>Pregnancy Status / Stage Notes</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Confirmed pregnant - Due late September"
+                    value={pregnancyNotes}
+                    onChange={(e) => setPregnancyNotes(e.target.value)}
+                    disabled={submitting}
+                  />
+                </div>
+                <div style={{ borderTop: '1px solid #fbcfe8', paddingTop: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label className="form-label" style={{ color: '#be185d', margin: 0, fontWeight: '800', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Sparkles size={16} color="#be185d" /> Kids Born / Delivered
+                    </label>
+                    {totalKidsCount > 0 && (
+                      <span style={{ fontSize: '11px', fontWeight: '800', background: '#be185d', color: 'white', padding: '2px 8px', borderRadius: '9999px' }}>
+                        {totalKidsCount} {totalKidsCount === 1 ? 'Kid' : 'Kids'} Total
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '11px', color: '#be185d' }}>Male Kids</label>
+                      <input type="number" min="0" className="form-input" placeholder="0" value={maleKidsCount} onChange={(e) => setMaleKidsCount(e.target.value)} disabled={submitting} />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '11px', color: '#be185d' }}>Female Kids</label>
+                      <input type="number" min="0" className="form-input" placeholder="0" value={femaleKidsCount} onChange={(e) => setFemaleKidsCount(e.target.value)} disabled={submitting} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MILKING YIELD */}
+            {selectedCategory.id === 'Milking Yield' && (
+              <div className="form-group" style={{ background: '#f0f9ff', padding: '12px', borderRadius: '12px', border: '1px solid #e0f2fe' }}>
+                <label className="form-label" style={{ color: '#0369a1' }}>Milk Yield (Liters) *</label>
+                <input type="number" step="0.1" min="0" className="form-input" placeholder="e.g. 3.5" value={milkYield} onChange={(e) => setMilkYield(e.target.value)} required disabled={submitting} />
+              </div>
+            )}
+
+            {/* WEIGHT CHECK */}
+            {selectedCategory.id === 'Weight Check' && (
+              <div className="form-group" style={{ background: '#faf5ff', padding: '12px', borderRadius: '12px', border: '1px solid #f3e8ff' }}>
+                <label className="form-label" style={{ color: '#7e22ce' }}>Measured Weight (kg) *</label>
+                <input type="number" step="0.5" min="0" className="form-input" placeholder="e.g. 48.5" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} required disabled={submitting} />
+              </div>
+            )}
+
+            {/* GENERAL / HOOF TRIMMING TITLE */}
+            {(selectedCategory.id === 'General' || selectedCategory.id === 'Hoof Trimming') && (
+              <div className="form-group">
+                <label className="form-label">Title / Description *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Hoof Trimming, Pasture move..."
+                  value={reminderTitle}
+                  onChange={(e) => setReminderTitle(e.target.value)}
+                  required
+                  disabled={submitting}
+                />
+              </div>
+            )}
 
             <div className="form-group">
               <label className="form-label">Notes & Instructions</label>
@@ -154,9 +345,7 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
             </button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
               {submitting ? (
-                <>
-                  <Loader2 size={16} className="spinner" /> Saving Changes...
-                </>
+                <><Loader2 size={16} className="spinner" /> Saving Changes...</>
               ) : (
                 'Save Changes'
               )}

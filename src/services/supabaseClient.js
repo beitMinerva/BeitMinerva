@@ -44,7 +44,14 @@ export function getSupabase() {
 
   if (!supabaseInstance) {
     try {
-      supabaseInstance = createClient(finalUrl, finalKey);
+      supabaseInstance = createClient(finalUrl, finalKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+          flowType: 'pkce'
+        }
+      });
     } catch (err) {
       console.error('Failed to initialize Supabase client:', err);
       return null;

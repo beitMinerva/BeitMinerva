@@ -6,7 +6,7 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
   const [isClosing, setIsClosing] = useState(false);
 
   const categories = [
-    { id: 'Hoof Trimming', label: 'Hoof Trimming', icon: Scissors, color: '#b45309', bg: '#fef3c7', border: '#fde68a' },
+    { id: 'Hoof Trimming', label: 'Hoof Trimming', icon: Scissors, color: '#0f766e', bg: '#f0fdfa', border: '#99f6e4' },
     { id: 'Vaccination', label: 'Vaccination', icon: Syringe, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
     { id: 'Medication', label: 'Medication', icon: Pill, color: '#c2410c', bg: '#fff7ed', border: '#ffedd5' },
     { id: 'Milking Yield', label: 'Milking Yield', icon: Milk, color: '#0369a1', bg: '#f0f9ff', border: '#e0f2fe' },
@@ -305,7 +305,7 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
                             borderRadius: '6px'
                           }}
                         >
-                          {g.tag_id} ΓÇó {g.name}
+                          {g.tag_id} / {g.name}
                         </span>
                       ))}
                     </div>
@@ -361,7 +361,7 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
                               border: '1px solid var(--primary-border)'
                             }}
                           >
-                            {g.tag_id} ΓÇó {g.name}
+                            {g.tag_id} / {g.name}
                           </span>
                         ))}
                         {goats.filter((g) => g.area_id === selectedPenId).length === 0 && (
@@ -483,15 +483,6 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
                 })}
               </div>
             </div>
-
-            {/* HOOF TRIMMING INFO BANNER */}
-            {selectedCategory.id === 'Hoof Trimming' && (
-              <div style={{ background: '#fef3c7', border: '1px solid #fde68a', padding: '10px 12px', borderRadius: '12px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '12px', fontWeight: '700', color: '#b45309' }}>
-                  ✂️ Hoof trimming prevents infection & foot rot. Recommended every 2 months.
-                </span>
-              </div>
-            )}
 
             {/* PREDEFINED CATEGORY STRUCTURED FIELDS */}
             {selectedCategory.id === 'Milking Yield' && (

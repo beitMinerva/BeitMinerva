@@ -34,6 +34,7 @@ export default function EventDetailModal({ event, goat, onClose, onEdit, onDelet
       case 'Milking': return '#0369a1';
       case 'Weight Check': return '#7e22ce';
       case 'Pregnancy Check': return '#be185d';
+      case 'Hoof Trimming': return '#0f766e';
       case 'Transfer': return '#059669';
       default: return '#475569';
     }

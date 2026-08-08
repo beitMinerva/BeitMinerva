@@ -249,7 +249,7 @@ export default function CalendarView({
       type: selectedCategory.id,
       title: `Scheduled: ${reminderTitle || selectedCategory.label}`,
       date: new Date(targetDate + 'T09:00:00').toISOString(),
-      notes: `Target: ${g.name} (${g.tag_id}) ${reminderNotes ? `ΓÇó ${reminderNotes}` : ''}`,
+      notes: `Target: ${g.name} (${g.tag_id}) ${reminderNotes ? `/ ${reminderNotes}` : ''}`,
       custom_fields: {
         repeat_frequency: reminderRepeat,
         custom_repeat_days: parseInt(reminderCustomDays) || 21
@@ -862,7 +862,7 @@ export default function CalendarView({
                               borderRadius: '6px'
                             }}
                           >
-                            {g.tag_id} ΓÇó {g.name}
+                            {g.tag_id} / {g.name}
                           </span>
                         ))}
                       </div>
@@ -918,7 +918,7 @@ export default function CalendarView({
                                 border: '1px solid var(--primary-border)'
                               }}
                             >
-                              {g.tag_id} ΓÇó {g.name}
+                              {g.tag_id} / {g.name}
                             </span>
                           ))}
                           {goats.filter((g) => g.area_id === selectedPenId).length === 0 && (

@@ -239,6 +239,7 @@ export default function App() {
           setGoatToEdit(null);
           setShowAddGoatModal(true);
         })}
+        showToast={showToast}
       />
 
       {/* Toast Notification */}
