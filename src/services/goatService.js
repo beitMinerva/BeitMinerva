@@ -141,47 +141,39 @@ export async function addGoat(goatData) {
     created_at: new Date().toISOString()
   };
 
-  try {
-    const { data, error } = await supabase.from('goats').insert([newGoat]).select().single();
-    if (!error && data) {
-      if (newGoat.weight) {
-        await addTimelineEvent({
-          goat_id: data.id,
-          type: 'Weight Check',
-          title: `Weight Logged: ${newGoat.weight} kg`,
-          date: new Date().toISOString(),
-          notes: 'Initial registration weight'
-        });
-      }
-      return data;
-    }
-  } catch (err) {
-    console.warn('Supabase add goat notice:', err.message);
+  const { data, error } = await supabase.from('goats').insert([newGoat]).select().single();
+  if (error) {
+    console.error('Supabase addGoat error:', error);
+    throw new Error(error.message || 'Failed to add goat. Check Supabase RLS policies.');
   }
-
-  return newGoat;
+  if (newGoat.weight) {
+    await addTimelineEvent({
+      goat_id: data.id,
+      type: 'Weight Check',
+      title: `Weight Logged: ${newGoat.weight} kg`,
+      date: new Date().toISOString(),
+      notes: 'Initial registration weight'
+    });
+  }
+  return data;
 }
 
 export async function updateGoat(id, updates) {
-  try {
-    const { data, error } = await supabase.from('goats').update(updates).eq('id', id).select().single();
-    if (!error && data) {
-      if (updates.weight) {
-        await addTimelineEvent({
-          goat_id: id,
-          type: 'Weight Check',
-          title: `Weight Updated: ${updates.weight} kg`,
-          date: new Date().toISOString(),
-          notes: 'Weight progression record'
-        });
-      }
-      return data;
-    }
-  } catch (err) {
-    console.warn('Supabase update goat notice:', err.message);
+  const { data, error } = await supabase.from('goats').update(updates).eq('id', id).select().single();
+  if (error) {
+    console.error('Supabase updateGoat error:', error);
+    throw new Error(error.message || 'Failed to update goat.');
   }
-
-  return null;
+  if (updates.weight) {
+    await addTimelineEvent({
+      goat_id: id,
+      type: 'Weight Check',
+      title: `Weight Updated: ${updates.weight} kg`,
+      date: new Date().toISOString(),
+      notes: 'Weight progression record'
+    });
+  }
+  return data;
 }
 
 export async function updateGoatArea(goatId, newAreaId, oldAreaName = '', newAreaName = '') {
@@ -225,32 +217,28 @@ export async function addTimelineEvent(eventData) {
     custom_fields: eventData.custom_fields || []
   };
 
-  try {
-    const { data, error } = await supabase.from('timeline_events').insert([newEvent]).select().single();
-    if (!error && data) return data;
-  } catch (err) {
-    console.warn('Supabase add event notice:', err.message);
+  const { data, error } = await supabase.from('timeline_events').insert([newEvent]).select().single();
+  if (error) {
+    console.error('Supabase addTimelineEvent error:', error);
+    throw new Error(error.message || 'Failed to save event.');
   }
-
-  return newEvent;
+  return data;
 }
 
 export async function updateTimelineEvent(eventId, updates) {
-  try {
-    const { data, error } = await supabase.from('timeline_events').update(updates).eq('id', eventId).select().single();
-    if (!error && data) return data;
-  } catch (err) {
-    console.warn('Supabase update timeline event notice:', err.message);
+  const { data, error } = await supabase.from('timeline_events').update(updates).eq('id', eventId).select().single();
+  if (error) {
+    console.error('Supabase updateTimelineEvent error:', error);
+    throw new Error(error.message || 'Failed to update event.');
   }
-  return null;
+  return data;
 }
 
 export async function deleteTimelineEvent(eventId) {
-  try {
-    const { error } = await supabase.from('timeline_events').delete().eq('id', eventId);
-    if (!error) return true;
-  } catch (err) {
-    console.warn('Supabase delete timeline event notice:', err.message);
+  const { error } = await supabase.from('timeline_events').delete().eq('id', eventId);
+  if (error) {
+    console.error('Supabase deleteTimelineEvent error:', error);
+    throw new Error(error.message || 'Failed to delete event.');
   }
-  return false;
+  return true;
 }

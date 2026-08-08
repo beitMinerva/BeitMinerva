@@ -89,68 +89,82 @@ export default function App() {
   };
 
   const handleSaveGoat = async (goatData) => {
-    if (goatToEdit && goatToEdit.id) {
-      const updated = await updateGoat(goatToEdit.id, goatData);
-      showToast(`Updated goat ${updated.name} (${updated.tag_id}).`);
-      if (selectedGoat && selectedGoat.id === updated.id) {
-        setSelectedGoat(updated);
+    try {
+      if (goatToEdit && goatToEdit.id) {
+        const updated = await updateGoat(goatToEdit.id, goatData);
+        showToast(`Updated goat ${updated.name} (${updated.tag_id}).`);
+        if (selectedGoat && selectedGoat.id === updated.id) setSelectedGoat(updated);
+      } else {
+        const created = await addGoat(goatData);
+        showToast(`Registered new goat ${created.name} (${created.tag_id}).`);
+        setSelectedGoat(created);
       }
-    } else {
-      const created = await addGoat(goatData);
-      showToast(`Registered new goat ${created.name} (${created.tag_id}).`);
-      setSelectedGoat(created);
+      await loadData();
+      setShowAddGoatModal(false);
+      setGoatToEdit(null);
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`);
     }
-    await loadData();
-    setShowAddGoatModal(false);
-    setGoatToEdit(null);
   };
 
   const handleAddBarnArea = async (areaData) => {
-    const created = await addBarnArea(areaData);
-    showToast(`Created Pen ${created.letter} (${created.name}).`);
-    await loadData();
+    try {
+      const created = await addBarnArea(areaData);
+      showToast(`Created Pen ${created.letter}.`);
+      await loadData();
+    } catch (err) { showToast(`❌ Error: ${err.message}`); }
   };
 
   const handleUpdateBarnArea = async (id, updates) => {
-    await updateBarnArea(id, updates);
-    showToast('Updated pen subtitle name.');
-    await loadData();
+    try {
+      await updateBarnArea(id, updates);
+      showToast('Pen updated.');
+      await loadData();
+    } catch (err) { showToast(`❌ Error: ${err.message}`); }
   };
 
   const handleDeleteBarnArea = async (id) => {
-    await deleteBarnArea(id);
-    showToast('Deleted pen.');
-    await loadData();
+    try {
+      await deleteBarnArea(id);
+      showToast('Pen deleted.');
+      await loadData();
+    } catch (err) { showToast(`❌ Error: ${err.message}`); }
   };
 
   const handleSaveEvent = async (eventData) => {
-    await addTimelineEvent(eventData);
-    showToast(`Logged ${eventData.type} event.`);
-    await loadData();
-    if (selectedGoat) {
-      const updatedEvents = await getTimelineEvents(selectedGoat.id);
-      setSelectedGoatEvents(updatedEvents);
-    }
+    try {
+      await addTimelineEvent(eventData);
+      showToast(`Logged ${eventData.type} event.`);
+      await loadData();
+      if (selectedGoat) {
+        const updatedEvents = await getTimelineEvents(selectedGoat.id);
+        setSelectedGoatEvents(updatedEvents);
+      }
+    } catch (err) { showToast(`❌ Error: ${err.message}`); }
   };
 
   const handleUpdateEvent = async (eventId, updates) => {
-    await updateTimelineEvent(eventId, updates);
-    showToast('Updated task reminder.');
-    await loadData();
-    if (selectedGoat) {
-      const updatedEvents = await getTimelineEvents(selectedGoat.id);
-      setSelectedGoatEvents(updatedEvents);
-    }
+    try {
+      await updateTimelineEvent(eventId, updates);
+      showToast('Updated task reminder.');
+      await loadData();
+      if (selectedGoat) {
+        const updatedEvents = await getTimelineEvents(selectedGoat.id);
+        setSelectedGoatEvents(updatedEvents);
+      }
+    } catch (err) { showToast(`❌ Error: ${err.message}`); }
   };
 
   const handleDeleteEvent = async (eventId) => {
-    await deleteTimelineEvent(eventId);
-    showToast('Deleted timeline entry.');
-    await loadData();
-    if (selectedGoat) {
-      const updatedEvents = await getTimelineEvents(selectedGoat.id);
-      setSelectedGoatEvents(updatedEvents);
-    }
+    try {
+      await deleteTimelineEvent(eventId);
+      showToast('Deleted timeline entry.');
+      await loadData();
+      if (selectedGoat) {
+        const updatedEvents = await getTimelineEvents(selectedGoat.id);
+        setSelectedGoatEvents(updatedEvents);
+      }
+    } catch (err) { showToast(`❌ Error: ${err.message}`); }
   };
 
   const handleTransferGoatArea = async (goatId, newAreaId, sourceAreaName, targetAreaName) => {
