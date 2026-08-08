@@ -39,6 +39,7 @@ export default function App() {
   const [goats, setGoats] = useState([]);
   const [barnAreas, setBarnAreas] = useState([]);
   const [recentEvents, setRecentEvents] = useState([]);
+  const [selectedPenForNewGoat, setSelectedPenForNewGoat] = useState(null);
   const [selectedGoatEvents, setSelectedGoatEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -235,7 +236,8 @@ export default function App() {
       {/* Beit Minerva Header */}
       <Header
         onOpenScanner={() => setActiveTab('scanner')}
-        onOpenAddGoat={() => requireAdmin(() => {
+        onOpenAddGoat={(penId) => requireAdmin(() => {
+          setSelectedPenForNewGoat(penId || null);
           setGoatToEdit(null);
           setShowAddGoatModal(true);
         })}
@@ -278,7 +280,8 @@ export default function App() {
                 barnAreas={barnAreas}
                 onRequireAdmin={requireAdmin}
                 onSelectGoat={(g) => setSelectedGoat(g)}
-                onOpenAddGoat={() => requireAdmin(() => {
+                onOpenAddGoat={(penId) => requireAdmin(() => {
+                  setSelectedPenForNewGoat(penId || null);
                   setGoatToEdit(null);
                   setShowAddGoatModal(true);
                 })}
@@ -310,7 +313,8 @@ export default function App() {
                 goats={goats}
                 barnAreas={barnAreas}
                 onSelectGoat={(g) => setSelectedGoat(g)}
-                onOpenAddGoat={() => requireAdmin(() => {
+                onOpenAddGoat={(penId) => requireAdmin(() => {
+                  setSelectedPenForNewGoat(penId || null);
                   setGoatToEdit(null);
                   setShowAddGoatModal(true);
                 })}
@@ -367,9 +371,11 @@ export default function App() {
         <AddGoatModal
           goatToEdit={goatToEdit}
           barnAreas={barnAreas}
+          initialPenId={selectedPenForNewGoat}
           onClose={() => {
             setShowAddGoatModal(false);
             setGoatToEdit(null);
+            setSelectedPenForNewGoat(null);
           }}
           onSave={handleSaveGoat}
         />

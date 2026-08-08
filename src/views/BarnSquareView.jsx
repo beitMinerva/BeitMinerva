@@ -117,6 +117,12 @@ export default function BarnSquareView({
     return inPen && matchesSearch;
   });
 
+  const handleOpenAddGoat = () => {
+    if (onOpenAddGoat) {
+      onOpenAddGoat(selectedPenId);
+    }
+  };
+
   const handleCloseManage = () => {
     setIsManageClosing(true);
     setTimeout(() => {
@@ -413,7 +419,7 @@ export default function BarnSquareView({
                 <History size={13} color="var(--primary)" /> Feed History
               </button>
 
-              <button className="btn btn-outline btn-sm" onClick={onOpenAddGoat} style={{ fontSize: '11px', fontFamily: "'Outfit', sans-serif", padding: '6px 10px' }}>
+              <button className="btn btn-outline btn-sm" onClick={handleOpenAddGoat} style={{ fontSize: '11px', fontFamily: "'Outfit', sans-serif", padding: '6px 10px' }}>
                 <Plus size={13} /> Register Goat
               </button>
             </div>

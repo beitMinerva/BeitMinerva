@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import BarcodeSVG from './BarcodeSVG';
 import { X, Loader2 } from 'lucide-react';
 
-export default function AddGoatModal({ goatToEdit = null, barnAreas = [], onClose, onSave }) {
+export default function AddGoatModal({ goatToEdit = null, barnAreas = [], initialPenId = null, onClose, onSave }) {
   const [isClosing, setIsClosing] = useState(false);
 
   const [tagId, setTagId] = useState(goatToEdit ? goatToEdit.tag_id : '');
@@ -13,7 +13,11 @@ export default function AddGoatModal({ goatToEdit = null, barnAreas = [], onClos
   const [birthDate, setBirthDate] = useState(goatToEdit ? goatToEdit.birth_date : new Date().toISOString().split('T')[0]);
   const [weight, setWeight] = useState(goatToEdit ? (goatToEdit.weight || 45) : 45);
   const [status, setStatus] = useState(goatToEdit ? goatToEdit.status : 'Healthy');
-  const [areaId, setAreaId] = useState(goatToEdit ? goatToEdit.area_id : (barnAreas[0]?.id || 'area-1'));
+  const [areaId, setAreaId] = useState(() => {
+    if (goatToEdit?.area_id) return goatToEdit.area_id;
+    if (initialPenId) return initialPenId;
+    return barnAreas[0]?.id || 'area-1';
+  });
   const [notes, setNotes] = useState(goatToEdit ? goatToEdit.notes : '');
   const [submitting, setSubmitting] = useState(false);
 
