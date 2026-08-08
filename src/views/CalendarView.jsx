@@ -1,8 +1,75 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Bell, Syringe, Pill, Milk, Weight, Heart, X, Loader2, Trash2, Edit2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Bell, Syringe, Pill, Milk, Weight, Heart, X, Loader2, Trash2, Edit2, RotateCw } from 'lucide-react';
 import ReminderDetailModal from '../components/ReminderDetailModal';
 import EditReminderModal from '../components/EditReminderModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+
+export function getRepeatFrequency(event) {
+  if (!event) return 'none';
+  if (typeof event.custom_fields === 'object' && event.custom_fields?.repeat_frequency) {
+    return event.custom_fields.repeat_frequency;
+  }
+  if (typeof event.custom_fields === 'string') {
+    try {
+      const parsed = JSON.parse(event.custom_fields);
+      if (parsed?.repeat_frequency) return parsed.repeat_frequency;
+    } catch (e) {}
+  }
+  return event.repeat_frequency || 'none';
+}
+
+export function getRepeatLabel(repeatCode) {
+  switch (repeatCode) {
+    case 'daily': return 'Daily';
+    case 'weekly': return 'Weekly';
+    case 'monthly': return 'Monthly';
+    case 'every_3_months': return 'Every 3 Months';
+    case 'every_6_months': return 'Every 6 Months';
+    case 'yearly': return 'Yearly';
+    default: return null;
+  }
+}
+
+export function doesEventOccurOnDate(event, targetDateStr) {
+  if (!event || !event.date) return false;
+  const startDateStr = event.date.split('T')[0];
+  if (startDateStr === targetDateStr) return true;
+
+  const repeat = getRepeatFrequency(event);
+  if (!repeat || repeat === 'none') return false;
+
+  const startDate = new Date(startDateStr + 'T00:00:00');
+  const targetDate = new Date(targetDateStr + 'T00:00:00');
+
+  if (targetDate < startDate) return false;
+
+  if (repeat === 'daily') return true;
+
+  if (repeat === 'weekly') {
+    const diffDays = Math.round((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays % 7 === 0;
+  }
+
+  if (repeat === 'monthly') {
+    return targetDate.getDate() === startDate.getDate();
+  }
+
+  if (repeat === 'every_3_months') {
+    const monthsDiff = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + (targetDate.getMonth() - startDate.getMonth());
+    return targetDate.getDate() === startDate.getDate() && monthsDiff >= 0 && monthsDiff % 3 === 0;
+  }
+
+  if (repeat === 'every_6_months') {
+    const monthsDiff = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + (targetDate.getMonth() - startDate.getMonth());
+    return targetDate.getDate() === startDate.getDate() && monthsDiff >= 0 && monthsDiff % 6 === 0;
+  }
+
+  if (repeat === 'yearly') {
+    return targetDate.getDate() === startDate.getDate() && targetDate.getMonth() === startDate.getMonth();
+  }
+
+  return false;
+}
 
 export default function CalendarView({
   goats = [],
@@ -37,6 +104,7 @@ export default function CalendarView({
   const [selectedCategory, setSelectedCategory] = useState(categories[0]);
   const [reminderTitle, setReminderTitle] = useState('');
   const [reminderNotes, setReminderNotes] = useState('');
+  const [reminderRepeat, setReminderRepeat] = useState('none');
 
   const handleModalClose = () => {
     setIsModalClosing(true);
@@ -68,15 +136,11 @@ export default function CalendarView({
   };
 
   const handleDateClick = (dayNum) => {
-    const action = () => {
-      const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-      setSelectedDateStr(formattedDate);
-      setShowAddReminderModal(true);
-    };
-    if (onRequireAdmin) {
-      onRequireAdmin(action);
+    const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    if (selectedDateStr === formattedDate) {
+      setSelectedDateStr(null); // Toggle filter off if clicked again
     } else {
-      action();
+      setSelectedDateStr(formattedDate);
     }
   };
 
@@ -84,20 +148,24 @@ export default function CalendarView({
     e.preventDefault();
     setSubmitting(true);
     const targetGoat = goats.find((g) => g.id === targetGoatId);
-    
+
+    const targetDate = selectedDateStr || new Date().toISOString().split('T')[0];
+
     try {
       if (onAddTimelineEvent) {
         await onAddTimelineEvent({
           goat_id: targetGoatId === 'ALL' ? (goats[0]?.id || 'herd') : targetGoatId,
           type: selectedCategory.id,
           title: `Scheduled: ${reminderTitle || selectedCategory.label}`,
-          date: new Date(selectedDateStr).toISOString(),
-          notes: `Target: ${targetGoatId === 'ALL' ? 'Entire Herd' : targetGoat?.name} ${reminderNotes ? `• ${reminderNotes}` : ''}`
+          date: new Date(targetDate + 'T09:00:00').toISOString(),
+          notes: `Target: ${targetGoatId === 'ALL' ? 'Entire Herd' : targetGoat?.name} ${reminderNotes ? `• ${reminderNotes}` : ''}`,
+          custom_fields: { repeat_frequency: reminderRepeat }
         });
       }
       handleModalClose();
       setReminderTitle('');
       setReminderNotes('');
+      setReminderRepeat('none');
     } catch (err) {
       console.error(err);
     } finally {
@@ -131,7 +199,7 @@ export default function CalendarView({
   }
   for (let d = 1; d <= daysInMonth; d++) {
     const cellDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const hasReminder = events.some((ev) => ev.date && ev.date.startsWith(cellDateStr));
+    const hasReminder = events.some((ev) => doesEventOccurOnDate(ev, cellDateStr));
     const isToday = cellDateStr === new Date().toISOString().split('T')[0];
     const isSelected = cellDateStr === selectedDateStr;
 
@@ -146,12 +214,17 @@ export default function CalendarView({
     });
   }
 
+  // Filter events by selected date (including recurring instances!)
+  const displayEvents = selectedDateStr
+    ? events.filter((ev) => doesEventOccurOnDate(ev, selectedDateStr))
+    : events;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div>
         <h2 style={{ fontSize: '18px', fontWeight: '800' }}>Calendar & Task Reminders</h2>
         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-          Tap any date cell to schedule a task reminder for a goat or the entire herd.
+          Tap any date cell to view or schedule task reminders for that day.
         </p>
       </div>
 
@@ -190,6 +263,7 @@ export default function CalendarView({
                 key={cell.key}
                 onClick={() => handleDateClick(cell.dayNum)}
                 className={`calendar-day-cell ${cell.isToday ? 'today' : ''} ${cell.isSelected ? 'selected' : ''}`}
+                style={{ cursor: 'pointer' }}
               >
                 <span>{cell.dayNum}</span>
                 {cell.hasReminder && <div className="reminder-dot" />}
@@ -202,9 +276,24 @@ export default function CalendarView({
       {/* SCHEDULED REMINDERS LIST WITH CLEAN SIMPLE UNIFORM CARDS */}
       <div className="card" style={{ padding: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Bell size={16} color="var(--primary)" /> Scheduled Farm Reminders ({events.length})
-          </h3>
+          <div>
+            <h3 style={{ fontSize: '15px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+              <Bell size={16} color="var(--primary)" />
+              {selectedDateStr
+                ? `Events for ${new Date(selectedDateStr + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} (${displayEvents.length})`
+                : `All Scheduled Reminders (${events.length})`}
+            </h3>
+            {selectedDateStr && (
+              <button
+                className="btn btn-link btn-xs"
+                onClick={() => setSelectedDateStr(null)}
+                style={{ fontSize: '11px', color: 'var(--primary)', padding: 0, marginTop: '2px', border: 'none', background: 'none', cursor: 'pointer', fontWeight: '700' }}
+              >
+                ← Show All Dates
+              </button>
+            )}
+          </div>
+
           <button
             className="btn btn-primary btn-sm"
             onClick={() => {
@@ -219,17 +308,20 @@ export default function CalendarView({
           </button>
         </div>
 
-        {events.length === 0 ? (
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '12px 0', textAlign: 'center' }}>
-            No upcoming reminders. Tap any date on the calendar above to schedule one.
+        {displayEvents.length === 0 ? (
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '16px 0', textAlign: 'center' }}>
+            {selectedDateStr
+              ? `No reminders scheduled for ${new Date(selectedDateStr + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}. Tap "+ Add Task" to schedule one.`
+              : 'No upcoming reminders. Tap any date on the calendar above to view or schedule one.'}
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {events
+            {displayEvents
               .slice()
               .sort((a, b) => new Date(a.date) - new Date(b.date))
               .map((rem) => {
                 const meta = getCategoryMeta(rem.type);
+                const repeatLabel = getRepeatLabel(getRepeatFrequency(rem));
 
                 return (
                   <div
@@ -238,7 +330,7 @@ export default function CalendarView({
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justify: 'space-between',
+                      justifyContent: 'space-between',
                       background: '#ffffff',
                       padding: '12px',
                       borderRadius: '12px',
@@ -249,7 +341,6 @@ export default function CalendarView({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-                      {/* DYNAMIC MATCHED ICON BADGE BACKGROUND & ICON COLOR */}
                       <div
                         style={{
                           width: '38px',
@@ -259,61 +350,42 @@ export default function CalendarView({
                           border: `1px solid ${meta.border}`,
                           display: 'grid',
                           placeItems: 'center',
-                          lineHeight: 0,
                           flexShrink: 0
                         }}
                       >
                         {getReminderIcon(rem.type)}
                       </div>
+
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <strong style={{ fontSize: '13px', display: 'block', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {rem.title}
-                        </strong>
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {rem.notes ? rem.notes : `Category: ${rem.type}`}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <strong style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>
+                            {rem.title}
+                          </strong>
+                          {repeatLabel && (
+                            <span style={{ fontSize: '10px', fontWeight: '800', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '1px 6px', borderRadius: '9999px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                              <RotateCw size={10} /> {repeatLabel}
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {rem.notes || rem.type}
                         </span>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '8px' }}>
                       <span
-                        className="badge"
                         style={{
                           fontSize: '11px',
                           fontWeight: '800',
-                          color: meta.color,
-                          background: meta.bg,
-                          border: `1px solid ${meta.border}`
+                          background: '#f1f5f9',
+                          color: 'var(--text-main)',
+                          padding: '3px 8px',
+                          borderRadius: '6px'
                         }}
                       >
                         {formatReminderDate(rem.date)}
                       </span>
-
-                      {onUpdateTimelineEvent && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setReminderToEdit(rem);
-                          }}
-                          style={{ background: '#f8fafc', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title="Edit Task Reminder"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                      )}
-
-                      {onDeleteTimelineEvent && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setReminderToDelete(rem);
-                          }}
-                          style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '6px', color: '#ef4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title="Delete Task Reminder"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
                     </div>
                   </div>
                 );
@@ -322,45 +394,73 @@ export default function CalendarView({
         )}
       </div>
 
-      {/* REMINDER DETAIL POP-UP MODAL */}
+      {/* DETAIL MODAL */}
       {selectedReminderForDetail && (
         <ReminderDetailModal
           reminder={selectedReminderForDetail}
+          goat={goats.find((g) => g.id === selectedReminderForDetail.goat_id)}
           onClose={() => setSelectedReminderForDetail(null)}
           onEdit={(rem) => {
-            setSelectedReminderForDetail(null);
-            setReminderToEdit(rem);
+            if (onRequireAdmin) {
+              onRequireAdmin(() => {
+                setSelectedReminderForDetail(null);
+                setReminderToEdit(rem);
+              });
+            } else {
+              setSelectedReminderForDetail(null);
+              setReminderToEdit(rem);
+            }
           }}
-          onDelete={onDeleteTimelineEvent ? (id) => onDeleteTimelineEvent(id) : undefined}
+          onDelete={(rem) => {
+            if (onRequireAdmin) {
+              onRequireAdmin(() => {
+                setSelectedReminderForDetail(null);
+                setReminderToDelete(rem);
+              });
+            } else {
+              setSelectedReminderForDetail(null);
+              setReminderToDelete(rem);
+            }
+          }}
         />
       )}
 
-      {/* EDIT REMINDER MODAL */}
+      {/* EDIT MODAL */}
       {reminderToEdit && (
         <EditReminderModal
           reminder={reminderToEdit}
           goats={goats}
           onClose={() => setReminderToEdit(null)}
-          onSave={onUpdateTimelineEvent}
+          onSave={async (eventId, updates) => {
+            if (onUpdateTimelineEvent) {
+              await onUpdateTimelineEvent(eventId, updates);
+            }
+            setReminderToEdit(null);
+          }}
         />
       )}
 
-      {/* DELETE REMINDER CONFIRMATION POPUP MODAL */}
+      {/* DELETE CONFIRMATION MODAL */}
       {reminderToDelete && (
         <DeleteConfirmModal
-          title="Delete Task Reminder"
-          message={`Are you sure you want to delete "${reminderToDelete.title}"?`}
+          title="Delete Scheduled Reminder"
+          message={`Are you sure you want to delete "${reminderToDelete.title || reminderToDelete.type}"?`}
           onClose={() => setReminderToDelete(null)}
-          onConfirm={() => onDeleteTimelineEvent && onDeleteTimelineEvent(reminderToDelete.id)}
+          onConfirm={async () => {
+            if (onDeleteTimelineEvent) {
+              await onDeleteTimelineEvent(reminderToDelete.id);
+            }
+            setReminderToDelete(null);
+          }}
         />
       )}
 
-      {/* SET REMINDER MODAL WITH SLIDE DOWN ANIMATION */}
+      {/* ADD TASK MODAL */}
       {showAddReminderModal && (
         <div className={`modal-overlay ${isModalClosing ? 'closing' : ''}`} onClick={handleModalClose}>
           <div className={`modal-content ${isModalClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
             <div className="modal-header">
-              <h3 className="modal-title">Set Task Reminder for {selectedDateStr}</h3>
+              <h2 className="modal-title">Schedule Farm Task / Reminder</h2>
               <button className="close-btn" onClick={handleModalClose} disabled={submitting}>
                 <X size={18} />
               </button>
@@ -368,11 +468,10 @@ export default function CalendarView({
 
             <form onSubmit={handleCreateReminder}>
               <div className="modal-body">
-                
-                {/* APPLIES TO TARGET GOAT CHIPS */}
+                {/* GOAT TARGET SELECTOR */}
                 <div className="form-group">
-                  <label className="form-label">Target Goat / Herd</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '120px', overflowY: 'auto' }}>
+                  <label className="form-label">Target Goat or Herd</label>
+                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
                     <span
                       onClick={() => !submitting && setTargetGoatId('ALL')}
                       style={{
@@ -383,7 +482,8 @@ export default function CalendarView({
                         border: targetGoatId === 'ALL' ? '2px solid var(--primary)' : '1px solid var(--border-color)',
                         background: targetGoatId === 'ALL' ? 'var(--primary-light)' : '#ffffff',
                         color: targetGoatId === 'ALL' ? 'var(--primary-dark)' : 'var(--text-main)',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        flexShrink: 0
                       }}
                     >
                       Entire Herd (All Goats)
@@ -400,7 +500,8 @@ export default function CalendarView({
                           border: targetGoatId === g.id ? '2px solid var(--primary)' : '1px solid var(--border-color)',
                           background: targetGoatId === g.id ? 'var(--primary-light)' : '#ffffff',
                           color: targetGoatId === g.id ? 'var(--primary-dark)' : 'var(--text-main)',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          flexShrink: 0
                         }}
                       >
                         {g.name} ({g.tag_id})
@@ -457,6 +558,24 @@ export default function CalendarView({
                 </div>
 
                 <div className="form-group">
+                  <label className="form-label">Repeat Schedule (Recurring Event)</label>
+                  <select
+                    className="form-select"
+                    value={reminderRepeat}
+                    onChange={(e) => setReminderRepeat(e.target.value)}
+                    disabled={submitting}
+                  >
+                    <option value="none">One-time event (No repeat)</option>
+                    <option value="daily">Repeat Daily</option>
+                    <option value="weekly">Repeat Weekly</option>
+                    <option value="monthly">Repeat Monthly</option>
+                    <option value="every_3_months">Repeat Every 3 Months</option>
+                    <option value="every_6_months">Repeat Every 6 Months</option>
+                    <option value="yearly">Repeat Yearly (Annual)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
                   <label className="form-label">Notes & Instructions</label>
                   <textarea
                     className="form-textarea"
@@ -475,7 +594,7 @@ export default function CalendarView({
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
                   {submitting ? (
                     <>
-                      <Loader2 size={16} className="spinner" /> Saving Task...
+                      <Loader2 size={16} className="spinner" /> Scheduling...
                     </>
                   ) : (
                     'Save Task Reminder'

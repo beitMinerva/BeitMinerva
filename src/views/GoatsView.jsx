@@ -58,7 +58,7 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, on
             onClick={onOpenLogEvent}
             style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
           >
-            <Syringe size={14} /> Log Vaccine
+            <Syringe size={14} /> Record Event
           </button>
         )}
       </div>

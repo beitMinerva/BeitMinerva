@@ -176,7 +176,7 @@ export default function BarnSquareView({
                 onClick={onOpenLogEvent}
                 style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
               >
-                <Syringe size={14} /> Log Vaccine
+                <Syringe size={14} /> Record Event
               </button>
             )}
             <button

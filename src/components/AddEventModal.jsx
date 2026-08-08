@@ -29,6 +29,7 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
   const [pregnancyNotes, setPregnancyNotes] = useState('Healthy pregnancy progression');
   const [generalTitle, setGeneralTitle] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 16));
+  const [repeatFrequency, setRepeatFrequency] = useState('none');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -102,7 +103,8 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
       type: selectedCategory.id,
       title: eventTitle,
       date: new Date(date).toISOString(),
-      notes: notes.trim()
+      notes: notes.trim(),
+      custom_fields: { repeat_frequency: repeatFrequency }
     }));
 
     try {
@@ -467,6 +469,25 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
                 required
                 disabled={submitting}
               />
+            </div>
+
+            {/* REPEAT FREQUENCY */}
+            <div className="form-group">
+              <label className="form-label">Repeat Schedule (Recurring Event)</label>
+              <select
+                className="form-select"
+                value={repeatFrequency}
+                onChange={(e) => setRepeatFrequency(e.target.value)}
+                disabled={submitting}
+              >
+                <option value="none">One-time event (No repeat)</option>
+                <option value="daily">Repeat Daily</option>
+                <option value="weekly">Repeat Weekly</option>
+                <option value="monthly">Repeat Monthly</option>
+                <option value="every_3_months">Repeat Every 3 Months</option>
+                <option value="every_6_months">Repeat Every 6 Months</option>
+                <option value="yearly">Repeat Yearly (Annual)</option>
+              </select>
             </div>
 
             {/* NOTES */}
