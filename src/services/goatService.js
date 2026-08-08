@@ -192,37 +192,67 @@ export async function addGoat(goatData) {
     created_at: new Date().toISOString()
   };
 
-  const { data, error } = await supabase.from('goats').insert([newGoat]).select().single();
+  let { data, error } = await supabase.from('goats').insert([newGoat]).select().single();
+
+  // Fallback if Supabase schema is missing neutered_status column
+  if (error && error.message && error.message.toLowerCase().includes('neutered_status')) {
+    const fallbackGoat = { ...newGoat };
+    delete fallbackGoat.neutered_status;
+    const res = await supabase.from('goats').insert([fallbackGoat]).select().single();
+    data = res.data;
+    error = res.error;
+  }
+
   if (error) {
     console.error('Supabase addGoat error:', error);
-    throw new Error(error.message || 'Failed to add goat. Check Supabase RLS policies.');
+    throw new Error(error.message || 'Failed to add goat.');
   }
-  if (newGoat.weight) {
-    await addTimelineEvent({
-      goat_id: data.id,
-      type: 'Weight Check',
-      title: `Weight Logged: ${newGoat.weight} kg`,
-      date: new Date().toISOString(),
-      notes: 'Initial registration weight'
-    });
+
+  if (newGoat.weight && data) {
+    try {
+      await addTimelineEvent({
+        goat_id: data.id,
+        type: 'Weight Check',
+        title: `Weight Logged: ${newGoat.weight} kg`,
+        date: new Date().toISOString(),
+        notes: 'Initial registration weight'
+      });
+    } catch (e) {
+      console.warn('Initial weight event notice:', e.message);
+    }
   }
   return data;
 }
 
 export async function updateGoat(id, updates) {
-  const { data, error } = await supabase.from('goats').update(updates).eq('id', id).select().single();
+  let { data, error } = await supabase.from('goats').update(updates).eq('id', id).select().single();
+
+  // Fallback if Supabase schema is missing neutered_status column
+  if (error && error.message && error.message.toLowerCase().includes('neutered_status')) {
+    const fallbackUpdates = { ...updates };
+    delete fallbackUpdates.neutered_status;
+    const res = await supabase.from('goats').update(fallbackUpdates).eq('id', id).select().single();
+    data = res.data;
+    error = res.error;
+  }
+
   if (error) {
     console.error('Supabase updateGoat error:', error);
     throw new Error(error.message || 'Failed to update goat.');
   }
-  if (updates.weight) {
-    await addTimelineEvent({
-      goat_id: id,
-      type: 'Weight Check',
-      title: `Weight Updated: ${updates.weight} kg`,
-      date: new Date().toISOString(),
-      notes: 'Weight progression record'
-    });
+
+  if (updates.weight && data) {
+    try {
+      await addTimelineEvent({
+        goat_id: id,
+        type: 'Weight Check',
+        title: `Weight Updated: ${updates.weight} kg`,
+        date: new Date().toISOString(),
+        notes: 'Weight progression record'
+      });
+    } catch (e) {
+      console.warn('Weight update event notice:', e.message);
+    }
   }
   return data;
 }
