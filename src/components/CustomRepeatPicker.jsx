@@ -108,7 +108,7 @@ export default function CustomRepeatPicker({
                 <RotateCw size={18} color="var(--primary)" />
                 <h3 className="modal-title" style={{ fontSize: '16px', fontFamily: "'Outfit', sans-serif" }}>Select Repeat Schedule</h3>
               </div>
-              <button className="close-btn" onClick={handleClose}>
+              <button type="button" className="close-btn" onClick={handleClose}>
                 <X size={18} />
               </button>
             </div>
@@ -121,7 +121,10 @@ export default function CustomRepeatPicker({
                 return (
                   <div
                     key={opt.id}
-                    onClick={() => handleSelectOption(opt.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectOption(opt.id);
+                    }}
                     style={{
                       background: isSelected ? '#ecfdf5' : '#ffffff',
                       border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-color)',
@@ -222,6 +225,7 @@ export default function CustomRepeatPicker({
             )}
 
             <button
+              type="button"
               className="btn btn-primary btn-full"
               onClick={handleClose}
               style={{ marginTop: '14px', height: '42px', fontFamily: "'Outfit', sans-serif" }}
