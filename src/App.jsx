@@ -497,6 +497,7 @@ export default function App() {
           goat={selectedGoat}
           barnAreas={barnAreas}
           events={selectedGoatEvents}
+          allEvents={recentEvents}
           onClose={() => setSelectedGoat(null)}
           onEdit={(g) => requireAdmin(() => {
             setGoatToEdit(g);

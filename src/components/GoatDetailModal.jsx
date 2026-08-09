@@ -26,6 +26,7 @@ export default function GoatDetailModal({
   goat,
   barnAreas = [],
   events = [],
+  allEvents = [],
   onClose,
   onEdit,
   onAddEvent,
@@ -310,6 +311,61 @@ export default function GoatDetailModal({
               <ArrowRightLeft size={14} /> Move Pen
             </button>
           </div>
+
+          {/* UPCOMING SCHEDULED REMINDERS CARD FOR THIS GOAT */}
+          {(() => {
+            const pool = allEvents.length > 0 ? allEvents : events;
+            const upcoming = pool
+              .filter((ev) => {
+                const isScheduled = ev.status === 'pending' || ev.is_scheduled || (ev.title && ev.title.toLowerCase().startsWith('scheduled'));
+                if (!isScheduled) return false;
+                if (ev.goat_id === goat.id) return true;
+                if (ev.goat_id === 'herd' || (ev.notes && (ev.notes.includes('Target: Entire Herd') || ev.notes.includes('Entire Herd')))) return true;
+                if (area && ev.notes && (ev.notes.includes(`Target: Pen ${area.letter}`) || ev.notes.includes(`Pen ${area.letter}`))) return true;
+                return false;
+              })
+              .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            if (upcoming.length === 0) return null;
+
+            return (
+              <div className="card" style={{ padding: '16px', background: '#ecfdf5', border: '1.5px solid #a7f3d0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', color: '#047857', margin: 0 }}>
+                    <Bell size={16} color="#047857" /> Upcoming Scheduled Tasks ({upcoming.length})
+                  </h3>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {upcoming.map((task) => (
+                    <div
+                      key={task.id}
+                      onClick={() => setSelectedEventForDetail(task)}
+                      style={{
+                        background: '#ffffff',
+                        borderRadius: '10px',
+                        padding: '10px 12px',
+                        border: '1px solid #86efac',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justify: 'space-between',
+                        cursor: 'pointer',
+                        boxShadow: 'var(--shadow-sm)'
+                      }}
+                    >
+                      <div>
+                        <strong style={{ fontSize: '13px', color: '#065f46', display: 'block' }}>{task.title}</strong>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{task.notes || task.type}</span>
+                      </div>
+                      <span style={{ fontSize: '11px', fontWeight: '800', background: '#dcfce7', color: '#166534', padding: '3px 8px', borderRadius: '6px' }}>
+                        {new Date(task.date).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* CLEAN SIMPLE TIMELINE CARDS (NO LEFT BORDER ACCENT) */}
           <div className="card" style={{ padding: '16px' }}>
