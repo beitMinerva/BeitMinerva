@@ -26,22 +26,33 @@ CREATE POLICY "Allow public delete access to push_subscriptions"
     ON public.push_subscriptions FOR DELETE USING (true);
 
 -- =========================================================================
--- 24/7 AUTOMATIC BACKGROUND SCHEDULER (pg_cron + pg_net)
--- Run this in Supabase SQL Editor to invoke Edge Function every 5 minutes
+-- 24/7 BEIRUT FARM SCHEDULER (pg_cron + pg_net)
+-- Runs at 7:30 AM, 12:00 PM, and 5:00 PM Beirut Time (UTC+3)
 -- =========================================================================
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Unschedules existing job if any to avoid duplicates
-SELECT cron.unschedule(jobid) 
-FROM cron.job 
-WHERE jobname = 'check-farm-push-notifications-every-5-min';
+-- Unschedules old test jobs if any
+SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname LIKE 'farm-push-%' OR jobname LIKE 'check-farm-push-%';
 
--- Schedule Edge Function to run automatically 24/7 every 5 minutes
+-- 1. Morning Briefing: 7:30 AM Beirut Time (4:30 AM UTC)
 SELECT cron.schedule(
-    'check-farm-push-notifications-every-5-min',
-    '*/5 * * * *',
+    'farm-push-morning-730am',
+    '30 4 * * *',
+    $$
+    SELECT net.http_post(
+        url := 'https://tlneqawnaifeipudbwjq.supabase.co/functions/v1/send-push-notifications',
+        headers := '{"Content-Type": "application/json", "Authorization": "Bearer sb_publishable_HtzmJ9d-NTPVUfUByceSbw_PtajHP1A"}'::jsonb,
+        body := '{}'::jsonb
+    );
+    $$
+);
+
+-- 2. Midday Briefing & Evening Check: 12:00 PM & 5:00 PM Beirut Time (9:00 AM & 2:00 PM UTC)
+SELECT cron.schedule(
+    'farm-push-midday-evening',
+    '0 9,14 * * *',
     $$
     SELECT net.http_post(
         url := 'https://tlneqawnaifeipudbwjq.supabase.co/functions/v1/send-push-notifications',
