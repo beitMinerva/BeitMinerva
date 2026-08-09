@@ -37,7 +37,8 @@ import {
   addTimelineEvent,
   addBatchTimelineEvents,
   updateTimelineEvent,
-  deleteTimelineEvent
+  deleteTimelineEvent,
+  calculateNextDueDate
 } from './services/goatService';
 
 export default function App() {
@@ -315,14 +316,59 @@ export default function App() {
   const handleCompleteTask = async (reminder) => {
     try {
       const cleanTitle = reminder.title ? reminder.title.replace(/^Scheduled:\s*/i, '') : reminder.type;
-      const updates = {
-        title: cleanTitle,
-        status: 'completed',
-        is_scheduled: false,
-        date: new Date().toISOString()
-      };
-      await updateTimelineEvent(reminder.id, updates);
-      showToast(`Task "${cleanTitle}" marked as completed.`);
+      
+      // Check repeat schedule
+      let frequency = 'none';
+      let days = 21;
+      if (typeof reminder.custom_fields === 'object' && reminder.custom_fields) {
+        frequency = reminder.custom_fields.repeat_frequency || 'none';
+        days = parseInt(reminder.custom_fields.custom_repeat_days) || 21;
+      } else if (typeof reminder.custom_fields === 'string') {
+        try {
+          const parsed = JSON.parse(reminder.custom_fields);
+          if (parsed) {
+            frequency = parsed.repeat_frequency || 'none';
+            days = parseInt(parsed.custom_repeat_days) || 21;
+          }
+        } catch (e) {}
+      } else if (reminder.repeat_frequency) {
+        frequency = reminder.repeat_frequency;
+      }
+
+      if (frequency && frequency !== 'none') {
+        // RECURRING TASK WORKFLOW:
+        // 1. Log completed event in goat/herd timeline history
+        await addTimelineEvent({
+          goat_id: reminder.goat_id,
+          type: reminder.type,
+          title: cleanTitle,
+          date: new Date().toISOString(),
+          notes: reminder.notes ? `Completed: ${reminder.notes}` : `Completed ${reminder.type} task.`,
+          custom_fields: { is_scheduled: false, status: 'completed' }
+        });
+
+        // 2. Advance the scheduled reminder date into the future
+        const nextDueDate = calculateNextDueDate(reminder.date, frequency, days);
+        await updateTimelineEvent(reminder.id, {
+          date: nextDueDate,
+          status: 'pending',
+          is_scheduled: true
+        });
+
+        const nextDateStr = new Date(nextDueDate).toLocaleDateString();
+        showToast(`✅ Logged to history! Next ${cleanTitle} scheduled for ${nextDateStr}.`);
+      } else {
+        // ONE-TIME TASK WORKFLOW:
+        const updates = {
+          title: cleanTitle,
+          status: 'completed',
+          is_scheduled: false,
+          date: new Date().toISOString()
+        };
+        await updateTimelineEvent(reminder.id, updates);
+        showToast(`✅ Task "${cleanTitle}" marked as completed.`);
+      }
+
       await loadData();
       if (selectedGoat) {
         const updatedEvents = await getTimelineEvents(selectedGoat.id);

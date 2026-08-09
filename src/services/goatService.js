@@ -360,3 +360,38 @@ export async function deleteTimelineEvent(eventId) {
   }
   return true;
 }
+
+export function calculateNextDueDate(baseDateStr, frequency, customDays = 21) {
+  const date = new Date(baseDateStr || Date.now());
+  if (isNaN(date.getTime())) return null;
+
+  switch (frequency) {
+    case 'daily':
+      date.setDate(date.getDate() + 1);
+      break;
+    case 'weekly':
+      date.setDate(date.getDate() + 7);
+      break;
+    case 'monthly':
+      date.setMonth(date.getMonth() + 1);
+      break;
+    case 'every_2_months':
+      date.setMonth(date.getMonth() + 2);
+      break;
+    case 'every_3_months':
+      date.setMonth(date.getMonth() + 3);
+      break;
+    case 'every_6_months':
+      date.setMonth(date.getMonth() + 6);
+      break;
+    case 'yearly':
+      date.setFullYear(date.getFullYear() + 1);
+      break;
+    case 'custom':
+      date.setDate(date.getDate() + (parseInt(customDays) || 21));
+      break;
+    default:
+      return null;
+  }
+  return date.toISOString();
+}
