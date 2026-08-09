@@ -119,7 +119,7 @@ export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelet
                 className="btn"
                 style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2' }}
                 onClick={() => {
-                  handleAnimatedClose(() => onDelete(reminder.id));
+                  handleAnimatedClose(() => onDelete(reminder));
                 }}
               >
                 <Trash2 size={14} /> Delete

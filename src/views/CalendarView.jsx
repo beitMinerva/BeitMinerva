@@ -719,14 +719,15 @@ export default function CalendarView({
             }
           }}
           onDelete={(rem) => {
+            const targetObj = (rem && typeof rem === 'object') ? rem : selectedReminderForDetail;
             if (onRequireAdmin) {
               onRequireAdmin(() => {
                 setSelectedReminderForDetail(null);
-                setReminderToDelete(rem);
+                setReminderToDelete(targetObj);
               });
             } else {
               setSelectedReminderForDetail(null);
-              setReminderToDelete(rem);
+              setReminderToDelete(targetObj);
             }
           }}
         />
