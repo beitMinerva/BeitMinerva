@@ -317,7 +317,14 @@ export default function GoatDetailModal({
             const pool = allEvents.length > 0 ? allEvents : events;
             const upcoming = pool
               .filter((ev) => {
-                const isScheduled = ev.status === 'pending' || ev.is_scheduled || (ev.title && ev.title.toLowerCase().startsWith('scheduled'));
+                if (ev.status === 'completed') return false;
+                const isScheduled =
+                  ev.status === 'pending' ||
+                  ev.is_scheduled === true ||
+                  (ev.title && ev.title.toLowerCase().startsWith('scheduled')) ||
+                  (typeof ev.custom_fields === 'object' && (ev.custom_fields?.is_scheduled || (ev.custom_fields?.repeat_frequency && ev.custom_fields.repeat_frequency !== 'none'))) ||
+                  (typeof ev.custom_fields === 'string' && (ev.custom_fields.includes('"is_scheduled":true') || (ev.custom_fields.includes('repeat_frequency') && !ev.custom_fields.includes('"repeat_frequency":"none"'))));
+
                 if (!isScheduled) return false;
                 if (ev.goat_id === goat.id) return true;
                 if (ev.goat_id === 'herd' || (ev.notes && (ev.notes.includes('Target: Entire Herd') || ev.notes.includes('Entire Herd')))) return true;
