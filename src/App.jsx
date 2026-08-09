@@ -335,17 +335,45 @@ export default function App() {
         frequency = reminder.repeat_frequency;
       }
 
+      // Resolve target goats for history logging
+      let targetGoatIds = [];
+      if (reminder.goat_id && reminder.goat_id !== 'herd' && !reminder.goat_id.startsWith('pen-')) {
+        targetGoatIds = [reminder.goat_id];
+      } else if (reminder.notes && reminder.notes.includes('Target: Pen')) {
+        const match = reminder.notes.match(/Target:\s*Pen\s*([A-F0-9-]+)/i);
+        if (match) {
+          const penLetterOrId = match[1];
+          const pen = barnAreas.find((p) => p.letter === penLetterOrId || p.id === penLetterOrId);
+          if (pen) targetGoatIds = goats.filter((g) => g.area_id === pen.id).map((g) => g.id);
+        }
+      }
+
+      const nowIso = new Date().toISOString();
+      const logNotes = reminder.notes ? `Completed: ${reminder.notes}` : `Completed ${reminder.type} task.`;
+
       if (frequency && frequency !== 'none') {
         // RECURRING TASK WORKFLOW:
-        // 1. Log completed event in goat/herd timeline history
-        await addTimelineEvent({
-          goat_id: reminder.goat_id,
-          type: reminder.type,
-          title: cleanTitle,
-          date: new Date().toISOString(),
-          notes: reminder.notes ? `Completed: ${reminder.notes}` : `Completed ${reminder.type} task.`,
-          custom_fields: { is_scheduled: false, status: 'completed' }
-        });
+        // 1. Log completed event in each target goat's timeline history
+        if (targetGoatIds.length > 1) {
+          const batchEvents = targetGoatIds.map((gId) => ({
+            goat_id: gId,
+            type: reminder.type,
+            title: cleanTitle,
+            date: nowIso,
+            notes: logNotes,
+            custom_fields: { is_scheduled: false, status: 'completed' }
+          }));
+          await addBatchTimelineEvents(batchEvents);
+        } else {
+          await addTimelineEvent({
+            goat_id: targetGoatIds[0] || reminder.goat_id,
+            type: reminder.type,
+            title: cleanTitle,
+            date: nowIso,
+            notes: logNotes,
+            custom_fields: { is_scheduled: false, status: 'completed' }
+          });
+        }
 
         // 2. Advance the scheduled reminder date into the future
         const nextDueDate = calculateNextDueDate(reminder.date, frequency, days);
@@ -356,17 +384,30 @@ export default function App() {
         });
 
         const nextDateStr = new Date(nextDueDate).toLocaleDateString();
-        showToast(`✅ Logged to history! Next ${cleanTitle} scheduled for ${nextDateStr}.`);
+        showToast(`✅ Logged for ${targetGoatIds.length} goat(s)! Next ${cleanTitle} scheduled for ${nextDateStr}.`);
       } else {
         // ONE-TIME TASK WORKFLOW:
-        const updates = {
-          title: cleanTitle,
-          status: 'completed',
-          is_scheduled: false,
-          date: new Date().toISOString()
-        };
-        await updateTimelineEvent(reminder.id, updates);
-        showToast(`✅ Task "${cleanTitle}" marked as completed.`);
+        if (targetGoatIds.length > 1) {
+          const batchEvents = targetGoatIds.map((gId) => ({
+            goat_id: gId,
+            type: reminder.type,
+            title: cleanTitle,
+            date: nowIso,
+            notes: logNotes,
+            custom_fields: { is_scheduled: false, status: 'completed' }
+          }));
+          await addBatchTimelineEvents(batchEvents);
+          await deleteTimelineEvent(reminder.id);
+        } else {
+          const updates = {
+            title: cleanTitle,
+            status: 'completed',
+            is_scheduled: false,
+            date: nowIso
+          };
+          await updateTimelineEvent(reminder.id, updates);
+        }
+        showToast(`✅ Task "${cleanTitle}" marked as completed for ${targetGoatIds.length} goat(s).`);
       }
 
       await loadData();
