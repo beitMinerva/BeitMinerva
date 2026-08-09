@@ -556,8 +556,11 @@ export default function GoatDetailModal({
         <DeleteConfirmModal
           title="Delete Timeline Record"
           message={`Are you sure you want to delete "${eventToDelete.title || eventToDelete.type}" from ${goat.name}'s timeline?`}
-          onClose={() => setEventToDelete(null)}
-          onConfirm={() => onDeleteEvent(eventToDelete.id)}
+          onConfirm={async () => {
+            const idToDelete = eventToDelete?.id;
+            setEventToDelete(null);
+            if (idToDelete && onDeleteEvent) await onDeleteEvent(idToDelete);
+          }}
         />
       )}
 

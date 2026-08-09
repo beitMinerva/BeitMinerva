@@ -754,10 +754,11 @@ export default function CalendarView({
           message={`Are you sure you want to delete "${reminderToDelete.title || reminderToDelete.type}"?`}
           onClose={() => setReminderToDelete(null)}
           onConfirm={async () => {
-            if (onDeleteTimelineEvent) {
-              await onDeleteTimelineEvent(reminderToDelete.id);
-            }
+            const idToDelete = reminderToDelete?.id;
             setReminderToDelete(null);
+            if (idToDelete && onDeleteTimelineEvent) {
+              await onDeleteTimelineEvent(idToDelete);
+            }
           }}
         />
       )}
