@@ -480,7 +480,7 @@ export default function CalendarView({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {scheduledEvents
               .slice()
-              .sort((a, b) => new Date(a.date) - new Date(b.date))
+              .sort((a, b) => new Date(b.date) - new Date(a.date))
               .map((rem) => {
                 const meta = getCategoryMeta(rem.type);
                 const repeatLabel = getRepeatLabel(rem);

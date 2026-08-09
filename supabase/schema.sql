@@ -25,6 +25,9 @@ CREATE POLICY "Allow public update access to push_subscriptions"
 CREATE POLICY "Allow public delete access to push_subscriptions" 
     ON public.push_subscriptions FOR DELETE USING (true);
 
+-- Optional Table Migration for timeline_events:
+ALTER TABLE public.timeline_events ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'completed';
+
 -- =========================================================================
 -- 24/7 BEIRUT FARM SCHEDULER (pg_cron + pg_net)
 -- Runs at 7:30 AM, 12:00 PM, and 5:00 PM Beirut Time (UTC+3)
