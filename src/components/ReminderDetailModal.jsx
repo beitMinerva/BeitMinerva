@@ -99,50 +99,44 @@ export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelet
           </div>
         </div>
 
-        <div className="modal-footer" style={{ justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {onCompleteTask && reminder.status !== 'completed' && (
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ background: '#059669', color: '#ffffff', gap: '6px', fontWeight: '700' }}
-                onClick={() => {
-                  handleAnimatedClose(() => onCompleteTask(reminder));
-                }}
-              >
-                <CheckCircle size={15} /> Complete & Log Event
-              </button>
-            )}
+        <div className="modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>
+          {onCompleteTask && reminder.status !== 'completed' && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ background: '#059669', color: '#ffffff', gap: '6px', fontWeight: '700' }}
+              onClick={() => {
+                handleAnimatedClose(() => onCompleteTask(reminder));
+              }}
+            >
+              <CheckCircle size={15} /> Log Event
+            </button>
+          )}
 
-            {onEdit && reminder.type !== 'Transfer' && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  handleAnimatedClose(() => onEdit(reminder));
-                }}
-              >
-                <Edit2 size={13} /> Edit
-              </button>
-            )}
+          {onEdit && reminder.type !== 'Transfer' && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                handleAnimatedClose(() => onEdit(reminder));
+              }}
+            >
+              <Edit2 size={13} /> Edit
+            </button>
+          )}
 
-            {onDelete && (
-              <button
-                type="button"
-                className="btn"
-                style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2' }}
-                onClick={() => {
-                  handleAnimatedClose(() => onDelete(reminder));
-                }}
-              >
-                <Trash2 size={14} /> Delete
-              </button>
-            )}
-          </div>
-
-          <button type="button" className="btn btn-secondary" onClick={() => handleAnimatedClose()}>
-            Close
-          </button>
+          {onDelete && (
+            <button
+              type="button"
+              className="btn"
+              style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2' }}
+              onClick={() => {
+                handleAnimatedClose(() => onDelete(reminder));
+              }}
+            >
+              <Trash2 size={14} /> Delete
+            </button>
+          )}
         </div>
       </div>
     </div>

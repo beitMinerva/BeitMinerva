@@ -117,50 +117,44 @@ export default function EventDetailModal({ event, goat, onClose, onEdit, onDelet
           </div>
         </div>
 
-        <div className="modal-footer" style={{ justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {onCompleteTask && event.status !== 'completed' && (
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ background: '#059669', color: '#ffffff', gap: '6px', fontWeight: '700' }}
-                onClick={() => {
-                  handleAnimatedClose(() => onCompleteTask(event));
-                }}
-              >
-                <CheckCircle size={15} /> Complete & Log Event
-              </button>
-            )}
+        <div className="modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>
+          {onCompleteTask && event.status !== 'completed' && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ background: '#059669', color: '#ffffff', gap: '6px', fontWeight: '700' }}
+              onClick={() => {
+                handleAnimatedClose(() => onCompleteTask(event));
+              }}
+            >
+              <CheckCircle size={15} /> Log Event
+            </button>
+          )}
 
-            {onEdit && event.type !== 'Transfer' && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  handleAnimatedClose(() => onEdit(event));
-                }}
-              >
-                <Edit2 size={13} /> Edit Event
-              </button>
-            )}
+          {onEdit && event.type !== 'Transfer' && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                handleAnimatedClose(() => onEdit(event));
+              }}
+            >
+              <Edit2 size={13} /> Edit Event
+            </button>
+          )}
 
-            {onDelete && (
-              <button
-                type="button"
-                className="btn"
-                style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2' }}
-                onClick={() => {
-                  handleAnimatedClose(() => onDelete(event.id));
-                }}
-              >
-                <Trash2 size={14} /> Delete
-              </button>
-            )}
-          </div>
-
-          <button type="button" className="btn btn-secondary" onClick={() => handleAnimatedClose()}>
-            Close Details
-          </button>
+          {onDelete && (
+            <button
+              type="button"
+              className="btn"
+              style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2' }}
+              onClick={() => {
+                handleAnimatedClose(() => onDelete(event.id));
+              }}
+            >
+              <Trash2 size={14} /> Delete
+            </button>
+          )}
         </div>
       </div>
     </div>

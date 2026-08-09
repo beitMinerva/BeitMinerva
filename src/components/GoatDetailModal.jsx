@@ -336,39 +336,69 @@ export default function GoatDetailModal({
             if (upcoming.length === 0) return null;
 
             return (
-              <div className="card" style={{ padding: '16px', background: '#ecfdf5', border: '1.5px solid #a7f3d0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <h3 style={{ fontSize: '15px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', color: '#047857', margin: 0 }}>
-                    <Bell size={16} color="#047857" /> Upcoming Scheduled Tasks ({upcoming.length})
+              <div className="card" style={{ padding: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-main)', margin: 0 }}>
+                    <Bell size={17} color="var(--primary)" /> Upcoming Scheduled Tasks ({upcoming.length})
                   </h3>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {upcoming.map((task) => (
-                    <div
-                      key={task.id}
-                      onClick={() => setSelectedEventForDetail(task)}
-                      style={{
-                        background: '#ffffff',
-                        borderRadius: '10px',
-                        padding: '10px 12px',
-                        border: '1px solid #86efac',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justify: 'space-between',
-                        cursor: 'pointer',
-                        boxShadow: 'var(--shadow-sm)'
-                      }}
-                    >
-                      <div>
-                        <strong style={{ fontSize: '13px', color: '#065f46', display: 'block' }}>{task.title}</strong>
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{task.notes || task.type}</span>
+                  {upcoming.map((task) => {
+                    const catStyle = getCategoryBadgeStyle(task.type);
+
+                    return (
+                      <div
+                        key={task.id}
+                        onClick={() => setSelectedEventForDetail(task)}
+                        style={{
+                          background: '#ffffff',
+                          borderRadius: '12px',
+                          padding: '12px 14px',
+                          border: '1px solid var(--border-color)',
+                          boxShadow: 'var(--shadow-sm)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                          <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <strong style={{ fontSize: '14px', color: 'var(--text-main)', display: 'block', lineHeight: 1.2 }}>
+                                {task.title}
+                              </strong>
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: '800',
+                                  color: catStyle.color,
+                                  background: catStyle.bg,
+                                  padding: '2px 7px',
+                                  borderRadius: '6px',
+                                  border: `1px solid ${catStyle.border}`,
+                                  display: 'inline-block'
+                                }}
+                              >
+                                {task.type}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            <span style={{ fontSize: '11px', fontWeight: '800', background: 'var(--primary-light)', color: 'var(--primary-dark)', padding: '3px 8px', borderRadius: '6px', border: '1px solid var(--primary-border)' }}>
+                              {new Date(task.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {task.notes && (
+                          <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '6px 0 0 0', lineHeight: 1.3 }}>
+                            {task.notes}
+                          </p>
+                        )}
                       </div>
-                      <span style={{ fontSize: '11px', fontWeight: '800', background: '#dcfce7', color: '#166534', padding: '3px 8px', borderRadius: '6px' }}>
-                        {new Date(task.date).toLocaleDateString()}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );

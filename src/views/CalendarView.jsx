@@ -130,7 +130,8 @@ export default function CalendarView({
   onRequireAdmin,
   onAddTimelineEvent,
   onUpdateTimelineEvent,
-  onDeleteTimelineEvent
+  onDeleteTimelineEvent,
+  onCompleteTimelineEvent
 }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(new Date().toISOString().split('T')[0]);
@@ -328,13 +329,13 @@ export default function CalendarView({
 
   // Separate Scheduled Tasks vs Logged Health Events History
   const scheduledEvents = dateEvents.filter((ev) =>
-    ev.title?.toLowerCase().startsWith('scheduled') ||
-    getRepeatFrequency(ev).frequency !== 'none'
+    ev.status !== 'completed' &&
+    (ev.status === 'pending' || ev.is_scheduled === true || ev.title?.toLowerCase().startsWith('scheduled') || getRepeatFrequency(ev).frequency !== 'none')
   );
 
   const loggedEvents = dateEvents.filter((ev) =>
-    !ev.title?.toLowerCase().startsWith('scheduled') &&
-    getRepeatFrequency(ev).frequency === 'none'
+    ev.status === 'completed' ||
+    (!ev.title?.toLowerCase().startsWith('scheduled') && !ev.is_scheduled && ev.status !== 'pending' && getRepeatFrequency(ev).frequency === 'none')
   );
 
   return (
