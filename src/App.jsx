@@ -378,14 +378,14 @@ export default function App() {
                   setGoatToEdit(null);
                   setShowAddGoatModal(true);
                 })}
-                onTransferGoatArea={handleTransferGoatArea}
-                onAddBarnArea={handleAddBarnArea}
-                onUpdateBarnArea={handleUpdateBarnArea}
-                onDeleteBarnArea={handleDeleteBarnArea}
-                onSavePenMilkEntry={handleSavePenMilkEntry}
-                onDeletePenMilkEntry={handleDeletePenMilkEntry}
-                onSavePenFeedingEntry={handleSavePenFeedingEntry}
-                onDeletePenFeedingEntry={handleDeletePenFeedingEntry}
+                onTransferGoatArea={(goatId, newAreaId) => requireAdmin(() => handleTransferGoatArea(goatId, newAreaId))}
+                onAddBarnArea={(newArea) => requireAdmin(() => handleAddBarnArea(newArea))}
+                onUpdateBarnArea={(areaId, updates) => requireAdmin(() => handleUpdateBarnArea(areaId, updates))}
+                onDeleteBarnArea={(areaId) => requireAdmin(() => handleDeleteBarnArea(areaId))}
+                onSavePenMilkEntry={(entry) => requireAdmin(() => handleSavePenMilkEntry(entry))}
+                onDeletePenMilkEntry={(entryId) => requireAdmin(() => handleDeletePenMilkEntry(entryId))}
+                onSavePenFeedingEntry={(entry) => requireAdmin(() => handleSavePenFeedingEntry(entry))}
+                onDeletePenFeedingEntry={(entryId) => requireAdmin(() => handleDeletePenFeedingEntry(entryId))}
               />
             )}
 
@@ -399,9 +399,9 @@ export default function App() {
                 events={recentEvents}
                 barnAreas={barnAreas}
                 onRequireAdmin={requireAdmin}
-                onAddTimelineEvent={handleSaveEvent}
-                onUpdateTimelineEvent={handleUpdateEvent}
-                onDeleteTimelineEvent={handleDeleteEvent}
+                onAddTimelineEvent={(eventData) => requireAdmin(() => handleSaveEvent(eventData))}
+                onUpdateTimelineEvent={(eventId, updates) => requireAdmin(() => handleUpdateEvent(eventId, updates))}
+                onDeleteTimelineEvent={(eventId) => requireAdmin(() => handleDeleteEvent(eventId))}
               />
             )}
 
@@ -452,13 +452,13 @@ export default function App() {
             setGoatForEvent(g);
             setShowAddEventModal(true);
           })}
-          onSaveReminder={handleSaveEvent}
+          onSaveReminder={(eventData) => requireAdmin(() => handleSaveEvent(eventData))}
           onTransferArea={(g) => {
             setActiveTab('barn');
             setSelectedGoat(null);
           }}
-          onUpdateEvent={handleUpdateEvent}
-          onDeleteEvent={handleDeleteEvent}
+          onUpdateEvent={(eventId, updates) => requireAdmin(() => handleUpdateEvent(eventId, updates))}
+          onDeleteEvent={(eventId) => requireAdmin(() => handleDeleteEvent(eventId))}
           onDeleteGoat={(id) => requireAdmin(() => handleDeleteGoat(id))}
         />
       )}
@@ -474,7 +474,7 @@ export default function App() {
             setGoatToEdit(null);
             setSelectedPenForNewGoat(null);
           }}
-          onSave={handleSaveGoat}
+          onSave={(goatData) => requireAdmin(() => handleSaveGoat(goatData))}
         />
       )}
 
@@ -488,7 +488,7 @@ export default function App() {
             setShowAddEventModal(false);
             setGoatForEvent(null);
           }}
-          onSave={handleSaveEvent}
+          onSave={(eventData) => requireAdmin(() => handleSaveEvent(eventData))}
         />
       )}
 
