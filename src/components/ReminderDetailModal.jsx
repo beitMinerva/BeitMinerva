@@ -110,7 +110,7 @@ export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelet
                   handleAnimatedClose(() => onCompleteTask(reminder));
                 }}
               >
-                <CheckCircle size={15} /> Mark Completed
+                <CheckCircle size={15} /> Complete & Log Event
               </button>
             )}
 

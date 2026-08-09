@@ -272,6 +272,8 @@ export default function App() {
     }
   };
 
+  const [taskToComplete, setTaskToComplete] = useState(null);
+
   const handleSaveEvent = async (eventData) => {
     try {
       if (Array.isArray(eventData)) {
@@ -281,6 +283,45 @@ export default function App() {
         await addTimelineEvent(eventData);
         showToast(`Logged ${eventData.type} event.`);
       }
+
+      // If completing an active scheduled task
+      if (taskToComplete) {
+        let frequency = 'none';
+        let days = 21;
+        if (typeof taskToComplete.custom_fields === 'object' && taskToComplete.custom_fields) {
+          frequency = taskToComplete.custom_fields.repeat_frequency || 'none';
+          days = parseInt(taskToComplete.custom_fields.custom_repeat_days) || 21;
+        } else if (typeof taskToComplete.custom_fields === 'string') {
+          try {
+            const parsed = JSON.parse(taskToComplete.custom_fields);
+            if (parsed) {
+              frequency = parsed.repeat_frequency || 'none';
+              days = parseInt(parsed.custom_repeat_days) || 21;
+            }
+          } catch (e) {}
+        } else if (taskToComplete.repeat_frequency) {
+          frequency = taskToComplete.repeat_frequency;
+        }
+
+        if (frequency && frequency !== 'none') {
+          const nextDueDate = calculateNextDueDate(taskToComplete.date, frequency, days);
+          await updateTimelineEvent(taskToComplete.id, {
+            date: nextDueDate,
+            status: 'pending',
+            is_scheduled: true
+          });
+          const nextDateStr = new Date(nextDueDate).toLocaleDateString();
+          showToast(`✅ Event logged to history! Next reminder scheduled for ${nextDateStr}.`);
+        } else {
+          await updateTimelineEvent(taskToComplete.id, {
+            status: 'completed',
+            is_scheduled: false
+          });
+          showToast(`✅ Event logged to history & task completed.`);
+        }
+        setTaskToComplete(null);
+      }
+
       await loadData();
       if (selectedGoat) {
         const updatedEvents = await getTimelineEvents(selectedGoat.id);
@@ -313,111 +354,15 @@ export default function App() {
     } catch (err) { showToast(`Error: ${err.message}`); }
   };
 
-  const handleCompleteTask = async (reminder) => {
-    try {
-      const cleanTitle = reminder.title ? reminder.title.replace(/^Scheduled:\s*/i, '') : reminder.type;
-      
-      // Check repeat schedule
-      let frequency = 'none';
-      let days = 21;
-      if (typeof reminder.custom_fields === 'object' && reminder.custom_fields) {
-        frequency = reminder.custom_fields.repeat_frequency || 'none';
-        days = parseInt(reminder.custom_fields.custom_repeat_days) || 21;
-      } else if (typeof reminder.custom_fields === 'string') {
-        try {
-          const parsed = JSON.parse(reminder.custom_fields);
-          if (parsed) {
-            frequency = parsed.repeat_frequency || 'none';
-            days = parseInt(parsed.custom_repeat_days) || 21;
-          }
-        } catch (e) {}
-      } else if (reminder.repeat_frequency) {
-        frequency = reminder.repeat_frequency;
-      }
-
-      // Resolve target goats for history logging
-      let targetGoatIds = [];
-      if (reminder.goat_id && reminder.goat_id !== 'herd' && !reminder.goat_id.startsWith('pen-')) {
-        targetGoatIds = [reminder.goat_id];
-      } else if (reminder.notes && reminder.notes.includes('Target: Pen')) {
-        const match = reminder.notes.match(/Target:\s*Pen\s*([A-F0-9-]+)/i);
-        if (match) {
-          const penLetterOrId = match[1];
-          const pen = barnAreas.find((p) => p.letter === penLetterOrId || p.id === penLetterOrId);
-          if (pen) targetGoatIds = goats.filter((g) => g.area_id === pen.id).map((g) => g.id);
-        }
-      }
-
-      const nowIso = new Date().toISOString();
-      const logNotes = reminder.notes ? `Completed: ${reminder.notes}` : `Completed ${reminder.type} task.`;
-
-      if (frequency && frequency !== 'none') {
-        // RECURRING TASK WORKFLOW:
-        // 1. Log completed event in each target goat's timeline history
-        if (targetGoatIds.length > 1) {
-          const batchEvents = targetGoatIds.map((gId) => ({
-            goat_id: gId,
-            type: reminder.type,
-            title: cleanTitle,
-            date: nowIso,
-            notes: logNotes,
-            custom_fields: { is_scheduled: false, status: 'completed' }
-          }));
-          await addBatchTimelineEvents(batchEvents);
-        } else {
-          await addTimelineEvent({
-            goat_id: targetGoatIds[0] || reminder.goat_id,
-            type: reminder.type,
-            title: cleanTitle,
-            date: nowIso,
-            notes: logNotes,
-            custom_fields: { is_scheduled: false, status: 'completed' }
-          });
-        }
-
-        // 2. Advance the scheduled reminder date into the future
-        const nextDueDate = calculateNextDueDate(reminder.date, frequency, days);
-        await updateTimelineEvent(reminder.id, {
-          date: nextDueDate,
-          status: 'pending',
-          is_scheduled: true
-        });
-
-        const nextDateStr = new Date(nextDueDate).toLocaleDateString();
-        showToast(`✅ Logged for ${targetGoatIds.length} goat(s)! Next ${cleanTitle} scheduled for ${nextDateStr}.`);
-      } else {
-        // ONE-TIME TASK WORKFLOW:
-        if (targetGoatIds.length > 1) {
-          const batchEvents = targetGoatIds.map((gId) => ({
-            goat_id: gId,
-            type: reminder.type,
-            title: cleanTitle,
-            date: nowIso,
-            notes: logNotes,
-            custom_fields: { is_scheduled: false, status: 'completed' }
-          }));
-          await addBatchTimelineEvents(batchEvents);
-          await deleteTimelineEvent(reminder.id);
-        } else {
-          const updates = {
-            title: cleanTitle,
-            status: 'completed',
-            is_scheduled: false,
-            date: nowIso
-          };
-          await updateTimelineEvent(reminder.id, updates);
-        }
-        showToast(`✅ Task "${cleanTitle}" marked as completed for ${targetGoatIds.length} goat(s).`);
-      }
-
-      await loadData();
-      if (selectedGoat) {
-        const updatedEvents = await getTimelineEvents(selectedGoat.id);
-        setSelectedGoatEvents(updatedEvents);
-      }
-    } catch (err) {
-      showToast(`Error completing task: ${err.message}`);
+  const handleCompleteTask = (reminder) => {
+    setTaskToComplete(reminder);
+    if (reminder.goat_id && reminder.goat_id !== 'herd' && !reminder.goat_id.startsWith('pen-')) {
+      const g = goats.find((item) => item.id === reminder.goat_id);
+      if (g) setGoatForEvent(g);
+    } else {
+      setGoatForEvent(null);
     }
+    setShowAddEventModal(true);
   };
 
   const handleTransferGoatArea = async (goatId, newAreaId, sourceAreaName, targetAreaName) => {
@@ -594,9 +539,11 @@ export default function App() {
           goat={goatForEvent}
           goats={goats}
           barnAreas={barnAreas}
+          taskToComplete={taskToComplete}
           onClose={() => {
             setShowAddEventModal(false);
             setGoatForEvent(null);
+            setTaskToComplete(null);
           }}
           onSave={(eventData) => requireAdmin(() => handleSaveEvent(eventData))}
         />

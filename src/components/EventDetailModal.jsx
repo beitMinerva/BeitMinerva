@@ -128,7 +128,7 @@ export default function EventDetailModal({ event, goat, onClose, onEdit, onDelet
                   handleAnimatedClose(() => onCompleteTask(event));
                 }}
               >
-                <CheckCircle size={15} /> Mark Completed
+                <CheckCircle size={15} /> Complete & Log Event
               </button>
             )}
 

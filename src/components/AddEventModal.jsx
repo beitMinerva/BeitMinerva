@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, FileText, Scissors, Check, Users, Home, CheckSquare, Square, Search, Plus, Trash2, Sparkles } from 'lucide-react';
 import CustomRepeatPicker from './CustomRepeatPicker';
 
-export default function AddEventModal({ goat, goats = [], barnAreas = [], onClose, onSave }) {
+export default function AddEventModal({ goat, goats = [], barnAreas = [], onClose, onSave, taskToComplete = null }) {
   const [isClosing, setIsClosing] = useState(false);
 
   const categories = [
@@ -15,15 +15,52 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
     { id: 'General', label: 'General Task / Note', icon: FileText, color: '#475569', bg: '#f8fafc', border: '#e2e8f0' },
   ];
 
+  // Match initial category if taskToComplete is provided
+  const initialCategory = taskToComplete
+    ? categories.find((c) => c.id === taskToComplete.type) || categories[0]
+    : categories[0];
+
+  // Resolve initial target goat / pen if taskToComplete is provided
+  const getInitialTargetMode = () => {
+    if (goat) return 'SINGLE';
+    if (taskToComplete) {
+      if (taskToComplete.goat_id && taskToComplete.goat_id !== 'herd' && !taskToComplete.goat_id.startsWith('pen-')) {
+        return 'SINGLE';
+      }
+      if (taskToComplete.notes && taskToComplete.notes.includes('Target: Pen')) {
+        return 'PEN';
+      }
+      return 'ALL';
+    }
+    return 'ALL';
+  };
+
+  const getInitialSelectedGoatIds = () => {
+    if (goat) return [goat.id];
+    if (taskToComplete && taskToComplete.goat_id && taskToComplete.goat_id !== 'herd' && !taskToComplete.goat_id.startsWith('pen-')) {
+      return [taskToComplete.goat_id];
+    }
+    return goats.map((g) => g.id);
+  };
+
+  const getInitialPenId = () => {
+    if (taskToComplete && taskToComplete.notes && taskToComplete.notes.includes('Target: Pen')) {
+      const match = taskToComplete.notes.match(/Target:\s*Pen\s*([A-F0-9-]+)/i);
+      if (match) {
+        const pen = barnAreas.find((p) => p.letter === match[1] || p.id === match[1]);
+        if (pen) return pen.id;
+      }
+    }
+    return barnAreas[0]?.id || '';
+  };
+
   // Target Mode: 'SINGLE', 'ALL', 'PEN', 'CUSTOM'
-  const [targetMode, setTargetMode] = useState(goat ? 'SINGLE' : 'ALL');
-  const [selectedPenId, setSelectedPenId] = useState(barnAreas[0]?.id || '');
-  const [selectedGoatIds, setSelectedGoatIds] = useState(
-    goat ? [goat.id] : goats.map((g) => g.id)
-  );
+  const [targetMode, setTargetMode] = useState(getInitialTargetMode());
+  const [selectedPenId, setSelectedPenId] = useState(getInitialPenId());
+  const [selectedGoatIds, setSelectedGoatIds] = useState(getInitialSelectedGoatIds());
   const [goatSearchTerm, setGoatSearchTerm] = useState('');
 
-  const [selectedCategory, setSelectedCategory] = useState(categories[0]);
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [milkYieldLiters, setMilkYieldLiters] = useState('3.5');
   const [weightKg, setWeightKg] = useState(goat?.weight || '45.0');
 
@@ -37,9 +74,9 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
   const [maleKidsCount, setMaleKidsCount] = useState('0');
   const [femaleKidsCount, setFemaleKidsCount] = useState('0');
 
-  const [generalTitle, setGeneralTitle] = useState('');
+  const [generalTitle, setGeneralTitle] = useState(taskToComplete?.title ? taskToComplete.title.replace(/^Scheduled:\s*/i, '') : '');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 16));
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(taskToComplete?.notes ? taskToComplete.notes : '');
   const [submitting, setSubmitting] = useState(false);
   const [repeatFrequency, setRepeatFrequency] = useState('none');
   const [customRepeatDays, setCustomRepeatDays] = useState('60');
@@ -201,7 +238,11 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Syringe size={18} color="var(--primary)" />
             <h2 className="modal-title" style={{ fontFamily: "'Outfit', sans-serif" }}>
-              {goat ? `Log Event: ${goat.name} (${goat.tag_id})` : 'Log Health Event / Vaccine'}
+              {taskToComplete
+                ? `Complete & Log Event: ${selectedCategory.label}`
+                : goat
+                ? `Log Event: ${goat.name} (${goat.tag_id})`
+                : 'Log Health Event / Vaccine'}
             </h2>
           </div>
           <button className="close-btn" onClick={handleAnimatedClose} disabled={submitting}>
