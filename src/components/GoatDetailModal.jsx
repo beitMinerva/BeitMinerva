@@ -33,7 +33,8 @@ export default function GoatDetailModal({
   onTransferArea,
   onUpdateEvent,
   onDeleteEvent,
-  onDeleteGoat
+  onDeleteGoat,
+  onCompleteTask
 }) {
   const [isClosing, setIsClosing] = useState(false);
   const [showDeleteGoatModal, setShowDeleteGoatModal] = useState(false);
@@ -537,6 +538,7 @@ export default function GoatDetailModal({
           onClose={() => setSelectedEventForDetail(null)}
           onEdit={onUpdateEvent ? (ev) => { setSelectedEventForDetail(null); setEventToEdit(ev); } : undefined}
           onDelete={onDeleteEvent ? (id) => onDeleteEvent(id) : undefined}
+          onCompleteTask={onCompleteTask ? (rem) => onCompleteTask(rem) : undefined}
         />
       )}
 

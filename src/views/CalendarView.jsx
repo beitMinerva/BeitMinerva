@@ -730,6 +730,11 @@ export default function CalendarView({
               setReminderToDelete(targetObj);
             }
           }}
+          onCompleteTask={(rem) => {
+            if (onCompleteTimelineEvent) {
+              onCompleteTimelineEvent(rem);
+            }
+          }}
         />
       )}
 

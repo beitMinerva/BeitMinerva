@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Calendar, Clock, FileText, Trash2, Tag, Edit2 } from 'lucide-react';
+import { X, Calendar, Clock, FileText, Trash2, Tag, Edit2, CheckCircle } from 'lucide-react';
 
-export default function EventDetailModal({ event, goat, onClose, onEdit, onDelete }) {
+export default function EventDetailModal({ event, goat, onClose, onEdit, onDelete, onCompleteTask }) {
   const [isClosing, setIsClosing] = useState(false);
 
   if (!event) return null;
@@ -117,8 +117,21 @@ export default function EventDetailModal({ event, goat, onClose, onEdit, onDelet
           </div>
         </div>
 
-        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+        <div className="modal-footer" style={{ justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '6px' }}>
+            {onCompleteTask && (event.title?.toLowerCase().startsWith('scheduled') || event.status === 'pending' || event.is_scheduled) && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ background: '#059669', color: '#ffffff', gap: '6px', fontWeight: '700' }}
+                onClick={() => {
+                  handleAnimatedClose(() => onCompleteTask(event));
+                }}
+              >
+                <CheckCircle size={15} /> Mark Completed
+              </button>
+            )}
+
             {onEdit && event.type !== 'Transfer' && (
               <button
                 type="button"

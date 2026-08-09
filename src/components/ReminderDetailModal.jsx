@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Calendar, FileText, Trash2, Tag, Edit2 } from 'lucide-react';
+import { X, Calendar, FileText, Trash2, Tag, Edit2, CheckCircle } from 'lucide-react';
 
-export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelete }) {
+export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelete, onCompleteTask }) {
   const [isClosing, setIsClosing] = useState(false);
 
   if (!reminder) return null;
@@ -99,8 +99,21 @@ export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelet
           </div>
         </div>
 
-        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+        <div className="modal-footer" style={{ justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '6px' }}>
+            {onCompleteTask && (reminder.title?.toLowerCase().startsWith('scheduled') || reminder.status === 'pending' || reminder.is_scheduled) && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ background: '#059669', color: '#ffffff', gap: '6px', fontWeight: '700' }}
+                onClick={() => {
+                  handleAnimatedClose(() => onCompleteTask(reminder));
+                }}
+              >
+                <CheckCircle size={15} /> Mark Completed
+              </button>
+            )}
+
             {onEdit && reminder.type !== 'Transfer' && (
               <button
                 type="button"

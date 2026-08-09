@@ -309,7 +309,28 @@ export default function App() {
         const updatedEvents = await getTimelineEvents(selectedGoat.id);
         setSelectedGoatEvents(updatedEvents);
       }
-    } catch (err) { showToast(`❌ Error: ${err.message}`); }
+    } catch (err) { showToast(`Error: ${err.message}`); }
+  };
+
+  const handleCompleteTask = async (reminder) => {
+    try {
+      const cleanTitle = reminder.title ? reminder.title.replace(/^Scheduled:\s*/i, '') : reminder.type;
+      const updates = {
+        title: cleanTitle,
+        status: 'completed',
+        is_scheduled: false,
+        date: new Date().toISOString()
+      };
+      await updateTimelineEvent(reminder.id, updates);
+      showToast(`Task "${cleanTitle}" marked as completed.`);
+      await loadData();
+      if (selectedGoat) {
+        const updatedEvents = await getTimelineEvents(selectedGoat.id);
+        setSelectedGoatEvents(updatedEvents);
+      }
+    } catch (err) {
+      showToast(`Error completing task: ${err.message}`);
+    }
   };
 
   const handleTransferGoatArea = async (goatId, newAreaId, sourceAreaName, targetAreaName) => {
@@ -402,6 +423,7 @@ export default function App() {
                 onAddTimelineEvent={(eventData) => requireAdmin(() => handleSaveEvent(eventData))}
                 onUpdateTimelineEvent={(eventId, updates) => requireAdmin(() => handleUpdateEvent(eventId, updates))}
                 onDeleteTimelineEvent={(eventId) => requireAdmin(() => handleDeleteEvent(eventId))}
+                onCompleteTimelineEvent={(reminder) => requireAdmin(() => handleCompleteTask(reminder))}
               />
             )}
 
@@ -460,6 +482,7 @@ export default function App() {
           onUpdateEvent={(eventId, updates) => requireAdmin(() => handleUpdateEvent(eventId, updates))}
           onDeleteEvent={(eventId) => requireAdmin(() => handleDeleteEvent(eventId))}
           onDeleteGoat={(id) => requireAdmin(() => handleDeleteGoat(id))}
+          onCompleteTask={(reminder) => requireAdmin(() => handleCompleteTask(reminder))}
         />
       )}
 
