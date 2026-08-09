@@ -119,7 +119,7 @@ export default function EventDetailModal({ event, goat, onClose, onEdit, onDelet
 
         <div className="modal-footer" style={{ justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '6px' }}>
-            {onCompleteTask && (event.title?.toLowerCase().startsWith('scheduled') || event.status === 'pending' || event.is_scheduled) && (
+            {onCompleteTask && event.status !== 'completed' && (
               <button
                 type="button"
                 className="btn btn-primary"

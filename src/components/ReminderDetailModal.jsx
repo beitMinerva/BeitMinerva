@@ -101,7 +101,7 @@ export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelet
 
         <div className="modal-footer" style={{ justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '6px' }}>
-            {onCompleteTask && (reminder.title?.toLowerCase().startsWith('scheduled') || reminder.status === 'pending' || reminder.is_scheduled) && (
+            {onCompleteTask && reminder.status !== 'completed' && (
               <button
                 type="button"
                 className="btn btn-primary"
