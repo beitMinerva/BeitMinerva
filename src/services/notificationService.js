@@ -1,18 +1,54 @@
-// Web Notifications Service & Due Tasks Checker for Goat Farm Management
+// Web Notifications Service & Due Tasks Checker for Goat Farm Management (iOS Safari & Android PWA Compatible)
+import { supabase } from '../config/supabase';
+
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BP0hZFBqEATCuSp6r9q52vA7sqGhb0Hkc7j1Keix9hBApQsDjcWX3pKdW9fJfK9FXlbNe0TA2WAJDQ38CvHBL_w';
+const PUSH_SERVER_URL = import.meta.env.VITE_PUSH_SERVER_URL || 'http://localhost:3001';
+
+export function isIOS() {
+  if (typeof window === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+export function isStandalone() {
+  if (typeof window === 'undefined') return false;
+  return (window.navigator.standalone === true) || window.matchMedia('(display-mode: standalone)').matches;
+}
 
 export function isNotificationSupported() {
-  return typeof window !== 'undefined' && 'Notification' in window;
+  if (typeof window === 'undefined') return false;
+  return 'Notification' in window || ('serviceWorker' in navigator && 'PushManager' in window);
 }
 
 export function getNotificationPermission() {
   if (!isNotificationSupported()) return 'unsupported';
-  return Notification.permission; // 'default', 'granted', 'denied'
+  if ('Notification' in window) return Notification.permission;
+  return 'default';
+}
+
+export async function registerServiceWorker() {
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    try {
+      const swPath = (import.meta.env.BASE_URL || './') + 'sw.js';
+      const reg = await navigator.serviceWorker.register(swPath);
+      return reg;
+    } catch (err) {
+      console.warn('Service Worker registration notice:', err);
+    }
+  }
+  return null;
 }
 
 export async function requestNotificationPermission() {
   if (!isNotificationSupported()) return 'unsupported';
+
+  // Register Service Worker first (Required for iOS Safari 16.4+)
+  await registerServiceWorker();
+
   try {
-    const permission = await Notification.requestPermission();
+    let permission = 'default';
+    if ('Notification' in window && typeof Notification.requestPermission === 'function') {
+      permission = await Notification.requestPermission();
+    }
     return permission;
   } catch (err) {
     console.error('Error requesting notification permission:', err);
@@ -20,63 +56,276 @@ export async function requestNotificationPermission() {
   }
 }
 
-export function sendBrowserNotification(title, body, options = {}) {
-  if (!isNotificationSupported() || Notification.permission !== 'granted') return null;
+// Convert Base64 VAPID key to Uint8Array for PushManager
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+/**
+ * Subscribe device to Web Push notifications (iOS background enabled)
+ */
+export async function subscribeToPushNotifications() {
+  if (!isNotificationSupported()) {
+    console.warn('Push notifications not supported on this browser/device.');
+    return { success: false, reason: 'unsupported' };
+  }
+
+  const permission = await requestNotificationPermission();
+  if (permission !== 'granted') {
+    return { success: false, reason: 'permission_denied' };
+  }
 
   try {
-    const notification = new Notification(title, {
-      body,
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
-      tag: options.tag || 'goat-farm-reminder',
-      renotify: true,
-      ...options
-    });
-
-    if (options.onClickUrl) {
-      notification.onclick = () => {
-        window.focus();
-        if (options.onClickUrl) window.location.href = options.onClickUrl;
-      };
+    let reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) {
+      reg = await registerServiceWorker();
     }
 
-    return notification;
+    if (!reg || !reg.pushManager) {
+      console.warn('ServiceWorker PushManager not available');
+      return { success: false, reason: 'no_push_manager' };
+    }
+
+    const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+    
+    // Always unsubscribe old key to ensure subscription matches current VAPID key
+    let subscription = await reg.pushManager.getSubscription();
+    if (subscription) {
+      try {
+        await subscription.unsubscribe();
+      } catch (unsubErr) {
+        console.warn('Notice unsubscribing old push sub:', unsubErr);
+      }
+    }
+
+    subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey
+    });
+
+    const subJson = subscription.toJSON();
+
+    // 1. Direct Supabase database sync so subscription is registered regardless of backend server
+    if (subJson.endpoint) {
+      const { error: dbErr } = await supabase.from('push_subscriptions').upsert({
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys?.p256dh || '',
+        auth: subJson.keys?.auth || '',
+        user_agent: navigator.userAgent,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'endpoint' });
+
+      if (dbErr) console.warn('Supabase push_subscriptions upsert notice:', dbErr.message);
+    }
+
+    // 2. Notify backend push server if a custom remote server URL is explicitly configured
+    if (PUSH_SERVER_URL && !PUSH_SERVER_URL.includes('localhost')) {
+      try {
+        await fetch(`${PUSH_SERVER_URL}/api/subscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription: subJson,
+            userAgent: navigator.userAgent
+          })
+        });
+      } catch (serverErr) {
+        console.warn('Remote push server notice:', serverErr);
+      }
+    }
+
+    console.log('✅ Web Push subscription active & saved to Supabase for mobile background notifications.');
+    return { success: true, subscription: subJson };
+
   } catch (err) {
-    console.error('Failed to trigger browser notification:', err);
-    return null;
+    console.error('Failed to subscribe to Web Push:', err);
+    return { success: false, error: err.message };
   }
 }
 
 /**
- * Scans events/scheduled tasks and notifies user of tasks due today or overdue
+ * Unsubscribe device from Web Push
  */
-export function checkUpcomingTasksAndNotify(events = [], goats = []) {
+export async function unsubscribeFromPushNotifications() {
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) return { success: true };
+
+    const subscription = await reg.pushManager.getSubscription();
+    if (subscription) {
+      const endpoint = subscription.endpoint;
+      await subscription.unsubscribe();
+
+      // Notify push server & delete from Supabase
+      try {
+        await fetch(`${PUSH_SERVER_URL}/api/unsubscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint })
+        });
+      } catch (err) {}
+
+      await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error unsubscribing from Web Push:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendBrowserNotification(title, body, options = {}) {
+  if (!isNotificationSupported()) return null;
+
+  const currentPerm = getNotificationPermission();
+  if (currentPerm !== 'granted') return null;
+
+  // Primary method for iOS Safari 16.4+ and PWA: ServiceWorker showNotification
+  if ('serviceWorker' in navigator) {
+    try {
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        reg = await registerServiceWorker();
+      }
+
+      if (reg && reg.showNotification) {
+        await reg.showNotification(title, {
+          body,
+          icon: '/favicon.svg',
+          badge: '/favicon.svg',
+          tag: options.tag || 'goat-farm-reminder',
+          renotify: true,
+          ...options
+        });
+        return true;
+      }
+    } catch (swErr) {
+      console.warn('SW showNotification fallback:', swErr);
+    }
+  }
+
+  // Fallback to window Notification API (Desktop / Chrome)
+  if ('Notification' in window) {
+    try {
+      const notification = new Notification(title, {
+        body,
+        icon: '/favicon.svg',
+        badge: '/favicon.svg',
+        tag: options.tag || 'goat-farm-reminder',
+        renotify: true,
+        ...options
+      });
+
+      if (options.onClickUrl) {
+        notification.onclick = () => {
+          window.focus();
+          if (options.onClickUrl) window.location.href = options.onClickUrl;
+        };
+      }
+
+      return notification;
+    } catch (err) {
+      console.error('Failed to trigger window Notification:', err);
+    }
+  }
+
+  return null;
+}
+
+export async function sendTestNotification() {
+  const perm = await requestNotificationPermission();
+  if (perm === 'granted') {
+    // Also trigger background push subscription for iOS
+    await subscribeToPushNotifications();
+
+    return await sendBrowserNotification('Beit Minerva Farm', 'Notifications active & working on your device!', {
+      tag: `test-notif-${Date.now()}`
+    });
+  }
+  return false;
+}
+
+export async function checkUpcomingTasksAndNotify(events = [], goats = []) {
   if (!events || events.length === 0) return [];
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const dueTasks = [];
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+
+  // Daily rate-limit: Only show in-app notification summary once per day to prevent spam
+  const lastNotifyDate = localStorage.getItem('last_inapp_notify_date');
+  if (lastNotifyDate === todayStr) {
+    return [];
+  }
+
+  const overdueTasks = [];
+  const todayTasks = [];
 
   events.forEach((ev) => {
-    const isScheduled = ev.title?.toLowerCase().startsWith('scheduled') || ev.custom_fields?.repeat_frequency;
-    if (!isScheduled) return;
+    // ONLY genuine scheduled tasks count (historical recorded health/milking/birth logs are ignored)
+    const isPendingScheduledTask =
+      ev.is_scheduled === true ||
+      ev.status === 'pending' ||
+      ev.type === 'Scheduled Task' ||
+      (ev.title && ev.title.toLowerCase().startsWith('scheduled')) ||
+      (ev.custom_fields && (ev.custom_fields.is_scheduled || (ev.custom_fields.repeat_frequency && ev.custom_fields.repeat_frequency !== 'none')));
+
+    if (!isPendingScheduledTask) return;
 
     const eventDateStr = ev.date?.split('T')[0];
-    if (eventDateStr === todayStr) {
-      const goatName = ev.goat_id ? goats.find(g => g.id === ev.goat_id)?.name || 'Goat' : 'Herd';
-      dueTasks.push({
-        event: ev,
-        title: ev.title || 'Scheduled Task Due Today',
-        message: `${ev.title} is due today for ${goatName}!`,
-        type: 'TODAY'
-      });
+    if (!eventDateStr) return;
+
+    const goatName = ev.goat_id
+      ? goats.find((g) => g.id === ev.goat_id)?.name || 'Goat'
+      : 'Herd';
+
+    const cleanTitle = ev.title?.replace(/^Scheduled:\s*/i, '') || ev.type || 'Task';
+
+    if (eventDateStr < todayStr) {
+      overdueTasks.push({ event: ev, cleanTitle, goatName, type: 'OVERDUE' });
+    } else if (eventDateStr === todayStr) {
+      todayTasks.push({ event: ev, cleanTitle, goatName, type: 'TODAY' });
     }
   });
 
-  // If permission is granted, trigger push notification for the first task
-  if (dueTasks.length > 0 && getNotificationPermission() === 'granted') {
-    const task = dueTasks[0];
-    sendBrowserNotification(`🐐 Farm Task Reminder`, task.message, { tag: `task-${task.event.id}` });
+  const totalDue = overdueTasks.length + todayTasks.length;
+
+  if (totalDue > 0 && getNotificationPermission() === 'granted') {
+    let title = 'Beit Minerva Farm';
+    let body = '';
+
+    if (todayTasks.length > 0 && overdueTasks.length > 0) {
+      title = `Farm Tasks Alert (${todayTasks.length} Due Today, ${overdueTasks.length} Overdue)`;
+      body = `• ${todayTasks[0].cleanTitle} (${todayTasks[0].goatName})\n+ ${overdueTasks.length} overdue task(s)`;
+    } else if (todayTasks.length > 0) {
+      if (todayTasks.length === 1) {
+        title = `Task Due Today: ${todayTasks[0].cleanTitle}`;
+        body = `Scheduled for ${todayTasks[0].goatName}.`;
+      } else {
+        title = `${todayTasks.length} Farm Tasks Due Today`;
+        body = `• ${todayTasks[0].cleanTitle} (${todayTasks[0].goatName})\n• ${todayTasks[1].cleanTitle} (${todayTasks[1].goatName})`;
+      }
+    } else if (overdueTasks.length > 0) {
+      if (overdueTasks.length === 1) {
+        title = `Overdue Task: ${overdueTasks[0].cleanTitle}`;
+        body = `Requires attention for ${overdueTasks[0].goatName}.`;
+      } else {
+        title = `${overdueTasks.length} Overdue Farm Tasks`;
+        body = `• ${overdueTasks[0].cleanTitle} (${overdueTasks[0].goatName})`;
+      }
+    }
+
+    // Send SINGLE clean summary notification
+    sendBrowserNotification(title, body, { tag: `farm-daily-summary-${todayStr}` });
+    localStorage.setItem('last_inapp_notify_date', todayStr);
   }
 
-  return dueTasks;
+  return [...overdueTasks, ...todayTasks];
 }
