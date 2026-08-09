@@ -23,8 +23,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body || 'Farm task reminder',
-    icon: new URL('favicon.svg', appScope).href,
-    badge: new URL('favicon.svg', appScope).href,
+    icon: new URL('logo.png', appScope).href,
+    badge: new URL('logo.png', appScope).href,
     tag: data.tag || 'goat-farm-reminder',
     renotify: true,
     data: { url: targetUrl }
