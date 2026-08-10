@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Loader2, Wheat, Scale, Clock, Sparkles, FileText } from 'lucide-react';
 import { parsePenFeeding } from './PenFeedingHistoryModal';
+import { getBeirutDateTimeString } from '../services/goatService';
 
 export default function PenFeedingFormModal({ pen, onClose, onSave }) {
   const parsed = parsePenFeeding(pen?.feeding_info || pen?.note);
@@ -12,6 +13,7 @@ export default function PenFeedingFormModal({ pen, onClose, onSave }) {
   const [composition, setComposition] = useState(currentRation.composition);
   const [schedule, setSchedule] = useState(currentRation.schedule);
   const [notes, setNotes] = useState(currentRation.notes);
+  const [feedingDate, setFeedingDate] = useState(() => getBeirutDateTimeString());
 
   const [isClosing, setIsClosing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -33,7 +35,7 @@ export default function PenFeedingFormModal({ pen, onClose, onSave }) {
       composition: composition.trim(),
       schedule: schedule.trim(),
       notes: notes.trim(),
-      date: new Date().toISOString()
+      date: new Date(feedingDate).toISOString()
     };
 
     try {
@@ -83,6 +85,21 @@ export default function PenFeedingFormModal({ pen, onClose, onSave }) {
                 placeholder="e.g. Premium Alfalfa Hay & Grain Mix"
                 value={foodType}
                 onChange={(e) => setFoodType(e.target.value)}
+                required
+                disabled={submitting}
+              />
+            </div>
+
+            {/* DATE & TIME PICKER (BEIRUT TIME) */}
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <Clock size={14} color="var(--primary)" /> Date & Time (Beirut Time) *
+              </label>
+              <input
+                type="datetime-local"
+                className="form-input"
+                value={feedingDate}
+                onChange={(e) => setFeedingDate(e.target.value)}
                 required
                 disabled={submitting}
               />

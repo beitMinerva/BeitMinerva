@@ -169,15 +169,15 @@ export default function BarnSquareView({
     }
   };
 
-  const handleSaveFeedingInfo = async (penId, feedingData) => {
+  const handleSaveFeedingInfo = async (penId, feedingData, entryId = null) => {
     if (onSavePenFeedingEntry) {
-      await onSavePenFeedingEntry(penId, feedingData);
+      await onSavePenFeedingEntry(penId, feedingData, entryId);
     }
   };
 
-  const handleSaveMilkEntry = async (penId, milkEntry) => {
+  const handleSaveMilkEntry = async (penId, milkEntry, entryId = null) => {
     if (!onSavePenMilkEntry) return;
-    await onSavePenMilkEntry(penId, milkEntry);
+    await onSavePenMilkEntry(penId, milkEntry, entryId);
   };
 
   const handleAddPen = async (e) => {

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, FileText, Scissors, Check, Users, Home, CheckSquare, Square, Search, Plus, Trash2, Sparkles } from 'lucide-react';
 import CustomRepeatPicker from './CustomRepeatPicker';
+import { calculateNextDueDate } from '../services/goatService';
 
-export default function AddEventModal({ goat, goats = [], barnAreas = [], onClose, onSave, taskToComplete = null }) {
+export default function AddEventModal({ goat, goats = [], barnAreas = [], onClose, onSave, taskToComplete = null, initialMode = 'LOG', initialDate = null }) {
   const [isClosing, setIsClosing] = useState(false);
 
   const categories = [
@@ -54,6 +55,35 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
     return barnAreas[0]?.id || '';
   };
 
+  const getInitialMedicines = () => {
+    if (taskToComplete) {
+      let custom = taskToComplete.custom_fields;
+      if (typeof custom === 'string') {
+        try { custom = JSON.parse(custom); } catch (e) {}
+      }
+      if (custom && Array.isArray(custom.medicines_list) && custom.medicines_list.length > 0) {
+        return custom.medicines_list;
+      }
+    }
+    return [{ id: 'med-1', name: '', dosage: '' }];
+  };
+
+  const getInitialCustomField = (key, fallback) => {
+    if (taskToComplete) {
+      let custom = taskToComplete.custom_fields;
+      if (typeof custom === 'string') {
+        try { custom = JSON.parse(custom); } catch (e) {}
+      }
+      if (custom && custom[key] !== undefined && custom[key] !== null) {
+        return String(custom[key]);
+      }
+    }
+    return fallback;
+  };
+
+  // Entry Mode: 'LOG' (completed event log) vs 'SCHEDULE' (future task reminder)
+  const [entryMode, setEntryMode] = useState(taskToComplete ? 'LOG' : initialMode);
+
   // Target Mode: 'SINGLE', 'ALL', 'PEN', 'CUSTOM'
   const [targetMode, setTargetMode] = useState(getInitialTargetMode());
   const [selectedPenId, setSelectedPenId] = useState(getInitialPenId());
@@ -61,21 +91,34 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
   const [goatSearchTerm, setGoatSearchTerm] = useState('');
 
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [milkYieldLiters, setMilkYieldLiters] = useState('3.5');
-  const [weightKg, setWeightKg] = useState(goat?.weight || '45.0');
+  const [milkYieldLiters, setMilkYieldLiters] = useState(getInitialCustomField('milk_liters', '3.5'));
+  const [weightKg, setWeightKg] = useState(getInitialCustomField('weight_kg', goat?.weight || '45.0'));
 
   // Dynamic multi-medicine / vaccine list with empty optional dosage by default
-  const [medicines, setMedicines] = useState([
-    { id: 'med-1', name: '', dosage: '' }
-  ]);
+  const [medicines, setMedicines] = useState(getInitialMedicines());
 
   // Pregnancy & Birth specific states
-  const [pregnancyNotes, setPregnancyNotes] = useState('Confirmed pregnant');
-  const [maleKidsCount, setMaleKidsCount] = useState('0');
-  const [femaleKidsCount, setFemaleKidsCount] = useState('0');
+  const [pregnancyNotes, setPregnancyNotes] = useState(getInitialCustomField('pregnancy_notes', 'Confirmed pregnant'));
+  const [maleKidsCount, setMaleKidsCount] = useState(getInitialCustomField('male_kids', '0'));
+  const [femaleKidsCount, setFemaleKidsCount] = useState(getInitialCustomField('female_kids', '0'));
+
+  const getInitialDateStr = () => {
+    if (initialDate) {
+      if (initialDate.includes('T')) return initialDate.slice(0, 16);
+      return `${initialDate}T09:00`;
+    }
+    const now = new Date();
+    const beirutNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Beirut' }));
+    const yyyy = beirutNow.getFullYear();
+    const mm = String(beirutNow.getMonth() + 1).padStart(2, '0');
+    const dd = String(beirutNow.getDate()).padStart(2, '0');
+    const hh = String(beirutNow.getHours()).padStart(2, '0');
+    const min = String(beirutNow.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  };
 
   const [generalTitle, setGeneralTitle] = useState(taskToComplete?.title ? taskToComplete.title.replace(/^Scheduled:\s*/i, '') : '');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 16));
+  const [date, setDate] = useState(getInitialDateStr());
   const [notes, setNotes] = useState(taskToComplete?.notes ? taskToComplete.notes : '');
   const [submitting, setSubmitting] = useState(false);
   const [repeatFrequency, setRepeatFrequency] = useState('none');
@@ -158,40 +201,58 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
     const females = parseInt(femaleKidsCount) || 0;
     const totalKids = males + females;
 
-    if (selectedCategory.id === 'Hoof Trimming') {
-      eventTitle = 'Hoof Trimming & Cutting';
-    } else if (selectedCategory.id === 'Milking Yield') {
-      const val = parseFloat(milkYieldLiters) || 0;
-      eventTitle = `Milking Yield: ${val} L`;
-    } else if (selectedCategory.id === 'Weight Check') {
-      const val = parseFloat(weightKg) || 0;
-      eventTitle = `Weight Logged: ${val} kg`;
-    } else if (selectedCategory.id === 'Vaccination' || selectedCategory.id === 'Medication') {
+    const isSchedulingTask = initialMode === 'SCHEDULE';
+
+    if (selectedCategory.id === 'Vaccination' || selectedCategory.id === 'Medication') {
       const medSummary = medicines
         .filter((m) => m.name.trim())
         .map((m) => {
           const doseStr = m.dosage.trim();
-          return doseStr ? `${m.name.trim()} (${doseStr} ml)` : m.name.trim();
+          return doseStr ? `${m.name.trim()} (${doseStr})` : m.name.trim();
         })
         .join(', ');
-      eventTitle = `${selectedCategory.id}: ${medSummary || 'Log'}`;
+      if (medSummary) {
+        eventTitle = `${selectedCategory.id}: ${medSummary}`;
+      } else if (generalTitle.trim()) {
+        eventTitle = `${selectedCategory.id}: ${generalTitle.trim()}`;
+      } else {
+        eventTitle = selectedCategory.label;
+      }
+    } else if (selectedCategory.id === 'Hoof Trimming') {
+      eventTitle = generalTitle.trim() ? `Hoof Trimming: ${generalTitle.trim()}` : 'Hoof Trimming & Cutting';
+    } else if (selectedCategory.id === 'Milking Yield' || selectedCategory.id === 'Milking') {
+      const val = parseFloat(milkYieldLiters) || 0;
+      eventTitle = val > 0 ? `Milking Yield: ${val} L` : (generalTitle.trim() || 'Milking Schedule');
+    } else if (selectedCategory.id === 'Weight Check') {
+      const val = parseFloat(weightKg) || 0;
+      eventTitle = val > 0 ? `Weight Logged: ${val} kg` : (generalTitle.trim() || 'Weight Check');
     } else if (selectedCategory.id === 'Pregnancy Check') {
       if (totalKids > 0) {
         eventTitle = `Kidding / Birth: ${totalKids} Kids (${males} Male, ${females} Female)`;
       } else {
-        eventTitle = `Pregnancy Check: ${pregnancyNotes || 'Healthy pregnancy'}`;
+        eventTitle = `Pregnancy Check: ${pregnancyNotes || generalTitle.trim() || 'Healthy pregnancy'}`;
       }
     } else {
       eventTitle = generalTitle.trim() || 'General Note';
     }
 
-    const payload = targetGoatsList.map((g) => ({
-      goat_id: g.id,
+    // Create 1 single clean event record with exact snapshot of target goat IDs
+    const isSingleGoat = targetGoatsList.length === 1;
+    const primaryGoatId = isSingleGoat ? targetGoatsList[0].id : null;
+    const snapshotGoatIds = targetGoatsList.map((g) => g.id);
+    const resolvedTargetMode = isSingleGoat ? 'SINGLE' : targetMode;
+
+    const payloadEvent = {
+      goat_id: primaryGoatId,
       type: selectedCategory.id,
       title: eventTitle,
       date: new Date(date).toISOString(),
+      status: isSchedulingTask ? 'pending' : 'completed',
       notes: notes.trim(),
       custom_fields: {
+        target_mode: resolvedTargetMode,
+        target_pen_id: resolvedTargetMode === 'PEN' ? selectedPenId : null,
+        target_goat_ids: snapshotGoatIds,
         male_kids: males,
         female_kids: females,
         total_kids: totalKids,
@@ -199,14 +260,37 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
         repeat_frequency: repeatFrequency,
         custom_repeat_days: customRepeatDays
       }
-    }));
+    };
 
     try {
-      if (payload.length === 1) {
-        await onSave(payload[0]);
-      } else {
-        await onSave(payload);
+      await onSave(payloadEvent);
+
+      // If user logged a completed event BUT set a repeat schedule, also create the 1 single future reminder task with extracted title!
+      if (!isSchedulingTask && repeatFrequency && repeatFrequency !== 'none') {
+        const nextDueDate = calculateNextDueDate(date, repeatFrequency, customRepeatDays);
+        if (nextDueDate) {
+          const futurePayloadEvent = {
+            goat_id: primaryGoatId,
+            type: selectedCategory.id,
+            title: eventTitle,
+            date: nextDueDate,
+            status: 'pending',
+            notes: notes.trim(),
+            custom_fields: {
+              is_scheduled: true,
+              status: 'pending',
+              target_mode: targetMode,
+              target_pen_id: targetMode === 'PEN' ? selectedPenId : null,
+              target_goat_ids: snapshotGoatIds,
+              medicines_list: medicines,
+              repeat_frequency: repeatFrequency,
+              custom_repeat_days: customRepeatDays
+            }
+          };
+          await onSave(futurePayloadEvent);
+        }
       }
+
       handleAnimatedClose();
     } catch (err) {
       console.error(err);
@@ -238,8 +322,10 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Syringe size={18} color="var(--primary)" />
             <h2 className="modal-title" style={{ fontFamily: "'Outfit', sans-serif" }}>
-              {taskToComplete
-                ? `Complete & Log Event: ${selectedCategory.label}`
+              {initialMode === 'SCHEDULE'
+                ? `Schedule Task: ${selectedCategory.label}`
+                : taskToComplete
+                ? `Log Event: ${selectedCategory.label}`
                 : goat
                 ? `Log Event: ${goat.name} (${goat.tag_id})`
                 : 'Log Health Event / Vaccine'}
@@ -525,47 +611,12 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
               </div>
             </div>
 
-            {/* PREDEFINED CATEGORY STRUCTURED FIELDS */}
-            {selectedCategory.id === 'Milking Yield' && (
-              <div className="form-group" style={{ background: '#f0f9ff', padding: '12px', borderRadius: '12px', border: '1px solid #e0f2fe' }}>
-                <label className="form-label" style={{ color: '#0369a1' }}>Milk Yield (Liters) *</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  className="form-input"
-                  placeholder="e.g. 3.5"
-                  value={milkYieldLiters}
-                  onChange={(e) => setMilkYieldLiters(e.target.value)}
-                  required
-                  disabled={submitting}
-                />
-              </div>
-            )}
-
-            {selectedCategory.id === 'Weight Check' && (
-              <div className="form-group" style={{ background: '#faf5ff', padding: '12px', borderRadius: '12px', border: '1px solid #f3e8ff' }}>
-                <label className="form-label" style={{ color: '#7e22ce' }}>Measured Weight (kg) *</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  className="form-input"
-                  placeholder="e.g. 48.5"
-                  value={weightKg}
-                  onChange={(e) => setWeightKg(e.target.value)}
-                  required
-                  disabled={submitting}
-                />
-              </div>
-            )}
-
-            {/* MULTI-MEDICINE & MULTI-VACCINE DYNAMIC LIST FORM */}
+            {/* MULTI-MEDICINE & MULTI-VACCINE DYNAMIC LIST FORM (FOR LOGGING & SCHEDULING) */}
             {(isVaccination || isMedication) && (
               <div className="form-group" style={{ background: medTheme.bg, padding: '12px', borderRadius: '12px', border: `1px solid ${medTheme.border}`, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <label className="form-label" style={{ color: medTheme.color, margin: 0, fontWeight: '800' }}>
-                    {isVaccination ? 'Vaccines Administered *' : 'Medications Administered *'}
+                    {isVaccination ? 'Vaccines to Administer (Optional)' : 'Medications to Administer (Optional)'}
                   </label>
                   <button
                     type="button"
@@ -584,10 +635,10 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
                         <input
                           type="text"
                           className="form-input"
-                          placeholder={isVaccination ? 'e.g. CD&T Booster, Rabies' : 'e.g. Dewormer, Penicillin'}
+                          placeholder={isVaccination ? 'e.g. CD&T Booster, Rabies, FMD' : 'e.g. Dewormer, Penicillin'}
                           value={med.name}
                           onChange={(e) => handleMedicineChange(med.id, 'name', e.target.value)}
-                          required={index === 0}
+                          required={index === 0 && initialMode !== 'SCHEDULE'}
                           disabled={submitting}
                           style={{ padding: '7px 10px', fontSize: '12px' }}
                         />
@@ -596,7 +647,7 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
                         <input
                           type="text"
                           className="form-input"
-                          placeholder="Dose (optional)"
+                          placeholder="Dose (e.g. 1 ML)"
                           value={med.dosage}
                           onChange={(e) => handleMedicineChange(med.id, 'dosage', e.target.value)}
                           disabled={submitting}
@@ -619,73 +670,112 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
               </div>
             )}
 
-            {/* PREGNANCY CHECK & BIRTH / KIDDING FORM FIELDS */}
-            {selectedCategory.id === 'Pregnancy Check' && (
-              <div className="form-group" style={{ background: '#fdf2f8', padding: '12px', borderRadius: '12px', border: '1px solid #fbcfe8', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div>
-                  <label className="form-label" style={{ color: '#be185d' }}>Pregnancy Status / Stage Notes</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="e.g. Confirmed pregnant - Due late September"
-                    value={pregnancyNotes}
-                    onChange={(e) => setPregnancyNotes(e.target.value)}
-                    disabled={submitting}
-                  />
-                </div>
-
-                <div style={{ borderTop: '1px solid #fbcfe8', paddingTop: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <label className="form-label" style={{ color: '#be185d', margin: 0, fontWeight: '800', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Sparkles size={16} color="#be185d" /> Kids Born / Delivered (If Birthing Event)
-                    </label>
-                    {totalKidsCount > 0 && (
-                      <span style={{ fontSize: '11px', fontWeight: '800', background: '#be185d', color: 'white', padding: '2px 8px', borderRadius: '9999px' }}>
-                        {totalKidsCount} {totalKidsCount === 1 ? 'Kid' : 'Kids'} Total
-                      </span>
-                    )}
+            {/* PREDEFINED CATEGORY STRUCTURED FIELDS (ONLY WHEN LOGGING COMPLETED EVENTS) */}
+            {initialMode !== 'SCHEDULE' && (
+              <>
+                {selectedCategory.id === 'Milking Yield' && (
+                  <div className="form-group" style={{ background: '#f0f9ff', padding: '12px', borderRadius: '12px', border: '1px solid #e0f2fe' }}>
+                    <label className="form-label" style={{ color: '#0369a1' }}>Milk Yield (Liters) *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      className="form-input"
+                      placeholder="e.g. 3.5"
+                      value={milkYieldLiters}
+                      onChange={(e) => setMilkYieldLiters(e.target.value)}
+                      required
+                      disabled={submitting}
+                    />
                   </div>
+                )}
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {selectedCategory.id === 'Weight Check' && (
+                  <div className="form-group" style={{ background: '#faf5ff', padding: '12px', borderRadius: '12px', border: '1px solid #f3e8ff' }}>
+                    <label className="form-label" style={{ color: '#7e22ce' }}>Measured Weight (kg) *</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      className="form-input"
+                      placeholder="e.g. 48.5"
+                      value={weightKg}
+                      onChange={(e) => setWeightKg(e.target.value)}
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                )}
+
+                {/* PREGNANCY CHECK & BIRTH / KIDDING FORM FIELDS */}
+                {selectedCategory.id === 'Pregnancy Check' && (
+                  <div className="form-group" style={{ background: '#fdf2f8', padding: '12px', borderRadius: '12px', border: '1px solid #fbcfe8', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div>
-                      <label className="form-label" style={{ fontSize: '11px', color: '#be185d' }}>Male Kids</label>
+                      <label className="form-label" style={{ color: '#be185d' }}>Pregnancy Status / Stage Notes</label>
                       <input
-                        type="number"
-                        min="0"
+                        type="text"
                         className="form-input"
-                        placeholder="0"
-                        value={maleKidsCount}
-                        onChange={(e) => setMaleKidsCount(e.target.value)}
+                        placeholder="e.g. Confirmed pregnant - Due late September"
+                        value={pregnancyNotes}
+                        onChange={(e) => setPregnancyNotes(e.target.value)}
                         disabled={submitting}
                       />
                     </div>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '11px', color: '#be185d' }}>Female Kids</label>
-                      <input
-                        type="number"
-                        min="0"
-                        className="form-input"
-                        placeholder="0"
-                        value={femaleKidsCount}
-                        onChange={(e) => setFemaleKidsCount(e.target.value)}
-                        disabled={submitting}
-                      />
+
+                    <div style={{ borderTop: '1px solid #fbcfe8', paddingTop: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <label className="form-label" style={{ color: '#be185d', margin: 0, fontWeight: '800', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Sparkles size={16} color="#be185d" /> Kids Born / Delivered (If Birthing Event)
+                        </label>
+                        {totalKidsCount > 0 && (
+                          <span style={{ fontSize: '11px', fontWeight: '800', background: '#be185d', color: 'white', padding: '2px 8px', borderRadius: '9999px' }}>
+                            {totalKidsCount} {totalKidsCount === 1 ? 'Kid' : 'Kids'} Total
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '11px', color: '#be185d' }}>Male Kids</label>
+                          <input
+                            type="number"
+                            min="0"
+                            className="form-input"
+                            placeholder="0"
+                            value={maleKidsCount}
+                            onChange={(e) => setMaleKidsCount(e.target.value)}
+                            disabled={submitting}
+                          />
+                        </div>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '11px', color: '#be185d' }}>Female Kids</label>
+                          <input
+                            type="number"
+                            min="0"
+                            className="form-input"
+                            placeholder="0"
+                            value={femaleKidsCount}
+                            onChange={(e) => setFemaleKidsCount(e.target.value)}
+                            disabled={submitting}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                )}
+              </>
             )}
 
-            {selectedCategory.id === 'General' && (
+            {/* REMINDER TITLE INPUT (WHEN SCHEDULING OR GENERAL CATEGORY) */}
+            {(initialMode === 'SCHEDULE' || selectedCategory.id === 'General') && (
               <div className="form-group">
-                <label className="form-label">Activity Summary *</label>
+                <label className="form-label">Task Reminder Title / Name (Optional)</label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="e.g. Hoof trimming, Pasture move..."
+                  placeholder={`e.g. ${selectedCategory.label}`}
                   value={generalTitle}
                   onChange={(e) => setGeneralTitle(e.target.value)}
-                  required
                   disabled={submitting}
                 />
               </div>

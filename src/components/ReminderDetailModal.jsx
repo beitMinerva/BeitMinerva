@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Calendar, FileText, Trash2, Tag, Edit2, CheckCircle } from 'lucide-react';
+import { X, Calendar, FileText, Trash2, Tag, Edit2, CheckCircle, Users } from 'lucide-react';
+import { formatBeirutDisplay } from '../services/goatService';
 
-export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelete, onCompleteTask }) {
+export default function ReminderDetailModal({ reminder, goats = [], barnAreas = [], onClose, onEdit, onDelete, onCompleteTask }) {
   const [isClosing, setIsClosing] = useState(false);
 
   if (!reminder) return null;
@@ -14,6 +15,29 @@ export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelet
     }, 220);
   };
 
+  const getTargetGoatsList = () => {
+    let customFields = {};
+    if (typeof reminder.custom_fields === 'object' && reminder.custom_fields) {
+      customFields = reminder.custom_fields;
+    } else if (typeof reminder.custom_fields === 'string') {
+      try {
+        customFields = JSON.parse(reminder.custom_fields) || {};
+      } catch (e) {}
+    }
+
+    const targetGoatIds = customFields.target_goat_ids || [];
+    if (targetGoatIds.length > 0) {
+      return goats.filter((g) => targetGoatIds.includes(g.id));
+    }
+
+    if (reminder.goat_id && reminder.goat_id !== 'herd') {
+      const g = goats.find((x) => x.id === reminder.goat_id);
+      if (g) return [g];
+    }
+
+    return goats;
+  };
+
   const getCategoryColor = (type) => {
     switch (type) {
       case 'Vaccination': return { color: '#059669', bg: '#ecfdf5' };
@@ -24,6 +48,41 @@ export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelet
       case 'Pregnancy Check': return { color: '#be185d', bg: '#fdf2f8' };
       default: return { color: '#059669', bg: '#ecfdf5' };
     }
+  };
+
+  const getTargetSummary = () => {
+    let customFields = {};
+    if (typeof reminder.custom_fields === 'object' && reminder.custom_fields) {
+      customFields = reminder.custom_fields;
+    } else if (typeof reminder.custom_fields === 'string') {
+      try {
+        customFields = JSON.parse(reminder.custom_fields) || {};
+      } catch (e) {}
+    }
+
+    const targetMode = customFields.target_mode || (reminder.goat_id === 'herd' || !reminder.goat_id ? 'HERD' : 'SINGLE');
+    const targetGoatIds = customFields.target_goat_ids || [];
+    const penId = customFields.target_pen_id;
+
+    if (targetMode === 'SINGLE' && reminder.goat_id && reminder.goat_id !== 'herd') {
+      const g = goats.find((x) => x.id === reminder.goat_id);
+      if (g) return `Goat ${g.tag_id} (${g.name})`;
+    }
+
+    if (targetMode === 'PEN' && penId) {
+      const pen = barnAreas.find((p) => p.id === penId);
+      const penName = pen ? `Pen ${pen.letter}` : 'Pen';
+      const count = targetGoatIds.length;
+      return `${penName} (${count} ${count === 1 ? 'Goat' : 'Goats'})`;
+    }
+
+    if (targetMode === 'CUSTOM') {
+      const count = targetGoatIds.length;
+      return `Custom Selection (${count} ${count === 1 ? 'Goat' : 'Goats'})`;
+    }
+
+    const count = targetGoatIds.length || goats.length;
+    return `Entire Herd (${count} ${count === 1 ? 'Goat' : 'Goats'})`;
   };
 
   const catStyle = getCategoryColor(reminder.type);
@@ -58,12 +117,10 @@ export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelet
             {reminder.title}
           </h2>
 
-          {reminder.notes && reminder.notes.includes('Target:') && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px' }}>
-              <Tag size={13} color="var(--primary)" />
-              <span>{reminder.notes.split('•')[0]}</span>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px' }}>
+            <Tag size={13} color="var(--primary)" />
+            <span>Applied To: <strong>{getTargetSummary()}</strong></span>
+          </div>
 
           {/* SCHEDULED DATE CARD */}
           <div className="card" style={{ padding: '12px', marginBottom: '14px', background: catStyle.bg, border: `1px solid ${catStyle.color}40` }}>
@@ -72,14 +129,14 @@ export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelet
               <div>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block' }}>SCHEDULED DATE</span>
                 <strong style={{ fontSize: '14px', color: catStyle.color }}>
-                  {new Date(reminder.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  {formatBeirutDisplay(reminder.date, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </strong>
               </div>
             </div>
           </div>
 
           {/* NOTES & INSTRUCTIONS */}
-          <div style={{ marginBottom: '10px' }}>
+          <div style={{ marginBottom: '14px' }}>
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <FileText size={14} color="var(--text-muted)" /> Instructions & Details
             </label>
@@ -91,12 +148,47 @@ export default function ReminderDetailModal({ reminder, onClose, onEdit, onDelet
                 border: '1px solid var(--border-color)',
                 fontSize: '13px',
                 color: 'var(--text-main)',
-                minHeight: '60px'
+                minHeight: '50px'
               }}
             >
               {reminder.notes ? reminder.notes : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No additional notes entered for this task reminder.</span>}
             </div>
           </div>
+
+          {/* TARGET GOATS LIST */}
+          {(() => {
+            const targetGoats = getTargetGoatsList();
+            if (targetGoats.length === 0) return null;
+
+            return (
+              <div style={{ marginBottom: '10px' }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Users size={14} color="var(--primary)" /> Goats Included ({targetGoats.length})
+                </label>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', maxHeight: '110px', overflowY: 'auto', background: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  {targetGoats.map((g) => (
+                    <span
+                      key={g.id}
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        background: '#ecfdf5',
+                        color: 'var(--primary-dark)',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--primary-border)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <strong>{g.tag_id}</strong> ({g.name})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatBeirutDisplay } from '../services/goatService';
 import {
   ClipboardList,
   Heart,
@@ -89,7 +90,7 @@ export default function DashboardView({
             <Calendar size={16} color="var(--primary)" /> Today's Action Items
           </h3>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            {formatBeirutDisplay(new Date(), { month: 'short', day: 'numeric' })}
           </span>
         </div>
 

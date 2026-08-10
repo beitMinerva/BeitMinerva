@@ -1,0 +1,47 @@
+import { describe, it, expect } from 'vitest';
+
+const mockGoats = [
+  { id: '1', tag_id: '#101', name: 'Bella', area_id: 'area-a', status: 'Active', gender: 'Female', breed: 'Shami' },
+  { id: '2', tag_id: '#102', name: 'Daisy', area_id: 'area-a', status: 'Active', gender: 'Female', breed: 'Alpine' },
+  { id: '3', tag_id: '#103', name: 'Max', area_id: 'area-b', status: 'Active', gender: 'Male', breed: 'Anglo-Nubian' },
+  { id: '4', tag_id: '#104', name: 'Luna', area_id: 'area-b', status: 'Sold', gender: 'Female', breed: 'Shami' },
+];
+
+function filterGoats(goats, { searchTerm = '', areaId = 'ALL', status = 'ALL' }) {
+  return goats.filter((g) => {
+    const matchesSearch = !searchTerm.trim() ||
+      g.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      g.tag_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (g.breed && g.breed.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesArea = areaId === 'ALL' || g.area_id === areaId;
+    const matchesStatus = status === 'ALL' || g.status === status;
+
+    return matchesSearch && matchesArea && matchesStatus;
+  });
+}
+
+describe('Goat Search & Filtering Logic', () => {
+  it('filters goats by tag_id search term', () => {
+    const result = filterGoats(mockGoats, { searchTerm: '#101' });
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Bella');
+  });
+
+  it('filters goats by name search term case-insensitively', () => {
+    const result = filterGoats(mockGoats, { searchTerm: 'daisy' });
+    expect(result).toHaveLength(1);
+    expect(result[0].tag_id).toBe('#102');
+  });
+
+  it('filters goats by barn area', () => {
+    const result = filterGoats(mockGoats, { areaId: 'area-a' });
+    expect(result).toHaveLength(2);
+  });
+
+  it('filters out sold goats when status is Active', () => {
+    const result = filterGoats(mockGoats, { status: 'Active' });
+    expect(result).toHaveLength(3);
+    expect(result.some((g) => g.name === 'Luna')).toBe(false);
+  });
+});

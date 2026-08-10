@@ -15,6 +15,13 @@ const DEFAULT_SUPABASE_ANON_KEY =
   'sb_publishable_HtzmJ9d-NTPVUfUByceSbw_PtajHP1A';
 
 export function getSupabaseCredentials() {
+  const envUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL;
+  const envKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY;
+
+  if (envUrl && envKey) {
+    return { url: envUrl, key: envKey };
+  }
+
   const url = localStorage.getItem(STORAGE_URL_KEY) || DEFAULT_SUPABASE_URL;
   const key = localStorage.getItem(STORAGE_ANON_KEY) || DEFAULT_SUPABASE_ANON_KEY;
   return { url, key };
@@ -36,13 +43,14 @@ export function isSupabaseConfigured() {
 }
 
 let supabaseInstance = null;
+let currentInstanceUrl = null;
 
 export function getSupabase() {
   const { url, key } = getSupabaseCredentials();
   const finalUrl = url || DEFAULT_SUPABASE_URL;
   const finalKey = key || DEFAULT_SUPABASE_ANON_KEY;
 
-  if (!supabaseInstance) {
+  if (!supabaseInstance || currentInstanceUrl !== finalUrl) {
     try {
       supabaseInstance = createClient(finalUrl, finalKey, {
         auth: {
@@ -52,6 +60,7 @@ export function getSupabase() {
           flowType: 'pkce'
         }
       });
+      currentInstanceUrl = finalUrl;
     } catch (err) {
       console.error('Failed to initialize Supabase client:', err);
       return null;

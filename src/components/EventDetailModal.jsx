@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Calendar, Clock, FileText, Trash2, Tag, Edit2, CheckCircle } from 'lucide-react';
+import { X, Calendar, Clock, FileText, Trash2, Tag, Edit2, CheckCircle, Users } from 'lucide-react';
+import { formatBeirutDisplay } from '../services/goatService';
 
-export default function EventDetailModal({ event, goat, onClose, onEdit, onDelete, onCompleteTask }) {
+export default function EventDetailModal({ event, goat, goats = [], barnAreas = [], onClose, onEdit, onDelete, onCompleteTask }) {
   const [isClosing, setIsClosing] = useState(false);
 
   if (!event) return null;
@@ -12,6 +13,65 @@ export default function EventDetailModal({ event, goat, onClose, onEdit, onDelet
       if (callback) callback();
       onClose();
     }, 220);
+  };
+
+  const getTargetSummary = () => {
+    let customFields = {};
+    if (typeof event.custom_fields === 'object' && event.custom_fields) {
+      customFields = event.custom_fields;
+    } else if (typeof event.custom_fields === 'string') {
+      try {
+        customFields = JSON.parse(event.custom_fields) || {};
+      } catch (e) {}
+    }
+
+    const targetMode = customFields.target_mode || (event.goat_id === 'herd' || !event.goat_id ? 'HERD' : 'SINGLE');
+    const targetGoatIds = customFields.target_goat_ids || [];
+    const penId = customFields.target_pen_id;
+
+    if (targetMode === 'SINGLE') {
+      const g = goat || goats.find((x) => x.id === event.goat_id);
+      if (g) return `Goat ${g.tag_id} (${g.name})`;
+    }
+
+    if (targetMode === 'PEN' && penId) {
+      const pen = barnAreas.find((p) => p.id === penId);
+      const penName = pen ? `Pen ${pen.letter}` : 'Pen';
+      const count = targetGoatIds.length;
+      return `${penName} (${count} ${count === 1 ? 'Goat' : 'Goats'})`;
+    }
+
+    if (targetMode === 'CUSTOM') {
+      const count = targetGoatIds.length;
+      return `Custom Selection (${count} ${count === 1 ? 'Goat' : 'Goats'})`;
+    }
+
+    const count = targetGoatIds.length || goats.length;
+    return `Entire Herd (${count} ${count === 1 ? 'Goat' : 'Goats'})`;
+  };
+
+  const getTargetGoatsList = () => {
+    let customFields = {};
+    if (typeof event.custom_fields === 'object' && event.custom_fields) {
+      customFields = event.custom_fields;
+    } else if (typeof event.custom_fields === 'string') {
+      try {
+        customFields = JSON.parse(event.custom_fields) || {};
+      } catch (e) {}
+    }
+
+    const targetGoatIds = customFields.target_goat_ids || [];
+    if (targetGoatIds.length > 0) {
+      return goats.filter((g) => targetGoatIds.includes(g.id));
+    }
+
+    if (goat) return [goat];
+    if (event.goat_id && event.goat_id !== 'herd') {
+      const g = goats.find((x) => x.id === event.goat_id);
+      if (g) return [g];
+    }
+
+    return goats;
   };
 
   const dateObj = new Date(event.date);
@@ -72,12 +132,10 @@ export default function EventDetailModal({ event, goat, onClose, onEdit, onDelet
             {event.title || event.type}
           </h2>
 
-          {goat && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px' }}>
-              <Tag size={13} color="var(--primary)" />
-              <span>Goat Record: <strong>{goat.name}</strong> ({goat.tag_id})</span>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px' }}>
+            <Tag size={13} color="var(--primary)" />
+            <span>Applied To: <strong>{getTargetSummary()}</strong></span>
+          </div>
 
           {/* EXACT DATE & TIME CONTAINER */}
           <div className="card" style={{ padding: '12px', marginBottom: '14px', background: '#f8fafc' }}>
@@ -97,7 +155,7 @@ export default function EventDetailModal({ event, goat, onClose, onEdit, onDelet
           </div>
 
           {/* NOTES & INSTRUCTIONS */}
-          <div style={{ marginBottom: '10px' }}>
+          <div style={{ marginBottom: '14px' }}>
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <FileText size={14} color="var(--text-muted)" /> Notes & Details
             </label>
@@ -109,12 +167,47 @@ export default function EventDetailModal({ event, goat, onClose, onEdit, onDelet
                 border: '1px solid var(--border-color)',
                 fontSize: '13px',
                 color: 'var(--text-main)',
-                minHeight: '60px'
+                minHeight: '50px'
               }}
             >
               {event.notes ? event.notes : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No additional notes entered for this event.</span>}
             </div>
           </div>
+
+          {/* TARGET GOATS LIST */}
+          {(() => {
+            const targetGoats = getTargetGoatsList();
+            if (targetGoats.length === 0) return null;
+
+            return (
+              <div style={{ marginBottom: '10px' }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Users size={14} color="var(--primary)" /> Goats Included ({targetGoats.length})
+                </label>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', maxHeight: '110px', overflowY: 'auto', background: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  {targetGoats.map((g) => (
+                    <span
+                      key={g.id}
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        background: '#ecfdf5',
+                        color: 'var(--primary-dark)',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--primary-border)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <strong>{g.tag_id}</strong> ({g.name})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>

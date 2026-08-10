@@ -4,6 +4,7 @@ import ReminderDetailModal from '../components/ReminderDetailModal';
 import EditReminderModal from '../components/EditReminderModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import CustomRepeatPicker from '../components/CustomRepeatPicker';
+import { getBeirutDateString, getBeirutDateTimeString, formatBeirutDisplay } from '../services/goatService';
 
 export function getRepeatFrequency(event) {
   if (!event) return { frequency: 'none', days: 21 };
@@ -131,10 +132,11 @@ export default function CalendarView({
   onAddTimelineEvent,
   onUpdateTimelineEvent,
   onDeleteTimelineEvent,
-  onCompleteTimelineEvent
+  onCompleteTimelineEvent,
+  onOpenAddEvent
 }) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDateStr, setSelectedDateStr] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDateStr, setSelectedDateStr] = useState(() => getBeirutDateString());
 
   const [showAddReminderModal, setShowAddReminderModal] = useState(false);
   const [isModalClosing, setIsModalClosing] = useState(false);
@@ -285,10 +287,10 @@ export default function CalendarView({
   };
 
   const formatReminderDate = (dateStr) => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const eventDateStr = new Date(dateStr).toISOString().split('T')[0];
+    const todayStr = getBeirutDateString();
+    const eventDateStr = getBeirutDateString(dateStr);
     if (eventDateStr === todayStr) return 'Today';
-    return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return formatBeirutDisplay(dateStr, { month: 'short', day: 'numeric' });
   };
 
   // Build Calendar Cells
@@ -307,7 +309,7 @@ export default function CalendarView({
       !ev.title?.toLowerCase().startsWith('scheduled') && getRepeatFrequency(ev).frequency === 'none'
     );
 
-    const isToday = cellDateStr === new Date().toISOString().split('T')[0];
+    const isToday = cellDateStr === getBeirutDateString();
     const isSelected = cellDateStr === selectedDateStr;
 
     calendarCells.push({
@@ -462,9 +464,13 @@ export default function CalendarView({
             className="btn btn-primary btn-sm"
             onClick={() => {
               if (onRequireAdmin) {
-                onRequireAdmin(() => setShowAddReminderModal(true));
+                onRequireAdmin(() => {
+                  if (onOpenAddEvent) onOpenAddEvent(selectedDateStr);
+                  else setShowAddReminderModal(true);
+                });
               } else {
-                setShowAddReminderModal(true);
+                if (onOpenAddEvent) onOpenAddEvent(selectedDateStr);
+                else setShowAddReminderModal(true);
               }
             }}
             style={{ fontFamily: "'Outfit', sans-serif" }}
@@ -701,6 +707,8 @@ export default function CalendarView({
         <ReminderDetailModal
           reminder={selectedReminderForDetail}
           goat={goats.find((g) => g.id === selectedReminderForDetail.goat_id)}
+          goats={goats}
+          barnAreas={barnAreas}
           onClose={() => setSelectedReminderForDetail(null)}
           onEdit={(rem) => {
             if (rem.type === 'Transfer') {

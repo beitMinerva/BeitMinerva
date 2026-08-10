@@ -295,7 +295,9 @@ export async function deleteGoat(id) {
 export async function getTimelineEvents(goatId = null) {
   try {
     let query = supabase.from('timeline_events').select('*').order('date', { ascending: false });
-    if (goatId) query = query.eq('goat_id', goatId);
+    if (goatId) {
+      query = query.or(`goat_id.eq.${goatId},goat_id.is.null,goat_id.eq.herd`);
+    }
     const { data, error } = await query;
     if (!error && data) return data;
   } catch (err) {
@@ -312,6 +314,7 @@ export async function addTimelineEvent(eventData) {
     type: eventData.type || 'General Notes',
     title: eventData.title || eventData.type,
     date: eventData.date || new Date().toISOString(),
+    status: eventData.status || (eventData.title?.toLowerCase().startsWith('scheduled') ? 'pending' : 'completed'),
     notes: eventData.notes || '',
     custom_fields: eventData.custom_fields || []
   };
@@ -331,6 +334,7 @@ export async function addBatchTimelineEvents(eventDataList) {
     type: eventData.type || 'General Notes',
     title: eventData.title || eventData.type,
     date: eventData.date || new Date().toISOString(),
+    status: eventData.status || (eventData.title?.toLowerCase().startsWith('scheduled') ? 'pending' : 'completed'),
     notes: eventData.notes || '',
     custom_fields: eventData.custom_fields || []
   }));
@@ -367,31 +371,68 @@ export function calculateNextDueDate(baseDateStr, frequency, customDays = 21) {
 
   switch (frequency) {
     case 'daily':
-      date.setDate(date.getDate() + 1);
+      date.setUTCDate(date.getUTCDate() + 1);
       break;
     case 'weekly':
-      date.setDate(date.getDate() + 7);
+      date.setUTCDate(date.getUTCDate() + 7);
       break;
     case 'monthly':
-      date.setMonth(date.getMonth() + 1);
+      date.setUTCMonth(date.getUTCMonth() + 1);
       break;
     case 'every_2_months':
-      date.setMonth(date.getMonth() + 2);
+      date.setUTCMonth(date.getUTCMonth() + 2);
       break;
     case 'every_3_months':
-      date.setMonth(date.getMonth() + 3);
+      date.setUTCMonth(date.getUTCMonth() + 3);
       break;
     case 'every_6_months':
-      date.setMonth(date.getMonth() + 6);
+      date.setUTCMonth(date.getUTCMonth() + 6);
       break;
     case 'yearly':
-      date.setFullYear(date.getFullYear() + 1);
+      date.setUTCFullYear(date.getUTCFullYear() + 1);
       break;
     case 'custom':
-      date.setDate(date.getDate() + (parseInt(customDays) || 21));
+      date.setUTCDate(date.getUTCDate() + (parseInt(customDays) || 21));
       break;
     default:
       return null;
   }
   return date.toISOString();
+}
+
+export function getBeirutDateTimeString(dateInput = new Date()) {
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  const beirutDate = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Beirut' }));
+  const yyyy = beirutDate.getFullYear();
+  const mm = String(beirutDate.getMonth() + 1).padStart(2, '0');
+  const dd = String(beirutDate.getDate()).padStart(2, '0');
+  const hh = String(beirutDate.getHours()).padStart(2, '0');
+  const min = String(beirutDate.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+export function getBeirutDateString(dateInput = new Date()) {
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  const beirutDate = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Beirut' }));
+  const yyyy = beirutDate.getFullYear();
+  const mm = String(beirutDate.getMonth() + 1).padStart(2, '0');
+  const dd = String(beirutDate.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export function formatBeirutDisplay(dateInput, options = {}) {
+  if (!dateInput) return '';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', {
+    timeZone: 'Asia/Beirut',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    ...options
+  });
 }

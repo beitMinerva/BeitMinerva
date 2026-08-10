@@ -26,3 +26,8 @@ Thumbs.db
 # Supabase CLI temp files
 supabase/.temp/
 
+# Scratch & test outputs
+scratch/
+test-results/
+.env.test
+

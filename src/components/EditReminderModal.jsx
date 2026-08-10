@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, Bell, Scissors, Sparkles, Plus, Trash2 } from 'lucide-react';
+import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, Bell, Scissors, Sparkles, Plus, Trash2, Users, Home, CheckSquare, Square } from 'lucide-react';
+import { getBeirutDateTimeString } from '../services/goatService';
 
-export default function EditReminderModal({ reminder, goats = [], onClose, onSave }) {
+export default function EditReminderModal({ reminder, goats = [], barnAreas = [], onClose, onSave }) {
   const [isClosing, setIsClosing] = useState(false);
 
   const categories = [
@@ -103,6 +104,17 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
     setMedicines((prev) => prev.map((m) => m.id === id ? { ...m, [field]: value } : m));
   };
 
+  // Target Mode selection
+  const initialTargetMode = parsedFields.target_mode || (reminder?.goat_id && reminder.goat_id !== 'herd' ? 'SINGLE' : 'HERD');
+  const [targetMode, setTargetMode] = useState(initialTargetMode);
+  const [selectedPenId, setSelectedPenId] = useState(parsedFields.target_pen_id || (barnAreas[0]?.id || ''));
+  const [selectedGoatIds, setSelectedGoatIds] = useState(parsedFields.target_goat_ids || (reminder?.goat_id && reminder.goat_id !== 'herd' ? [reminder.goat_id] : goats.map((g) => g.id)));
+  const [goatSearchTerm, setGoatSearchTerm] = useState('');
+
+  const toggleGoatSelection = (id) => {
+    setSelectedGoatIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
+
   const handleAnimatedClose = () => {
     setIsClosing(true);
     setTimeout(() => { onClose(); }, 220);
@@ -112,20 +124,43 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
     e.preventDefault();
     setSubmitting(true);
 
+    const getTargetGoatsList = () => {
+      if (targetMode === 'HERD') return goats;
+      if (targetMode === 'PEN') return goats.filter((g) => g.area_id === selectedPenId);
+      if (targetMode === 'CUSTOM') return goats.filter((g) => selectedGoatIds.includes(g.id));
+      if (targetMode === 'SINGLE') {
+        const selectedSingleId = selectedGoatIds[0] || reminder?.goat_id;
+        const g = goats.find((x) => x.id === selectedSingleId);
+        return g ? [g] : [];
+      }
+      return goats;
+    };
+
+    const targetList = getTargetGoatsList();
+    const snapshotIds = targetList.map((g) => g.id);
+    const isSingle = targetList.length === 1;
+    const primaryGoatId = isSingle ? targetList[0].id : null;
+    const resolvedTargetMode = isSingle ? 'SINGLE' : targetMode;
+
     const males = parseInt(maleKidsCount) || 0;
     const females = parseInt(femaleKidsCount) || 0;
     const totalKids = males + females;
     const titlePrefix = isScheduled ? 'Scheduled: ' : '';
 
     let eventTitle = reminderTitle.trim();
-    let customFields = { ...parsedFields };
+    let customFields = {
+      ...parsedFields,
+      target_mode: resolvedTargetMode,
+      target_pen_id: resolvedTargetMode === 'PEN' ? selectedPenId : null,
+      target_goat_ids: snapshotIds
+    };
 
     if (selectedCategory.id === 'Vaccination' || selectedCategory.id === 'Medication') {
       const medSummary = medicines
         .filter((m) => m.name.trim())
         .map((m) => m.dosage.trim() ? `${m.name.trim()} (${m.dosage.trim()})` : m.name.trim())
         .join(', ');
-      eventTitle = `${selectedCategory.id}: ${medSummary || reminderTitle.trim() || 'Log'}`;
+      eventTitle = `${selectedCategory.id}: ${medSummary || reminderTitle.trim() || selectedCategory.label}`;
       customFields = { ...customFields, medicines_list: medicines };
     } else if (selectedCategory.id === 'Pregnancy Check') {
       if (totalKids > 0) {
@@ -138,15 +173,16 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
       eventTitle = `Milking Yield: ${parseFloat(milkYield) || 0} L`;
       customFields = { ...customFields, milk_liters: parseFloat(milkYield) || 0 };
     } else if (selectedCategory.id === 'Weight Check') {
-      eventTitle = `Weight Logged: ${parseFloat(weightKg) || 0} kg`;
+      eventTitle = `Weight Check: ${parseFloat(weightKg) || 0} kg`;
       customFields = { ...customFields, weight_kg: parseFloat(weightKg) || 0 };
-    } else {
-      eventTitle = reminderTitle.trim() || selectedCategory.label;
     }
+
+    if (!eventTitle) eventTitle = selectedCategory.label;
 
     try {
       if (onSave) {
         await onSave(reminder.id, {
+          goat_id: primaryGoatId,
           type: selectedCategory.id,
           title: `${titlePrefix}${eventTitle}`,
           date: new Date(reminderDate).toISOString(),
@@ -195,6 +231,185 @@ export default function EditReminderModal({ reminder, goats = [], onClose, onSav
                 required
                 disabled={submitting}
               />
+            </div>
+
+            {/* TARGET SELECTION UI (HERD, PEN, CUSTOM) */}
+            <div className="form-group" style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Select Target Goats *</span>
+                <span style={{ fontSize: '11px', color: 'var(--primary-dark)', fontWeight: '800' }}>
+                  {targetMode === 'HERD' ? `Entire Herd (${goats.length} Goats)` :
+                   targetMode === 'PEN' ? `Selected Pen (${goats.filter(g => g.area_id === selectedPenId).length} Goats)` :
+                   targetMode === 'CUSTOM' ? `Custom Selection (${selectedGoatIds.length} Goats)` :
+                   `Single Goat (${selectedGoatIds.length} Goat)`}
+                </span>
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setTargetMode('HERD'); setSelectedGoatIds(goats.map(g => g.id)); }}
+                  style={{
+                    padding: '8px 6px',
+                    borderRadius: '10px',
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    border: targetMode === 'HERD' ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                    background: targetMode === 'HERD' ? 'var(--primary-light)' : '#ffffff',
+                    color: targetMode === 'HERD' ? 'var(--primary-dark)' : 'var(--text-main)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justify: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Users size={13} /> Entire Herd
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTargetMode('PEN')}
+                  style={{
+                    padding: '8px 6px',
+                    borderRadius: '10px',
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    border: targetMode === 'PEN' ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                    background: targetMode === 'PEN' ? 'var(--primary-light)' : '#ffffff',
+                    color: targetMode === 'PEN' ? 'var(--primary-dark)' : 'var(--text-main)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justify: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Home size={13} /> By Barn Pen
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTargetMode('CUSTOM')}
+                  style={{
+                    padding: '8px 6px',
+                    borderRadius: '10px',
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    border: targetMode === 'CUSTOM' ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                    background: targetMode === 'CUSTOM' ? 'var(--primary-light)' : '#ffffff',
+                    color: targetMode === 'CUSTOM' ? 'var(--primary-dark)' : 'var(--text-main)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justify: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <CheckSquare size={13} /> Select Specific
+                </button>
+              </div>
+
+              {/* PEN SELECTION PICKER */}
+              {targetMode === 'PEN' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+                    {barnAreas.map((pen) => {
+                      const isSelected = selectedPenId === pen.id;
+                      const penGoatCount = goats.filter((g) => g.area_id === pen.id).length;
+
+                      return (
+                        <button
+                          key={pen.id}
+                          type="button"
+                          onClick={() => setSelectedPenId(pen.id)}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                            background: isSelected ? 'var(--primary-gradient)' : '#ffffff',
+                            color: isSelected ? '#ffffff' : 'var(--text-main)',
+                            cursor: 'pointer',
+                            flexShrink: 0
+                          }}
+                        >
+                          Pen {pen.letter} ({penGoatCount})
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* CUSTOM GOAT CHECKBOX SELECTION LIST */}
+              {targetMode === 'CUSTOM' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Search tag ID or name..."
+                      value={goatSearchTerm}
+                      onChange={(e) => setGoatSearchTerm(e.target.value)}
+                      style={{ padding: '6px 10px', fontSize: '12px' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setSelectedGoatIds(goats.map(g => g.id))}
+                      style={{ padding: '6px 8px', fontSize: '11px', flexShrink: 0 }}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setSelectedGoatIds([])}
+                      style={{ padding: '6px 8px', fontSize: '11px', flexShrink: 0 }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+
+                  <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', background: '#ffffff', padding: '8px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                    {goats.filter(g => {
+                      if (!goatSearchTerm.trim()) return true;
+                      const q = goatSearchTerm.trim().toLowerCase();
+                      return g.name.toLowerCase().includes(q) || g.tag_id.toLowerCase().includes(q);
+                    }).map((g) => {
+                      const isChecked = selectedGoatIds.includes(g.id);
+
+                      return (
+                        <div
+                          key={g.id}
+                          onClick={() => toggleGoatSelection(g.id)}
+                          style={{
+                            padding: '6px 8px',
+                            borderRadius: '8px',
+                            border: isChecked ? '1px solid var(--primary-border)' : '1px solid var(--border-color)',
+                            background: isChecked ? 'var(--primary-light)' : '#f8fafc',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '11px'
+                          }}
+                        >
+                          <div style={{ color: isChecked ? 'var(--primary)' : 'var(--text-light)' }}>
+                            {isChecked ? <CheckSquare size={14} /> : <Square size={14} />}
+                          </div>
+                          <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <strong style={{ display: 'block', fontSize: '11px' }}>{g.tag_id}</strong>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{g.name}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* CATEGORY CUSTOM CARDS GRID */}

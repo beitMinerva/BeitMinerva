@@ -87,6 +87,8 @@ export default function App() {
   const [goatToEdit, setGoatToEdit] = useState(null);
   const [showAddEventModal, setShowAddEventModal] = useState(false);
   const [goatForEvent, setGoatForEvent] = useState(null);
+  const [initialAddEventMode, setInitialAddEventMode] = useState('LOG');
+  const [initialAddEventDate, setInitialAddEventDate] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
 
   const loadData = async () => {
@@ -196,12 +198,25 @@ export default function App() {
     } catch (err) { showToast(`❌ Error: ${err.message}`); }
   };
 
-  const handleSavePenMilkEntry = async (barnAreaId, milkEntry, entryId = null) => {
+  const handleSavePenMilkEntry = async (param1, param2, param3 = null) => {
     try {
+      let barnAreaId, milkEntry, entryId;
+      if (typeof param1 === 'object' && param1 !== null && !param2) {
+        milkEntry = param1;
+        barnAreaId = param1.barn_area_id || param1.area_id;
+        entryId = param1.id;
+      } else {
+        barnAreaId = param1;
+        milkEntry = param2 || {};
+        entryId = param3;
+      }
+
+      const amountLiters = Number(milkEntry.amount_liters ?? milkEntry.milk_liters ?? milkEntry.amount) || 0;
+
       if (entryId) {
         const updated = await updatePenMilkEntry(entryId, {
-          date: milkEntry.date,
-          amount_liters: Number(milkEntry.amount_liters) || 0,
+          date: milkEntry.date || new Date().toISOString(),
+          amount_liters: amountLiters,
           notes: milkEntry.notes || ''
         });
         setPenMilkEntries((prev) => prev.map((item) => (item.id === entryId ? updated : item)));
@@ -211,10 +226,12 @@ export default function App() {
 
       const created = await addPenMilkEntry({
         barn_area_id: barnAreaId,
-        ...milkEntry
+        date: milkEntry.date || new Date().toISOString(),
+        amount_liters: amountLiters,
+        notes: milkEntry.notes || ''
       });
       setPenMilkEntries((prev) => [created, ...prev]);
-      showToast('Saved pen milk entry.');
+      showToast(`Saved pen milk entry (${amountLiters.toFixed(1)} L).`);
       return created;
     } catch (err) {
       showToast(`❌ Error: ${err.message}`);
@@ -233,11 +250,22 @@ export default function App() {
     }
   };
 
-  const handleSavePenFeedingEntry = async (barnAreaId, feedingData, entryId = null) => {
+  const handleSavePenFeedingEntry = async (param1, param2, param3 = null) => {
     try {
+      let barnAreaId, feedingData, entryId;
+      if (typeof param1 === 'object' && param1 !== null && !param2) {
+        feedingData = param1;
+        barnAreaId = param1.barn_area_id || param1.area_id;
+        entryId = param1.id;
+      } else {
+        barnAreaId = param1;
+        feedingData = param2 || {};
+        entryId = param3;
+      }
+
       if (entryId) {
         const updated = await updatePenFeedingEntry(entryId, {
-          food_type: feedingData.food_type,
+          food_type: feedingData.food_type || '',
           daily_weight: Number(feedingData.daily_weight) || 0,
           composition: feedingData.composition || '',
           schedule: feedingData.schedule || '',
@@ -250,6 +278,7 @@ export default function App() {
 
       const created = await addPenFeedingEntry({
         barn_area_id: barnAreaId,
+        date: feedingData.date || new Date().toISOString(),
         ...feedingData
       });
       setPenFeedingEntries((prev) => [created, ...prev]);
@@ -304,7 +333,8 @@ export default function App() {
         }
 
         if (frequency && frequency !== 'none') {
-          const nextDueDate = calculateNextDueDate(taskToComplete.date, frequency, days);
+          const actualCompletionDate = (Array.isArray(eventData) ? eventData[0]?.date : eventData?.date) || new Date().toISOString();
+          const nextDueDate = calculateNextDueDate(actualCompletionDate, frequency, days);
           await updateTimelineEvent(taskToComplete.id, {
             date: nextDueDate,
             status: 'pending',
@@ -435,9 +465,9 @@ export default function App() {
                 onAddBarnArea={(newArea) => requireAdmin(() => handleAddBarnArea(newArea))}
                 onUpdateBarnArea={(areaId, updates) => requireAdmin(() => handleUpdateBarnArea(areaId, updates))}
                 onDeleteBarnArea={(areaId) => requireAdmin(() => handleDeleteBarnArea(areaId))}
-                onSavePenMilkEntry={(entry) => requireAdmin(() => handleSavePenMilkEntry(entry))}
+                onSavePenMilkEntry={(p1, p2, p3) => requireAdmin(() => handleSavePenMilkEntry(p1, p2, p3))}
                 onDeletePenMilkEntry={(entryId) => requireAdmin(() => handleDeletePenMilkEntry(entryId))}
-                onSavePenFeedingEntry={(entry) => requireAdmin(() => handleSavePenFeedingEntry(entry))}
+                onSavePenFeedingEntry={(p1, p2, p3) => requireAdmin(() => handleSavePenFeedingEntry(p1, p2, p3))}
                 onDeletePenFeedingEntry={(entryId) => requireAdmin(() => handleDeletePenFeedingEntry(entryId))}
               />
             )}
@@ -456,6 +486,13 @@ export default function App() {
                 onUpdateTimelineEvent={(eventId, updates) => requireAdmin(() => handleUpdateEvent(eventId, updates))}
                 onDeleteTimelineEvent={(eventId) => requireAdmin(() => handleDeleteEvent(eventId))}
                 onCompleteTimelineEvent={(reminder) => requireAdmin(() => handleCompleteTask(reminder))}
+                onOpenAddEvent={(dateStr) => requireAdmin(() => {
+                  setGoatForEvent(null);
+                  setTaskToComplete(null);
+                  setInitialAddEventDate(dateStr || null);
+                  setInitialAddEventMode('SCHEDULE');
+                  setShowAddEventModal(true);
+                })}
               />
             )}
 
@@ -541,10 +578,14 @@ export default function App() {
           goats={goats}
           barnAreas={barnAreas}
           taskToComplete={taskToComplete}
+          initialMode={initialAddEventMode}
+          initialDate={initialAddEventDate}
           onClose={() => {
             setShowAddEventModal(false);
             setGoatForEvent(null);
             setTaskToComplete(null);
+            setInitialAddEventMode('LOG');
+            setInitialAddEventDate(null);
           }}
           onSave={(eventData) => requireAdmin(() => handleSaveEvent(eventData))}
         />

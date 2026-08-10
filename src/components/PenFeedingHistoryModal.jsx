@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { X, Wheat, Scale, Clock, Sparkles, History, Calendar, Milk, TrendingUp, Filter, Pencil, Trash2, Loader2, FileText } from 'lucide-react';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { isMilkingEvent, getEventMetricValue } from '../utils/metricEventUtils';
+import { getBeirutDateTimeString, formatBeirutDisplay } from '../services/goatService';
 
 export function parsePenFeeding(infoStr) {
   if (!infoStr) {
@@ -141,7 +142,7 @@ export default function PenFeedingHistoryModal({
   const [timeRange, setTimeRange] = useState('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [milkDate, setMilkDate] = useState(new Date().toISOString().slice(0, 16));
+  const [milkDate, setMilkDate] = useState(() => getBeirutDateTimeString());
   const [milkAmount, setMilkAmount] = useState('');
   const [milkNotes, setMilkNotes] = useState('');
   const [submittingMilk, setSubmittingMilk] = useState(false);
@@ -265,7 +266,7 @@ export default function PenFeedingHistoryModal({
         amount_liters: Number(milkAmount) || 0,
         notes: milkNotes.trim()
       }, editingEntry?.id || null);
-      setMilkDate(new Date().toISOString().slice(0, 16));
+      setMilkDate(getBeirutDateTimeString());
       setMilkAmount('');
       setMilkNotes('');
       setEditingEntry(null);
@@ -279,14 +280,14 @@ export default function PenFeedingHistoryModal({
   const handleStartEditEntry = (item) => {
     const amount = Number(item.amount_liters ?? item.milk_liters ?? item.amount ?? 0);
     setEditingEntry(item);
-    setMilkDate(new Date(item.date || item.created_at || new Date()).toISOString().slice(0, 16));
+    setMilkDate(getBeirutDateTimeString(item.date || item.created_at || new Date()));
     setMilkAmount(String(amount));
     setMilkNotes(item.notes || '');
   };
 
   const handleCancelEditEntry = () => {
     setEditingEntry(null);
-    setMilkDate(new Date().toISOString().slice(0, 16));
+    setMilkDate(getBeirutDateTimeString());
     setMilkAmount('');
     setMilkNotes('');
   };
@@ -307,8 +308,7 @@ export default function PenFeedingHistoryModal({
 
   const formatDateLabel = (dateStr) => {
     if (!dateStr) return 'Past Log';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatBeirutDisplay(dateStr);
   };
 
   return (

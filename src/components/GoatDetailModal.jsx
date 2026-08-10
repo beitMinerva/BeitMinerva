@@ -5,8 +5,40 @@ import DeleteConfirmModal from './DeleteConfirmModal';
 import EventDetailModal from './EventDetailModal';
 import EditReminderModal from './EditReminderModal';
 import CustomRepeatPicker from './CustomRepeatPicker';
-import { ArrowLeft, Tag, MapPin, Plus, Edit2, Trash2, Bell, ArrowRightLeft, Clock, Syringe, Pill, Milk, Weight, Heart, Scissors, X, Loader2 } from 'lucide-react';
-import { calculateGoatAge } from '../services/goatService';
+import { ArrowLeft, Tag, MapPin, Plus, Edit2, Trash2, Bell, ArrowRightLeft, Clock, Syringe, Pill, Milk, Weight, Heart, Scissors, X, Loader2, RotateCw } from 'lucide-react';
+import { calculateGoatAge, formatBeirutDisplay, getBeirutDateString } from '../services/goatService';
+
+export function getRepeatLabel(event) {
+  let frequency = 'none';
+  let days = 21;
+
+  if (typeof event.custom_fields === 'object' && event.custom_fields) {
+    frequency = event.custom_fields.repeat_frequency || 'none';
+    days = parseInt(event.custom_fields.custom_repeat_days) || 21;
+  } else if (typeof event.custom_fields === 'string') {
+    try {
+      const parsed = JSON.parse(event.custom_fields);
+      if (parsed) {
+        frequency = parsed.repeat_frequency || 'none';
+        days = parseInt(parsed.custom_repeat_days) || 21;
+      }
+    } catch (e) {}
+  } else if (event.repeat_frequency) {
+    frequency = event.repeat_frequency;
+  }
+
+  switch (frequency) {
+    case 'daily': return 'Daily';
+    case 'weekly': return 'Weekly';
+    case 'monthly': return 'Monthly';
+    case 'every_2_months': return 'Every 2 Months';
+    case 'every_3_months': return 'Every 3 Months';
+    case 'every_6_months': return 'Every 6 Months';
+    case 'yearly': return 'Yearly';
+    case 'custom': return `Every ${days} Days`;
+    default: return 'One-time Task';
+  }
+}
 
 export function formatBeirutDateTime(dateStr) {
   if (!dateStr) return '';
@@ -215,7 +247,7 @@ export default function GoatDetailModal({
             <ArrowLeft size={16} /> Back to Herd
           </button>
 
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '6px', marginLeft: "3px" }}>
             {onDeleteGoat && (
               <button
                 className="btn btn-secondary btn-sm"
@@ -327,7 +359,23 @@ export default function GoatDetailModal({
 
                 if (!isScheduled) return false;
                 if (ev.goat_id === goat.id) return true;
-                if (ev.goat_id === 'herd' || (ev.notes && (ev.notes.includes('Target: Entire Herd') || ev.notes.includes('Entire Herd')))) return true;
+
+                // Evaluate exact snapshot of target goat IDs (insulates newly created goats!)
+                let targetIds = null;
+                if (typeof ev.custom_fields === 'object' && ev.custom_fields) {
+                  targetIds = ev.custom_fields.target_goat_ids || null;
+                } else if (typeof ev.custom_fields === 'string') {
+                  try {
+                    const parsed = JSON.parse(ev.custom_fields);
+                    if (parsed) targetIds = parsed.target_goat_ids || null;
+                  } catch (e) {}
+                }
+
+                if (Array.isArray(targetIds)) {
+                  return targetIds.includes(goat.id);
+                }
+
+                if (!ev.goat_id || ev.goat_id === 'herd' || (ev.notes && (ev.notes.includes('Target: Entire Herd') || ev.notes.includes('Entire Herd')))) return true;
                 if (area && ev.notes && (ev.notes.includes(`Target: Pen ${area.letter}`) || ev.notes.includes(`Pen ${area.letter}`))) return true;
                 return false;
               })
@@ -381,12 +429,29 @@ export default function GoatDetailModal({
                               >
                                 {task.type}
                               </span>
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: '800',
+                                  color: '#0369a1',
+                                  background: '#f0f9ff',
+                                  padding: '2px 7px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #e0f2fe',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px'
+                                }}
+                              >
+                                <RotateCw size={10} color="#0369a1" />
+                                {getRepeatLabel(task)}
+                              </span>
                             </div>
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                             <span style={{ fontSize: '11px', fontWeight: '800', background: 'var(--primary-light)', color: 'var(--primary-dark)', padding: '3px 8px', borderRadius: '6px', border: '1px solid var(--primary-border)' }}>
-                              {new Date(task.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {formatBeirutDisplay(task.date)}
                             </span>
                           </div>
                         </div>
@@ -404,27 +469,54 @@ export default function GoatDetailModal({
             );
           })()}
 
-          {/* CLEAN SIMPLE TIMELINE CARDS (NO LEFT BORDER ACCENT) */}
-          <div className="card" style={{ padding: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Clock size={17} color="var(--primary)" /> Timeline History ({events.length})
-              </h3>
-              <button className="btn btn-outline btn-sm" onClick={() => onAddEvent(goat)}>
-                <Plus size={13} /> Add
-              </button>
-            </div>
+          {/* CLEAN SIMPLE TIMELINE CARDS (HISTORICAL COMPLETED EVENTS ONLY) */}
+          {(() => {
+            const historyEvents = events.filter((ev) => {
+              if (ev.status === 'pending' || ev.is_scheduled === true) return false;
+              if (ev.title && ev.title.toLowerCase().startsWith('scheduled')) return false;
 
-            {events.length === 0 ? (
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '16px 0', textAlign: 'center' }}>
-                No timeline events recorded for {goat.name}. Click "Log Event" above to record weight progression, milking yields, or vaccinations.
-              </p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {events.map((ev) => {
-                  const catStyle = getCategoryBadgeStyle(ev.type);
+              if (ev.goat_id === goat.id) return true;
 
-                  return (
+              let targetIds = null;
+              if (typeof ev.custom_fields === 'object' && ev.custom_fields) {
+                targetIds = ev.custom_fields.target_goat_ids || null;
+              } else if (typeof ev.custom_fields === 'string') {
+                try {
+                  const parsed = JSON.parse(ev.custom_fields);
+                  if (parsed) targetIds = parsed.target_goat_ids || null;
+                } catch (e) {}
+              }
+
+              if (Array.isArray(targetIds)) {
+                return targetIds.includes(goat.id);
+              }
+
+              if (!ev.goat_id || ev.goat_id === 'herd' || (ev.notes && (ev.notes.includes('Target: Entire Herd') || ev.notes.includes('Entire Herd')))) return true;
+              if (area && ev.notes && (ev.notes.includes(`Target: Pen ${area.letter}`) || ev.notes.includes(`Pen ${area.letter}`))) return true;
+              return false;
+            });
+
+            return (
+              <div className="card" style={{ padding: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Clock size={17} color="var(--primary)" /> Timeline History ({historyEvents.length})
+                  </h3>
+                  <button className="btn btn-outline btn-sm" onClick={() => onAddEvent(goat)}>
+                    <Plus size={13} /> Add
+                  </button>
+                </div>
+
+                {historyEvents.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '16px 0', textAlign: 'center' }}>
+                    No completed timeline events recorded for {goat.name}. Click "Log Event" above to record weight progression, milking yields, or vaccinations.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {historyEvents.map((ev) => {
+                      const catStyle = getCategoryBadgeStyle(ev.type);
+
+                      return (
                     <div
                       key={ev.id}
                       onClick={() => setSelectedEventForDetail(ev)}
@@ -462,7 +554,7 @@ export default function GoatDetailModal({
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>
-                            {new Date(ev.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {formatBeirutDisplay(ev.date)}
                           </span>
                           {onUpdateEvent && ev.type !== 'Transfer' && (
                             <button
@@ -502,6 +594,8 @@ export default function GoatDetailModal({
               </div>
             )}
           </div>
+        );
+      })()}
         </div>
       </div>
 
