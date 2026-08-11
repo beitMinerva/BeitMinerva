@@ -41,12 +41,11 @@ export async function registerServiceWorker() {
 export async function requestNotificationPermission() {
   if (!isNotificationSupported()) return 'unsupported';
 
-  // Register Service Worker first (Required for iOS Safari 16.4+)
-  await registerServiceWorker();
+  let permission = 'default';
 
+  // 1. Request permission synchronously on the physical tap stack first (iOS Requirement)
   try {
     if ('Notification' in window && typeof Notification.requestPermission === 'function') {
-      let permission = 'default';
       try {
         const res = Notification.requestPermission();
         if (res && typeof res.then === 'function') {
@@ -61,13 +60,18 @@ export async function requestNotificationPermission() {
           Notification.requestPermission((p) => resolve(p));
         });
       }
-      return permission;
     }
   } catch (err) {
     console.error('Error requesting notification permission:', err);
     return 'denied';
   }
-  return 'default';
+
+  // 2. Register Service Worker after permission prompt is triggered
+  if (permission === 'granted') {
+    await registerServiceWorker();
+  }
+
+  return permission;
 }
 
 // Convert Base64 VAPID key to Uint8Array for PushManager
