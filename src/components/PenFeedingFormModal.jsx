@@ -340,8 +340,8 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                               transition: 'all 0.15s ease'
                             }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
                                 {/* CUSTOM VIBRANT CHECKBOX BUTTON */}
                                 <div
                                   style={{
@@ -363,26 +363,26 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                                   )}
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <strong style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a' }}>
-                                    Pen {p.letter} {p.name && p.name !== `Pen ${p.letter}` ? `(${p.name})` : ''}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0, flexWrap: 'nowrap' }}>
+                                  <strong style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', whiteSpace: 'nowrap' }}>
+                                    Pen {p.letter}{p.name && p.name !== `Pen ${p.letter}` ? ` · ${p.name}` : ''}
                                   </strong>
 
                                   {isPrimary ? (
-                                    <span style={{ fontSize: '10px', fontWeight: '800', background: '#dcfce7', color: '#047857', padding: '1px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
-                                      Current Pen
+                                    <span style={{ fontSize: '10px', fontWeight: '800', background: '#dcfce7', color: '#047857', padding: '1px 5px', borderRadius: '4px', border: '1px solid #a7f3d0', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                      This Pen
                                     </span>
                                   ) : (
-                                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
-                                      {count} {count === 1 ? 'goat' : 'goats'}
+                                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                      {count} goats
                                     </span>
                                   )}
                                 </div>
                               </div>
 
                               {isSelected && allocatedInfo && (
-                                <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', background: '#ecfdf5', padding: '3px 9px', borderRadius: '6px', border: '1.5px solid #a7f3d0' }}>
-                                  {(allocatedInfo.ratio * 100).toFixed(1)}% Share
+                                <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', background: '#ecfdf5', padding: '3px 7px', borderRadius: '6px', border: '1.5px solid #a7f3d0', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                  {(allocatedInfo.ratio * 100).toFixed(1)}%
                                 </span>
                               )}
                             </div>
@@ -390,10 +390,10 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                             {isSelected && (
                               <div
                                 onClick={(e) => e.stopPropagation()}
-                                style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '32px', borderTop: '1px dashed #f1f5f9', paddingTop: '6px' }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '30px', borderTop: '1px dashed #f1f5f9', paddingTop: '6px', flexWrap: 'nowrap' }}
                               >
-                                <label style={{ fontSize: '11px', color: '#475569', fontWeight: '700', whiteSpace: 'nowrap' }}>
-                                  Target Rate:
+                                <label style={{ fontSize: '11px', color: '#475569', fontWeight: '700', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                  Rate:
                                 </label>
                                 <input
                                   type="number"
