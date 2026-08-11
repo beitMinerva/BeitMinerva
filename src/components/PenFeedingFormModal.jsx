@@ -416,7 +416,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
             {!isSharedTrough && (
               <div
                 style={{
-                  background: '#f8fafc',
+                  background: '#ffffff',
                   border: '1.5px solid #e2e8f0',
                   borderRadius: '14px',
                   padding: '12px 14px',
