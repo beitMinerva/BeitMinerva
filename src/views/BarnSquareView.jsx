@@ -271,16 +271,6 @@ export default function BarnSquareView({
             >
               <Pencil size={13} /> Edit Pens
             </button>
-
-            {onOpenAnalytics && (
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={onOpenAnalytics}
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: "'Outfit', sans-serif" }}
-              >
-                <BarChart2 size={13} /> Analytics
-              </button>
-            )}
           </div>
         </div>
 
