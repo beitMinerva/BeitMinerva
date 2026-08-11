@@ -104,26 +104,32 @@ export default function AddGoatModal({ goatToEdit = null, barnAreas = [], initia
               </div>
             </div>
 
-            {/* GENDER CUSTOM CARD SELECTION (Female vs Male) */}
+            {/* GENDER CUSTOM CARD SELECTION (Female vs Male vs Other) */}
             <div className="form-group">
               <label className="form-label">Gender</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {['Female', 'Male'].map((g) => (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                {[
+                  { id: 'Female', label: 'Female' },
+                  { id: 'Male', label: 'Male' },
+                  { id: 'Other', label: 'Other' }
+                ].map(({ id, label }) => (
                   <div
-                    key={g}
-                    onClick={() => !submitting && setGender(g)}
+                    key={id}
+                    onClick={() => !submitting && setGender(id)}
                     style={{
-                      padding: '10px',
+                      padding: '10px 4px',
                       borderRadius: '10px',
-                      border: gender === g ? '2px solid var(--primary)' : '1px solid var(--border-color)',
-                      background: gender === g ? 'var(--primary-light)' : '#ffffff',
+                      border: gender === id ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                      background: gender === id ? 'var(--primary-light)' : '#ffffff',
                       cursor: 'pointer',
                       textAlign: 'center',
                       fontWeight: '800',
-                      color: gender === g ? 'var(--primary-dark)' : 'var(--text-main)'
+                      fontSize: '13px',
+                      color: gender === id ? 'var(--primary-dark)' : 'var(--text-main)',
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    {g}
+                    {label}
                   </div>
                 ))}
               </div>

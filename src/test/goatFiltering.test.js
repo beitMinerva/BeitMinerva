@@ -22,6 +22,7 @@ function filterGoats(goats, { searchTerm = '', areaId = 'ALL', status = 'ALL', g
       const genStr = (g.gender || '').toLowerCase();
       if (gender === 'Female') return genStr.includes('female') || genStr.includes('doe') || genStr === 'f';
       if (gender === 'Male') return !genStr.includes('female') && (genStr.includes('male') || genStr.includes('buck') || genStr === 'm');
+      if (gender === 'Other') return genStr.includes('other') || (!genStr.includes('female') && !genStr.includes('doe') && !genStr.includes('male') && !genStr.includes('buck'));
       return true;
     })();
 
@@ -53,7 +54,7 @@ describe('Goat Search & Filtering Logic', () => {
     expect(result.some((g) => g.name === 'Luna')).toBe(false);
   });
 
-  it('filters goats by gender (Female vs Male)', () => {
+  it('filters goats by gender (Female vs Male vs Other)', () => {
     const females = filterGoats(mockGoats, { gender: 'Female' });
     expect(females).toHaveLength(3);
     expect(females.every((g) => g.gender === 'Female')).toBe(true);
@@ -61,5 +62,10 @@ describe('Goat Search & Filtering Logic', () => {
     const males = filterGoats(mockGoats, { gender: 'Male' });
     expect(males).toHaveLength(1);
     expect(males[0].name).toBe('Max');
+
+    const mockWithOther = [...mockGoats, { id: '5', tag_id: '#105', name: 'Special', area_id: 'area-a', status: 'Active', gender: 'Other', breed: 'Cross' }];
+    const others = filterGoats(mockWithOther, { gender: 'Other' });
+    expect(others).toHaveLength(1);
+    expect(others[0].name).toBe('Special');
   });
 });

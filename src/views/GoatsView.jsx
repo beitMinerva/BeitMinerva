@@ -8,7 +8,7 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, on
   const [selectedGender, setSelectedGender] = useState('All');
 
   const statuses = ['All', 'Healthy', 'Under Treatment', 'Pregnant', 'Dry', 'Quarantine'];
-  const genders = ['All', 'Female', 'Male'];
+  const genders = ['All', 'Female', 'Male', 'Other'];
 
   const filteredGoats = goats.filter((goat) => {
     const matchesSearch =
@@ -23,6 +23,7 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, on
       const g = (goat.gender || '').toLowerCase();
       if (selectedGender === 'Female') return g.includes('female') || g.includes('doe') || g === 'f';
       if (selectedGender === 'Male') return !g.includes('female') && (g.includes('male') || g.includes('buck') || g === 'm');
+      if (selectedGender === 'Other') return g.includes('other') || (!g.includes('female') && !g.includes('doe') && !g.includes('male') && !g.includes('buck'));
       return true;
     })();
 
@@ -44,29 +45,36 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, on
       </div>
 
       {/* Gender & Status Filter Bar */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {/* Gender Filter Pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
             Gender:
           </span>
-          <div style={{ display: 'flex', gap: '5px' }}>
-            {genders.map((gender) => (
-              <button
-                key={gender}
-                type="button"
-                className={`btn btn-sm ${selectedGender === gender ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setSelectedGender(gender)}
-                style={{
-                  borderRadius: '9999px',
-                  fontSize: '11px',
-                  padding: '3px 10px',
-                  fontWeight: selectedGender === gender ? '800' : '600'
-                }}
-              >
-                {gender === 'Female' ? '♀ Female' : gender === 'Male' ? '♂ Male' : 'All'}
-              </button>
-            ))}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {genders.map((gender) => {
+              const isSelected = selectedGender === gender;
+              return (
+                <button
+                  key={gender}
+                  type="button"
+                  onClick={() => setSelectedGender(gender)}
+                  style={{
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    padding: '4px 12px',
+                    fontWeight: isSelected ? '800' : '600',
+                    border: isSelected ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                    background: isSelected ? 'var(--primary-light)' : '#ffffff',
+                    color: isSelected ? 'var(--primary-dark)' : 'var(--text-main)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {gender}
+                </button>
+              );
+            })}
           </div>
         </div>
 

@@ -25,11 +25,23 @@ export function getNotificationPermission() {
   return 'default';
 }
 
+export function getNotificationDiagnostics() {
+  return {
+    permission: typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported',
+    standalone: isStandalone(),
+    serviceWorker: typeof navigator !== 'undefined' && 'serviceWorker' in navigator,
+    pushManager: typeof window !== 'undefined' && 'PushManager' in window,
+    controller: typeof navigator !== 'undefined' && navigator.serviceWorker ? !!navigator.serviceWorker.controller : false,
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  };
+}
+
 export async function registerServiceWorker() {
   if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     try {
-      const swPath = (import.meta.env.BASE_URL || './') + 'sw.js';
-      const reg = await navigator.serviceWorker.register(swPath);
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      const swPath = baseUrl.endsWith('/') ? `${baseUrl}sw.js` : `${baseUrl}/sw.js`;
+      const reg = await navigator.serviceWorker.register(swPath, { scope: baseUrl });
       return reg;
     } catch (err) {
       console.warn('Service Worker registration notice:', err);
@@ -41,37 +53,16 @@ export async function registerServiceWorker() {
 export async function requestNotificationPermission() {
   if (!isNotificationSupported()) return 'unsupported';
 
-  let permission = 'default';
-
-  // 1. Request permission synchronously on the physical tap stack first (iOS Requirement)
-  try {
-    if ('Notification' in window && typeof Notification.requestPermission === 'function') {
-      try {
-        const res = Notification.requestPermission();
-        if (res && typeof res.then === 'function') {
-          permission = await res;
-        } else {
-          permission = await new Promise((resolve) => {
-            Notification.requestPermission((p) => resolve(p));
-          });
-        }
-      } catch (innerErr) {
-        permission = await new Promise((resolve) => {
-          Notification.requestPermission((p) => resolve(p));
-        });
-      }
+  if ('Notification' in window && typeof Notification.requestPermission === 'function') {
+    try {
+      const permission = await Notification.requestPermission();
+      return permission;
+    } catch (err) {
+      console.error('Error requesting notification permission:', err);
+      return 'denied';
     }
-  } catch (err) {
-    console.error('Error requesting notification permission:', err);
-    return 'denied';
   }
-
-  // 2. Register Service Worker after permission prompt is triggered
-  if (permission === 'granted') {
-    await registerServiceWorker();
-  }
-
-  return permission;
+  return 'unsupported';
 }
 
 // Convert Base64 VAPID key to Uint8Array for PushManager
@@ -87,29 +78,31 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 /**
- * Subscribe device to Web Push notifications (iOS background enabled)
+ * Subscribe device to Web Push notifications (Assumes permission already granted)
  */
 export async function subscribeToPushNotifications() {
   if (!isNotificationSupported()) {
-    console.warn('Push notifications not supported on this browser/device.');
     return { success: false, reason: 'unsupported' };
   }
 
-  const permission = await requestNotificationPermission();
+  const permission = getNotificationPermission();
   if (permission !== 'granted') {
     return { success: false, reason: `permission_${permission}` };
   }
 
   try {
-    await registerServiceWorker();
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    let reg = await registerServiceWorker();
+    if (!reg && 'serviceWorker' in navigator) {
+      reg = await navigator.serviceWorker.getRegistration(baseUrl);
+    }
 
-    let reg = null;
     if ('serviceWorker' in navigator) {
-      reg = await navigator.serviceWorker.ready;
+      await navigator.serviceWorker.ready;
+      reg = await navigator.serviceWorker.getRegistration(baseUrl);
     }
 
     if (!reg || !reg.pushManager) {
-      console.warn('ServiceWorker PushManager not available');
       return { success: false, reason: 'no_push_manager' };
     }
 
@@ -125,7 +118,6 @@ export async function subscribeToPushNotifications() {
 
     const subJson = subscription.toJSON();
 
-    // 1. Direct Supabase database sync so subscription is registered regardless of backend server
     if (subJson.endpoint) {
       const { error: dbErr } = await supabase.from('push_subscriptions').upsert({
         endpoint: subJson.endpoint,
@@ -138,22 +130,6 @@ export async function subscribeToPushNotifications() {
       if (dbErr) {
         console.warn('Supabase push_subscriptions upsert notice:', dbErr.message);
         return { success: false, reason: dbErr.message };
-      }
-    }
-
-    // 2. Notify backend push server if a custom remote server URL is explicitly configured
-    if (PUSH_SERVER_URL && !PUSH_SERVER_URL.includes('localhost')) {
-      try {
-        await fetch(`${PUSH_SERVER_URL}/api/subscribe`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            subscription: subJson,
-            userAgent: navigator.userAgent
-          })
-        });
-      } catch (serverErr) {
-        console.warn('Remote push server notice:', serverErr);
       }
     }
 

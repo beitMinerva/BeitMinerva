@@ -22,22 +22,36 @@ export default function Header({ onOpenScanner, onOpenAddGoat, showToast }) {
   const handleEnableNotifications = async () => {
     setIsSubscribing(true);
     try {
-      const perm = await requestNotificationPermission();
-      setNotifPermission(perm);
-      if (perm === 'granted') {
-        const subResult = await subscribeToPushNotifications();
-        if (subResult && subResult.success) {
-          if (showToast) showToast('✅ Web Push active & registered to Supabase!');
-          await sendTestNotification();
-        } else if (subResult && subResult.reason) {
-          if (showToast) showToast(`⚠️ iOS Push Error: ${subResult.reason}`);
-        }
+      console.log({
+        permission: typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported',
+        standalone: typeof window !== 'undefined' ? window.navigator?.standalone : false,
+        displayMode: typeof window !== 'undefined' ? window.matchMedia('(display-mode: standalone)').matches : false,
+        serviceWorker: typeof navigator !== 'undefined' && 'serviceWorker' in navigator,
+        pushManager: typeof window !== 'undefined' && 'PushManager' in window
+      });
+
+      // 1. Single permission request directly on the user tap event
+      const permission = await requestNotificationPermission();
+      console.log('iOS/Web Notification Permission:', permission);
+      setNotifPermission(permission);
+
+      if (permission !== 'granted') {
+        if (showToast) showToast(`⚠️ Notification permission: ${permission}`);
+        return;
+      }
+
+      // 2. Subscribe to push Manager without requesting permission again
+      const result = await subscribeToPushNotifications();
+      console.log('Push Subscription result:', result);
+
+      if (result.success) {
+        if (showToast) showToast('✅ Notifications enabled & registered!');
       } else {
-        if (showToast) showToast(`⚠️ iOS Permission Status: ${perm}`);
+        if (showToast) showToast(`⚠️ Push error: ${result.reason || 'Failed to subscribe'}`);
       }
     } catch (err) {
-      console.error('Error enabling notifications:', err);
-      if (showToast) showToast(`❌ iOS Diagnostic Error: ${err.message || String(err)}`);
+      console.error('Notification setup failed:', err);
+      if (showToast) showToast(`❌ Notification error: ${err.message || String(err)}`);
     } finally {
       setIsSubscribing(false);
     }
