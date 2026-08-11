@@ -50,7 +50,7 @@ export default function GoatCard({ goat, barnAreas = [], onClick }) {
             {goat.status}
           </span>
           {isBaby && (
-            <span className="badge" style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '10px', fontWeight: '800' }}>
+            <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', fontSize: '10px', fontWeight: '800' }}>
               Baby
             </span>
           )}

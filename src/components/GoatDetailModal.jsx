@@ -6,7 +6,7 @@ import EventDetailModal from './EventDetailModal';
 import EditReminderModal from './EditReminderModal';
 import CustomRepeatPicker from './CustomRepeatPicker';
 import { ArrowLeft, Tag, MapPin, Plus, Edit2, Trash2, Bell, ArrowRightLeft, Clock, Syringe, Pill, Milk, Weight, Heart, Scissors, X, Loader2, RotateCw } from 'lucide-react';
-import { calculateGoatAge, formatBeirutDisplay, getBeirutDateString } from '../services/goatService';
+import { calculateGoatAge, formatBeirutDisplay, getBeirutDateString, isNurseryPenCheck } from '../services/goatService';
 
 export function getRepeatLabel(event) {
   let frequency = 'none';
@@ -95,6 +95,7 @@ export default function GoatDetailModal({
   const ageStr = calculateGoatAge(goat.birth_date);
   const genderLabel = goat.gender === 'Doe' ? 'Female' : goat.gender === 'Buck' ? 'Male' : (goat.gender || 'Female');
   const neuteredLabel = goat.neutered_status || 'Intact';
+  const isBaby = Boolean(area && isNurseryPenCheck(area));
 
   const reminderCategories = [
     { id: 'Vaccination', label: 'Vaccination Booster', icon: Syringe, color: '#059669', bg: '#ecfdf5' },
@@ -281,6 +282,11 @@ export default function GoatDetailModal({
                 <span className={`badge ${getStatusBadgeClass(goat.status)}`}>
                   {goat.status}
                 </span>
+                {isBaby && (
+                  <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', fontSize: '11px', fontWeight: '800' }}>
+                    Baby
+                  </span>
+                )}
               </div>
 
               <h1 style={{ fontSize: '24px', fontWeight: '800', margin: '0 0 4px 0' }}>{goat.name}</h1>
