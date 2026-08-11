@@ -42,23 +42,39 @@ export async function getBarnAreas() {
 
 export function isNurseryPenCheck(pen) {
   if (!pen) return false;
-  return pen.is_nursery === true || pen.isNursery === true;
+  if (pen.is_nursery === true || pen.isNursery === true) return true;
+  if (pen.name && pen.name.includes('[NURSERY]')) return true;
+  if (pen.note && pen.note.includes('[NURSERY]')) return true;
+  return false;
 }
 
 export async function addBarnArea(areaData) {
   const currentAreas = await getBarnAreas();
   const nextLetter = String.fromCharCode(65 + currentAreas.length);
+  const isNur = Boolean(areaData.is_nursery);
+
+  let cleanName = (areaData.name || `Pen ${areaData.letter || nextLetter}`).replace(/\s*\[NURSERY\]/gi, '').trim();
+  if (isNur) {
+    cleanName = `${cleanName} [NURSERY]`.trim();
+  }
 
   const newArea = {
     id: areaData.id || makeId('ba'),
     letter: areaData.letter || nextLetter,
-    name: areaData.name || `Pen ${areaData.letter || nextLetter}`,
+    name: cleanName,
     order_index: areaData.order_index !== undefined ? areaData.order_index : currentAreas.length,
-    is_nursery: areaData.is_nursery || false
+    is_nursery: isNur
   };
 
   const { data, error } = await supabase.from('barn_areas').insert([newArea]).select().single();
   if (error) {
+    // Fail-safe: if is_nursery column doesn't exist in Supabase schema yet, retry without it
+    if (error.message && error.message.includes('is_nursery')) {
+      delete newArea.is_nursery;
+      const retryRes = await supabase.from('barn_areas').insert([newArea]).select().single();
+      if (retryRes.error) throw new Error(retryRes.error.message || 'Failed to add pen.');
+      return retryRes.data;
+    }
     console.error('Supabase addBarnArea error:', error);
     throw new Error(error.message || 'Failed to add pen.');
   }
@@ -66,8 +82,24 @@ export async function addBarnArea(areaData) {
 }
 
 export async function updateBarnArea(id, updates) {
-  const { data, error } = await supabase.from('barn_areas').update(updates).eq('id', id).select().single();
+  const payload = { ...updates };
+  if (payload.is_nursery !== undefined && payload.name) {
+    let cleanName = payload.name.replace(/\s*\[NURSERY\]/gi, '').trim();
+    if (payload.is_nursery) {
+      cleanName = `${cleanName} [NURSERY]`.trim();
+    }
+    payload.name = cleanName;
+  }
+
+  const { data, error } = await supabase.from('barn_areas').update(payload).eq('id', id).select().single();
   if (error) {
+    // Fail-safe: if is_nursery column doesn't exist in Supabase schema yet, retry without it
+    if (error.message && error.message.includes('is_nursery')) {
+      delete payload.is_nursery;
+      const retryRes = await supabase.from('barn_areas').update(payload).eq('id', id).select().single();
+      if (retryRes.error) throw new Error(retryRes.error.message || 'Failed to update pen area.');
+      return retryRes.data;
+    }
     console.error('Supabase updateBarnArea error:', error);
     throw new Error(error.message || 'Failed to update pen area.');
   }

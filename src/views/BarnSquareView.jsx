@@ -375,7 +375,7 @@ export default function BarnSquareView({
                       fontFamily: "'Outfit', sans-serif"
                     }}
                   >
-                    {pen.name}
+                    {(pen.name || '').replace(/\s*\[NURSERY\]/gi, '').trim()}
                   </span>
                 )}
               </div>
@@ -643,11 +643,11 @@ export default function BarnSquareView({
                               {pen.letter}
                             </div>
 
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <strong style={{ fontSize: '13px', fontWeight: '800', display: 'block', lineHeight: 1.2 }}>
-                                  {pen.name}
-                                </strong>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <strong style={{ fontSize: '13px', fontWeight: '800', display: 'block', lineHeight: 1.2 }}>
+                                    {(pen.name || '').replace(/\s*\[NURSERY\]/gi, '').trim()}
+                                  </strong>
                                 {isNurseryPenCheck(pen) && (
                                   <span style={{ fontSize: '10px', fontWeight: '800', background: '#e0f2fe', color: '#0284c7', padding: '1px 6px', borderRadius: '4px' }}>
                                     Nursery
