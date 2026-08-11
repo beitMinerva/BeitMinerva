@@ -446,7 +446,7 @@ export default function PenFeedingHistoryModal({
                     </div>
                     <div>
                       <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Milk (L)</label>
-                      <input type="number" step="0.1" min="0" className="form-input" value={milkAmount} onChange={(e) => setMilkAmount(e.target.value)} placeholder="e.g. 12.5" disabled={submittingMilk} required />
+                      <input type="number" step="any" min="0" className="form-input" value={milkAmount} onChange={(e) => setMilkAmount(e.target.value)} placeholder="e.g. 12.5" disabled={submittingMilk} required />
                     </div>
                   </div>
                   <div>
@@ -772,7 +772,7 @@ export default function PenFeedingHistoryModal({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
                   <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Daily Weight (kg)</label>
-                  <input type="number" step="0.1" className="form-input" value={feedingWeight} onChange={(e) => setFeedingWeight(e.target.value)} placeholder="e.g. 15.0" disabled={submittingFeeding} />
+                  <input type="number" step="any" className="form-input" value={feedingWeight} onChange={(e) => setFeedingWeight(e.target.value)} placeholder="e.g. 15.0" disabled={submittingFeeding} />
                 </div>
                 <div>
                   <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Schedule / Timing</label>
@@ -799,11 +799,11 @@ export default function PenFeedingHistoryModal({
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                       <div>
                         <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '2px' }}>Total kg (Pen)</label>
-                        <input type="number" step="0.1" min="0" className="form-input" value={c.kg} onChange={(e) => c.setKg(e.target.value)} disabled={submittingFeeding} placeholder="0.0" />
+                        <input type="number" step="any" min="0" className="form-input" value={c.kg} onChange={(e) => c.setKg(e.target.value)} disabled={submittingFeeding} placeholder="0.0" />
                       </div>
                       <div>
                         <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '2px' }}>$/kg</label>
-                        <input type="number" step="0.01" min="0" className="form-input" value={c.price} onChange={(e) => c.setPrice(e.target.value)} disabled={submittingFeeding} placeholder="0.00" />
+                        <input type="number" step="any" min="0" className="form-input" value={c.price} onChange={(e) => c.setPrice(e.target.value)} disabled={submittingFeeding} placeholder="0.00" />
                       </div>
                     </div>
                   </div>

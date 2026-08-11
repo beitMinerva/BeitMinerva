@@ -402,7 +402,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                                 </label>
                                 <input
                                   type="number"
-                                  step="0.1"
+                                  step="any"
                                   min="0"
                                   className="form-input"
                                   placeholder="2.5"
@@ -467,7 +467,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                       </label>
                       <input
                         type="number"
-                        step="0.1"
+                        step="any"
                         min="0"
                         className="form-input"
                         placeholder="e.g. 18.0"
@@ -483,7 +483,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                       </label>
                       <input
                         type="number"
-                        step="0.01"
+                        step="any"
                         min="0"
                         className="form-input"
                         placeholder="e.g. 0.40"
