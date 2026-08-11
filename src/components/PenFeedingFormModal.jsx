@@ -125,42 +125,30 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
     try {
       if (onSave) {
         const isMultiPenShared = isSharedTrough && activePens.length > 1;
+        const sharedPenNames = isMultiPenShared
+          ? activePens.map(p => `Pen ${p.letter}`).join(' & ')
+          : '';
 
-        if (!isMultiPenShared) {
-          // Single Pen Entry — save exact entered component weights
-          const feedingData = {
-            alpha_kg: totalAlpha,
-            alpha_price_per_kg: Number(alphaPricePerKg) || 0,
-            mixed_grains_kg: totalMixed,
-            mixed_grains_price_per_kg: Number(mixedGrainsPricePerKg) || 0,
-            straw_kg: totalStraw,
-            straw_price_per_kg: Number(strawPricePerKg) || 0,
-            schedule: schedule.trim(),
-            notes: notes.trim(),
-            date: new Date(feedingDate).toISOString()
-          };
-          await onSave(pen.id, feedingData);
-        } else {
-          // Shared Trough Multi-Pen Proportional Allocation
-          const sharedPenNames = activePens.map(p => `Pen ${p.letter}`).join(' & ');
-          for (const item of allocatedPenData) {
+        for (const item of allocatedPenData) {
+          let finalNote = notes.trim();
+          if (isMultiPenShared) {
             const ratioPct = (item.ratio * 100).toFixed(1);
             const sharedNoteTag = `[Shared Trough with ${sharedPenNames} · ${ratioPct}% share]`;
-            const finalNote = notes.trim() ? `${sharedNoteTag} ${notes.trim()}` : notes.trim();
-
-            const feedingData = {
-              alpha_kg: item.alphaAllocated,
-              alpha_price_per_kg: Number(alphaPricePerKg) || 0,
-              mixed_grains_kg: item.mixedAllocated,
-              mixed_grains_price_per_kg: Number(mixedGrainsPricePerKg) || 0,
-              straw_kg: item.strawAllocated,
-              straw_price_per_kg: Number(strawPricePerKg) || 0,
-              schedule: schedule.trim(),
-              notes: finalNote,
-              date: new Date(feedingDate).toISOString()
-            };
-            await onSave(item.pen.id, feedingData);
+            finalNote = finalNote ? `${sharedNoteTag} ${finalNote}` : sharedNoteTag;
           }
+
+          const feedingData = {
+            alpha_kg: item.alphaAllocated,
+            alpha_price_per_kg: Number(alphaPricePerKg) || 0,
+            mixed_grains_kg: item.mixedAllocated,
+            mixed_grains_price_per_kg: Number(mixedGrainsPricePerKg) || 0,
+            straw_kg: item.strawAllocated,
+            straw_price_per_kg: Number(strawPricePerKg) || 0,
+            schedule: schedule.trim(),
+            notes: finalNote,
+            date: new Date(feedingDate).toISOString()
+          };
+          await onSave(item.pen.id, feedingData);
         }
       }
       handleClose();
@@ -433,27 +421,75 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                   borderRadius: '14px',
                   padding: '12px 14px',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '8px'
+                  flexDirection: 'column',
+                  gap: '10px'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Users size={16} color="#059669" />
-                  <div>
-                    <strong style={{ fontSize: '13px', color: '#0f172a', fontWeight: '800', display: 'block', lineHeight: 1.2 }}>
-                      Pen {pen?.letter} Total Feed
-                    </strong>
-                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
-                      {primaryPenGoatCount} goats · Total Feed: {totalKgPen} kg {perHeadKgPrimary !== null ? `(${perHeadKgPrimary.toFixed(2)} kg/goat)` : ''}
-                    </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Users size={16} color="#059669" />
+                    <div>
+                      <strong style={{ fontSize: '13px', color: '#0f172a', fontWeight: '800', display: 'block', lineHeight: 1.2 }}>
+                        Pen {pen?.letter} Target Rate
+                      </strong>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
+                        {primaryPenGoatCount} goats · Est. Intake: {allocatedPenData[0]?.totalAllocatedKg || 0} kg
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', color: '#475569', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                      Rate:
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      className="form-input"
+                      placeholder="2.5"
+                      value={targetRates[pen?.id] !== undefined ? targetRates[pen?.id] : '2.5'}
+                      onChange={(e) => handleTargetRateChange(pen?.id, e.target.value)}
+                      disabled={submitting}
+                      style={{ fontSize: '12px', fontWeight: '700', padding: '4px 8px', height: '28px', width: '75px', background: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
+                    />
+                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>kg/goat</span>
                   </div>
                 </div>
 
-                {perHeadCostPrimary !== null && perHeadCostPrimary > 0 && (
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', background: '#ecfdf5', padding: '3px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
-                    ${perHeadCostPrimary.toFixed(2)}/goat
-                  </span>
+                {/* EXPECTED COMPONENTS BREAKDOWN & COST DISPLAY */}
+                {allocatedPenData[0] && totalKgPen > 0 && (
+                  <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: '#334155' }}>
+                        Expected Component Breakdown:
+                      </span>
+                      {totalCostPen > 0 && (
+                        <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', background: '#ecfdf5', padding: '2px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                          Cost: ${(totalCostPen * (allocatedPenData[0].totalAllocatedKg / totalKgPen)).toFixed(2)}
+                          {primaryPenGoatCount > 0 ? ` ($${((totalCostPen * (allocatedPenData[0].totalAllocatedKg / totalKgPen)) / primaryPenGoatCount).toFixed(2)}/goat)` : ''}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {allocatedPenData[0].alphaAllocated > 0 && (
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#f0fdf4', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '6px' }}>
+                          Alpha: {allocatedPenData[0].alphaAllocated} kg
+                        </span>
+                      )}
+                      {allocatedPenData[0].mixedAllocated > 0 && (
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#f0fdf4', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '6px' }}>
+                          Mixed Grains: {allocatedPenData[0].mixedAllocated} kg
+                        </span>
+                      )}
+                      {allocatedPenData[0].strawAllocated > 0 && (
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#f0fdf4', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '6px' }}>
+                          Straw: {allocatedPenData[0].strawAllocated} kg
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
