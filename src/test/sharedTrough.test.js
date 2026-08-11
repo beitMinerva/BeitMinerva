@@ -73,6 +73,39 @@ describe('Shared Feed Trough Recipe Proportion Allocation Math', () => {
     expect(penB.strawAllocated).toBe(2.5); // 10 * 25%
   });
 
+  it('correctly calculates Mlk A (8 goats) and Mlk B (15 goats) with 1kg Alpha, 18kg Mixed, 1kg Straw recipe', () => {
+    const pens = [
+      { id: 'mlk-A', count: 8, targetRate: 2.5 },  // 8 * 2.5 = 20.0 kg total intake
+      { id: 'mlk-B', count: 15, targetRate: 2.5 }  // 15 * 2.5 = 37.5 kg total intake
+    ];
+
+    // Farmer enters recipe batch: 1 kg Alpha, 18 kg Mixed Grains, 1 kg Straw = 20 kg total mix batch
+    // Recipe proportions: Alpha = 5% (1/20), Mixed = 90% (18/20), Straw = 5% (1/20)
+    const result = calculateSharedTroughAllocation({
+      pens,
+      totalAlpha: 1,
+      totalMixed: 18,
+      totalStraw: 1
+    });
+
+    const mlkA = result.find(r => r.penId === 'mlk-A');
+    const mlkB = result.find(r => r.penId === 'mlk-B');
+
+    // Mlk A (8 goats @ 2.5 kg/goat) -> Total 20.0 kg eaten
+    expect(mlkA.perHeadKg).toBe(2.5);
+    expect(mlkA.totalAllocatedKg).toBe(20.0);
+    expect(mlkA.alphaAllocated).toBe(1.0);   // 20.0 * 5% = 1.0 kg
+    expect(mlkA.mixedAllocated).toBe(18.0);  // 20.0 * 90% = 18.0 kg
+    expect(mlkA.strawAllocated).toBe(1.0);   // 20.0 * 5% = 1.0 kg
+
+    // Mlk B (15 goats @ 2.5 kg/goat) -> Total 37.5 kg eaten
+    expect(mlkB.perHeadKg).toBe(2.5);
+    expect(mlkB.totalAllocatedKg).toBe(37.5);
+    expect(mlkB.alphaAllocated).toBe(1.875);  // 37.5 * 5% = 1.875 kg
+    expect(mlkB.mixedAllocated).toBe(33.75);  // 37.5 * 90% = 33.75 kg
+    expect(mlkB.strawAllocated).toBe(1.875);  // 37.5 * 5% = 1.875 kg
+  });
+
   it('handles single component recipe (e.g. 100% Alfalfa)', () => {
     const pens = [
       { id: 'pen-A', count: 8, targetRate: 3.0 } // 24 kg target intake
