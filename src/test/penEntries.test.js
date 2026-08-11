@@ -57,6 +57,45 @@ describe('Daily Feed Carryover & Shift Validation', () => {
     expect(result.penFeedPerformanceMap['pen-A'].feedKg).toBe(200);
   });
 
+  it('automatically increments total feed on August 12 (tomorrow) by +1 day of active feed', () => {
+    const barnAreas = [{ id: 'pen-A', letter: 'A', name: 'Pen A' }];
+    const feedingEntries = [
+      {
+        id: 'feed-1',
+        barn_area_id: 'pen-A',
+        date: '2026-08-01T08:00:00.000Z',
+        alpha_kg: 1,
+        alpha_price_per_kg: 0.45,
+        mixed_grains_kg: 18,
+        mixed_grains_price_per_kg: 0.45,
+        straw_kg: 1,
+        straw_price_per_kg: 0.25
+      }
+    ];
+
+    // Aug 1 to Aug 11 (Today: 11 days @ 20 kg/day = 220 kg)
+    const todayResult = calculateDailyFeedCarryover({
+      feedingEntries,
+      barnAreas,
+      timeRange: 'custom',
+      customStartDate: '2026-08-01',
+      customEndDate: '2026-08-11'
+    });
+    expect(todayResult.totalFeedKg).toBe(220);
+    expect(todayResult.totalRangeDays).toBe(11);
+
+    // Aug 1 to Aug 12 (Tomorrow: 12 days @ 20 kg/day = 240 kg) -> automatically increments by +20 kg
+    const tomorrowResult = calculateDailyFeedCarryover({
+      feedingEntries,
+      barnAreas,
+      timeRange: 'custom',
+      customStartDate: '2026-08-01',
+      customEndDate: '2026-08-12'
+    });
+    expect(tomorrowResult.totalFeedKg).toBe(240); // 220 + 20 kg
+    expect(tomorrowResult.totalRangeDays).toBe(12);
+  });
+
   it('updates daily carryover immediately when a new ration is logged mid-period', () => {
     const barnAreas = [{ id: 'pen-A', letter: 'A', name: 'Pen A' }];
     const feedingEntries = [
