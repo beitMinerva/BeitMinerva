@@ -24,7 +24,7 @@ export default function FarmAnalyticsModal({
   const [loading, setLoading] = useState(false);
 
   // Editable farm economic parameters
-  const [milkPricePerLiter, setMilkPricePerLiter] = useState(1.25);
+  const [milkPricePerLiter, setMilkPricePerLiter] = useState(1.1);
   const [alphaPricePerKg, setAlphaPricePerKg] = useState(0.55);
   const [mixedGrainsPricePerKg, setMixedGrainsPricePerKg] = useState(0.40);
   const [strawPricePerKg, setStrawPricePerKg] = useState(0.20);
@@ -125,6 +125,7 @@ export default function FarmAnalyticsModal({
   const milkYieldPerActiveDoe = dailyAverageMilk / Math.max(1, milkingDoeCount);
 
   // 2. FEED CONSUMPTION & DYNAMIC COST METRICS
+  // 2. FEED CONSUMPTION & DYNAMIC CUMULATIVE CARRYOVER METRICS
   const getFeedKg = (e) => {
     const alphaKg = parseFloat(e.alpha_kg) || 0;
     const mixedKg = parseFloat(e.mixed_grains_kg) || 0;
@@ -140,9 +141,7 @@ export default function FarmAnalyticsModal({
     return perHead * count;
   };
 
-  const totalFeedKg = filteredFeed.reduce((sum, e) => sum + getFeedKg(e), 0);
-  
-  const totalFeedCost = filteredFeed.reduce((sum, e) => {
+  const getFeedEntryCost = (e) => {
     const alphaKg = parseFloat(e.alpha_kg) || 0;
     const alphaPrice = parseFloat(e.alpha_price_per_kg) || parseFloat(alphaPricePerKg) || 0;
     const mixedKg = parseFloat(e.mixed_grains_kg) || 0;
@@ -152,13 +151,78 @@ export default function FarmAnalyticsModal({
 
     const hasComponents = alphaKg > 0 || mixedKg > 0 || strawKg > 0;
     if (hasComponents) {
-      return sum + (alphaKg * alphaPrice + mixedKg * mixedPrice + strawKg * strawPrice);
+      return (alphaKg * alphaPrice + mixedKg * mixedPrice + strawKg * strawPrice);
     }
-    // Fallback for old entries without component breakdown
     const totalKg = getFeedKg(e);
     const avgPrice = ((parseFloat(alphaPricePerKg)||0.55) + (parseFloat(mixedGrainsPricePerKg)||0.40) + (parseFloat(strawPricePerKg)||0.20)) / 3;
-    return sum + (totalKg * avgPrice);
-  }, 0);
+    return (totalKg * avgPrice);
+  };
+
+  // Compute daily cumulative feed carryover for each day in selected date range
+  const { totalFeedKg, totalFeedCost, penFeedPerformanceMap, totalRangeDays } = React.useMemo(() => {
+    if (!feedingEntries || feedingEntries.length === 0) {
+      return { totalFeedKg: 0, totalFeedCost: 0, penFeedPerformanceMap: {}, totalRangeDays: 1 };
+    }
+
+    const end = timeRange === 'custom' && customEndDate ? new Date(customEndDate) : new Date();
+    end.setHours(23, 59, 59, 999);
+
+    let start = new Date(end);
+    if (timeRange === 'custom' && customStartDate) {
+      start = new Date(customStartDate);
+    } else if (timeRange === 'all') {
+      const earliest = feedingEntries.reduce((earliestDate, entry) => {
+        const d = new Date(entry.date);
+        return d < earliestDate ? d : earliestDate;
+      }, new Date());
+      start = earliest;
+    } else {
+      const days = parseInt(timeRange) || 30;
+      start.setDate(start.getDate() - (days - 1));
+    }
+    start.setHours(0, 0, 0, 0);
+
+    const dayList = [];
+    let curr = new Date(start);
+    while (curr <= end) {
+      dayList.push(new Date(curr));
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    const sortedEntries = [...feedingEntries].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const allPens = barnAreas.length > 0 ? barnAreas : Array.from(new Set(feedingEntries.map(e => e.barn_area_id))).map(id => ({ id }));
+
+    let grandTotalKg = 0;
+    let grandTotalCost = 0;
+    const penMap = {};
+    allPens.forEach(p => { penMap[p.id] = { feedKg: 0, feedCost: 0, daysCount: 0 }; });
+
+    dayList.forEach(day => {
+      const dayEnd = new Date(day);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      allPens.forEach(p => {
+        const penEntries = sortedEntries.filter(e => e.barn_area_id === p.id && new Date(e.date) <= dayEnd);
+        const activeEntry = penEntries[penEntries.length - 1];
+
+        if (activeEntry) {
+          const kg = getFeedKg(activeEntry);
+          const cost = getFeedEntryCost(activeEntry);
+          grandTotalKg += kg;
+          grandTotalCost += cost;
+
+          if (penMap[p.id]) {
+            penMap[p.id].feedKg += kg;
+            penMap[p.id].feedCost += cost;
+            penMap[p.id].daysCount += 1;
+          }
+        }
+      });
+    });
+
+    return { totalFeedKg: grandTotalKg, totalFeedCost: grandTotalCost, penFeedPerformanceMap: penMap, totalRangeDays: Math.max(1, dayList.length) };
+  }, [feedingEntries, barnAreas, timeRange, customStartDate, customEndDate, alphaPricePerKg, mixedGrainsPricePerKg, strawPricePerKg]);
+
   const feedCostPerLiter = totalMilkVolume > 0 ? (totalFeedCost / totalMilkVolume).toFixed(2) : '0.00';
 
   // 3. SCIENTIFIC FEED METRICS: FCE vs FCR
@@ -168,7 +232,7 @@ export default function FarmAnalyticsModal({
   // 4. FINANCIAL MARGIN (MILK REVENUE + GOAT SALES REVENUE - FEED EXPENSE)
   const goatSalesEvents = filteredEvents.filter(e => e.type === 'Sale');
   const totalGoatSalesRevenue = goatSalesEvents.reduce((sum, e) => sum + (parseFloat(e.custom_fields?.sale_price) || 0), 0);
-  const milkRevenue = sellableMilkVolume * (parseFloat(milkPricePerLiter) || 1.25);
+  const milkRevenue = sellableMilkVolume * (parseFloat(milkPricePerLiter) || 1.1);
   const estimatedGrossRevenue = milkRevenue + totalGoatSalesRevenue;
   const feedMargin = estimatedGrossRevenue - totalFeedCost;
 
@@ -177,15 +241,15 @@ export default function FarmAnalyticsModal({
     const penMilkEntries = filteredMilk.filter(m => m.barn_area_id === area.id);
     const penMilk = penMilkEntries.reduce((sum, m) => sum + (parseFloat(m.amount_liters) || 0), 0);
     
-    const penFeedEntries = filteredFeed.filter(f => f.barn_area_id === area.id);
-    const penFeed = penFeedEntries.reduce((sum, f) => sum + getFeedKg(f), 0);
     const penGoats = goats.filter(g => g.area_id === area.id);
     const goatCount = penGoats.length || 1;
 
+    const penFeedData = penFeedPerformanceMap[area.id] || { feedKg: 0, feedCost: 0, daysCount: totalRangeDays };
+    const penFeed = penFeedData.feedKg;
+
     // Days milk was actually logged for this pen
     const penMilkDays = Math.max(1, new Set(penMilkEntries.map(m => getBeirutDateString(m.date))).size);
-    // Days feed was actually logged for this pen
-    const penFeedDays = Math.max(1, new Set(penFeedEntries.map(f => getBeirutDateString(f.date))).size);
+    const penFeedDays = Math.max(1, penFeedData.daysCount);
 
     const milkPerGoatDay = (penMilk / penMilkDays) / goatCount;
     const feedPerGoatDay = (penFeed / penFeedDays) / goatCount;
