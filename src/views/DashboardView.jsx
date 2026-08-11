@@ -24,7 +24,8 @@ export default function DashboardView({
   onSelectGoat,
   onOpenScanner,
   onOpenAddGoat,
-  onNavigateTab
+  onNavigateTab,
+  onOpenAnalytics
 }) {
   const totalGoats = goats.length;
   const healthyGoats = goats.filter((g) => g.status === 'Healthy').length;
@@ -63,14 +64,14 @@ export default function DashboardView({
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
           <button
             className="btn"
             style={{ background: 'white', color: '#2e7d32', fontWeight: '600' }}
             onClick={onOpenScanner}
           >
             <ScanLine size={16} />
-            <span>Scan Ear Tag Barcode</span>
+            <span>Scan Ear Tag</span>
           </button>
           <button
             className="btn"
@@ -80,6 +81,16 @@ export default function DashboardView({
             <Plus size={16} />
             <span>Add Goat</span>
           </button>
+          {onOpenAnalytics && (
+            <button
+              className="btn"
+              style={{ background: 'rgba(255, 255, 255, 0.18)', color: 'white', border: '1px solid rgba(255, 255, 255, 0.3)' }}
+              onClick={onOpenAnalytics}
+            >
+              <BarChart3 size={16} />
+              <span>Analytics</span>
+            </button>
+          )}
         </div>
       </div>
 

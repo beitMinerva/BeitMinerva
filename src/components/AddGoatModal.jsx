@@ -22,7 +22,7 @@ export default function AddGoatModal({ goatToEdit = null, barnAreas = [], initia
   const [submitting, setSubmitting] = useState(false);
 
   const breeds = ['Alpine', 'Boer', 'Nubian', 'Saanen', 'Nigerian Dwarf', 'Kiko', 'Pygmy', 'Toggenburg', 'Crossbreed'];
-  const statuses = ['Healthy', 'Under Treatment', 'Pregnant', 'Dry', 'Quarantine'];
+  const statuses = ['Healthy', 'Under Treatment', 'Pregnant', 'Dry', 'Quarantine', 'Sold'];
 
   const handleAnimatedClose = () => {
     setIsClosing(true);

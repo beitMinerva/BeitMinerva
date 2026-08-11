@@ -1,19 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { X, TrendingUp, Milk, Wheat, DollarSign, Activity, Calendar, ShieldAlert, Award, ChevronRight, BarChart2 } from 'lucide-react';
-import { getPenMilkEntries, getPenFeedingEntries, getTimelineEvents, formatBeirutDisplay } from '../services/goatService';
+import { ArrowLeft, X, TrendingUp, Milk, Wheat, DollarSign, Activity, Award, BarChart2, PieChart, Sliders, Calendar } from 'lucide-react';
+import { getPenMilkEntries, getPenFeedingEntries, getTimelineEvents, getBeirutDateString } from '../services/goatService';
 
-export default function FarmAnalyticsModal({ goats = [], barnAreas = [], onClose }) {
-  const [timeRange, setTimeRange] = useState('30'); // '7', '30', '90', 'all'
-  const [milkEntries, setMilkEntries] = useState([]);
-  const [feedingEntries, setFeedingEntries] = useState([]);
-  const [timelineEvents, setTimelineEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function FarmAnalyticsModal({
+  goats = [],
+  barnAreas = [],
+  milkEntries: propMilkEntries = [],
+  feedingEntries: propFeedingEntries = [],
+  timelineEvents: propTimelineEvents = [],
+  onClose
+}) {
+  const [timeRange, setTimeRange] = useState('30'); // '7', '30', '90', 'custom', 'all'
+  const [customStartDate, setCustomStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return getBeirutDateString(d);
+  });
+  const [customEndDate, setCustomEndDate] = useState(() => getBeirutDateString(new Date()));
 
-  // Custom economic parameters for goat farming
-  const milkPricePerLiter = 1.25; // $1.25 per liter
-  const feedCostPerKg = 0.45;     // $0.45 per kg
+  const [milkEntries, setMilkEntries] = useState(propMilkEntries);
+  const [feedingEntries, setFeedingEntries] = useState(propFeedingEntries);
+  const [timelineEvents, setTimelineEvents] = useState(propTimelineEvents);
+  const [loading, setLoading] = useState(false);
+
+  // Editable farm economic parameters
+  const [milkPricePerLiter, setMilkPricePerLiter] = useState(1.25);
+  const [alphaPricePerKg, setAlphaPricePerKg] = useState(0.55);
+  const [mixedGrainsPricePerKg, setMixedGrainsPricePerKg] = useState(0.40);
+  const [strawPricePerKg, setStrawPricePerKg] = useState(0.20);
+  const [showPriceSettings, setShowPriceSettings] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'monthly'
 
   useEffect(() => {
+    if (propMilkEntries.length > 0 || propFeedingEntries.length > 0 || propTimelineEvents.length > 0) {
+      setMilkEntries(propMilkEntries);
+      setFeedingEntries(propFeedingEntries);
+      setTimelineEvents(propTimelineEvents);
+      setLoading(false);
+      return;
+    }
+
     async function loadAnalyticsData() {
       setLoading(true);
       try {
@@ -32,11 +58,20 @@ export default function FarmAnalyticsModal({ goats = [], barnAreas = [], onClose
       }
     }
     loadAnalyticsData();
-  }, []);
+  }, [propMilkEntries, propFeedingEntries, propTimelineEvents]);
 
-  // Filter data by selected time range
   const filterByTimeRange = (entries, dateKey = 'date') => {
     if (timeRange === 'all') return entries;
+    if (timeRange === 'custom') {
+      if (!customStartDate || !customEndDate) return entries;
+      const start = new Date(customStartDate);
+      const end = new Date(customEndDate);
+      end.setHours(23, 59, 59, 999);
+      return entries.filter(e => {
+        const d = new Date(e[dateKey]);
+        return d >= start && d <= end;
+      });
+    }
     const days = parseInt(timeRange) || 30;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
@@ -47,289 +82,572 @@ export default function FarmAnalyticsModal({ goats = [], barnAreas = [], onClose
   const filteredFeed = filterByTimeRange(feedingEntries, 'date');
   const filteredEvents = filterByTimeRange(timelineEvents, 'date');
 
-  // 1. CALCULATE MILK METRICS
-  const totalMilkLiters = filteredMilk.reduce((sum, e) => sum + (parseFloat(e.amount_liters) || 0), 0);
-  
-  // Individual goat milk events in timeline
+  let daysInRange = 30;
+  if (timeRange === 'custom' && customStartDate && customEndDate) {
+    const diffTime = Math.abs(new Date(customEndDate) - new Date(customStartDate));
+    daysInRange = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  } else if (timeRange === 'all') {
+    daysInRange = Math.max(1, Math.ceil((new Date() - new Date(milkEntries[milkEntries.length - 1]?.date || Date.now())) / (1000 * 60 * 60 * 24)));
+  } else {
+    daysInRange = parseInt(timeRange) || 30;
+  }
+
+  // 1. MILK PRODUCTION & YIELD METRICS
+  const penMilkVolume = filteredMilk.reduce((sum, e) => sum + (parseFloat(e.amount_liters) || 0), 0);
   const goatMilkEvents = filteredEvents.filter(e => e.type === 'Milking');
-  const totalGoatMilkLiters = goatMilkEvents.reduce((sum, e) => sum + (parseFloat(e.custom_fields?.amount_liters) || 0), 0);
-  const combinedMilkLiters = totalMilkLiters + totalGoatMilkLiters;
+  const individualMilkVolume = goatMilkEvents.reduce((sum, e) => sum + (parseFloat(e.custom_fields?.amount_liters) || 0), 0);
+  const totalMilkVolume = penMilkVolume + individualMilkVolume;
 
-  const activeMilkingDoesCount = goats.filter(g => (g.gender === 'Female' || g.gender === 'Doe') && g.status !== 'Dry' && g.status !== 'Quarantine').length || 1;
-  const daysInRange = timeRange === 'all' ? Math.max(1, Math.ceil((new Date() - new Date(milkEntries[milkEntries.length - 1]?.date || Date.now())) / (1000 * 60 * 60 * 24))) : parseInt(timeRange);
+  // Commercial / Sellable milk (excludes Home Use & Kid Feeding entries)
+  const penSellableMilk = filteredMilk
+    .filter(e => e.destination !== 'home_use' && e.destination !== 'farm_use')
+    .reduce((sum, e) => sum + (parseFloat(e.amount_liters) || 0), 0);
+  const goatSellableMilk = goatMilkEvents
+    .filter(e => e.custom_fields?.destination !== 'home_use' && e.custom_fields?.destination !== 'farm_use')
+    .reduce((sum, e) => sum + (parseFloat(e.custom_fields?.amount_liters) || 0), 0);
+  const sellableMilkVolume = penSellableMilk + goatSellableMilk;
+
+  const activeMilkingDoes = goats.filter(g => {
+    const gen = (g.gender || '').toLowerCase();
+    const isFemale = gen.includes('female') || gen.includes('doe') || gen === 'f';
+    return isFemale && g.status !== 'Dry' && g.status !== 'Quarantine';
+  });
+  const milkingDoeCount = activeMilkingDoes.length || 1;
+
+  // Active days on which milking occurred
+  const milkDatesSet = new Set([
+    ...filteredMilk.map(m => getBeirutDateString(m.date)),
+    ...goatMilkEvents.map(e => getBeirutDateString(e.date))
+  ]);
+  const activeMilkingDays = Math.max(1, milkDatesSet.size);
+
+  const dailyAverageMilk = totalMilkVolume / activeMilkingDays;
+  const milkYieldPerActiveDoe = dailyAverageMilk / Math.max(1, milkingDoeCount);
+
+  // 2. FEED CONSUMPTION & DYNAMIC COST METRICS
+  const getFeedKg = (e) => {
+    const alphaKg = parseFloat(e.alpha_kg) || 0;
+    const mixedKg = parseFloat(e.mixed_grains_kg) || 0;
+    const strawKg = parseFloat(e.straw_kg) || 0;
+    if (alphaKg > 0 || mixedKg > 0 || strawKg > 0) {
+      return alphaKg + mixedKg + strawKg;
+    }
+    if (parseFloat(e.total_weight) > 0) {
+      return parseFloat(e.total_weight);
+    }
+    const perHead = parseFloat(e.daily_weight) || 0;
+    const count = parseFloat(e.goat_count) || 1;
+    return perHead * count;
+  };
+
+  const totalFeedKg = filteredFeed.reduce((sum, e) => sum + getFeedKg(e), 0);
   
-  const dailyAverageMilk = combinedMilkLiters / Math.max(1, daysInRange);
-  const avgMilkPerDoePerDay = dailyAverageMilk / Math.max(1, activeMilkingDoesCount);
+  const totalFeedCost = filteredFeed.reduce((sum, e) => {
+    const alphaKg = parseFloat(e.alpha_kg) || 0;
+    const alphaPrice = parseFloat(e.alpha_price_per_kg) || parseFloat(alphaPricePerKg) || 0;
+    const mixedKg = parseFloat(e.mixed_grains_kg) || 0;
+    const mixedPrice = parseFloat(e.mixed_grains_price_per_kg) || parseFloat(mixedGrainsPricePerKg) || 0;
+    const strawKg = parseFloat(e.straw_kg) || 0;
+    const strawPrice = parseFloat(e.straw_price_per_kg) || parseFloat(strawPricePerKg) || 0;
 
-  // 2. CALCULATE FEED METRICS
-  const totalFeedKg = filteredFeed.reduce((sum, e) => sum + (parseFloat(e.amount_kg) || 0), 0);
-  const dailyAverageFeed = totalFeedKg / Math.max(1, daysInRange);
-  const estimatedFeedCost = totalFeedKg * feedCostPerKg;
+    const hasComponents = alphaKg > 0 || mixedKg > 0 || strawKg > 0;
+    if (hasComponents) {
+      return sum + (alphaKg * alphaPrice + mixedKg * mixedPrice + strawKg * strawPrice);
+    }
+    // Fallback for old entries without component breakdown
+    const totalKg = getFeedKg(e);
+    const avgPrice = ((parseFloat(alphaPricePerKg)||0.55) + (parseFloat(mixedGrainsPricePerKg)||0.40) + (parseFloat(strawPricePerKg)||0.20)) / 3;
+    return sum + (totalKg * avgPrice);
+  }, 0);
+  const feedCostPerLiter = totalMilkVolume > 0 ? (totalFeedCost / totalMilkVolume).toFixed(2) : '0.00';
 
-  // 3. FEED CONVERSION RATIO (FCR): Milk Liters ÷ Feed Kg
-  const fcrRatio = totalFeedKg > 0 ? (combinedMilkLiters / totalFeedKg).toFixed(2) : '0.00';
+  // 3. SCIENTIFIC FEED METRICS: FCE vs FCR
+  const fceEfficiency = totalFeedKg > 0 ? (totalMilkVolume / totalFeedKg).toFixed(2) : '0.00'; // L milk / kg feed
+  const fcrRatio = totalMilkVolume > 0 ? (totalFeedKg / totalMilkVolume).toFixed(2) : '0.00'; // kg feed / L milk
 
-  // 4. FINANCIAL PROJECTIONS
-  const estimatedGrossRevenue = combinedMilkLiters * milkPricePerLiter;
-  const estimatedNetMargin = estimatedGrossRevenue - estimatedFeedCost;
+  // 4. FINANCIAL MARGIN (MILK REVENUE + GOAT SALES REVENUE - FEED EXPENSE)
+  const goatSalesEvents = filteredEvents.filter(e => e.type === 'Sale');
+  const totalGoatSalesRevenue = goatSalesEvents.reduce((sum, e) => sum + (parseFloat(e.custom_fields?.sale_price) || 0), 0);
+  const milkRevenue = sellableMilkVolume * (parseFloat(milkPricePerLiter) || 1.25);
+  const estimatedGrossRevenue = milkRevenue + totalGoatSalesRevenue;
+  const feedMargin = estimatedGrossRevenue - totalFeedCost;
 
-  // 5. PEN PERFORMANCE COMPARISON
+  // 5. NORMALIZED PEN COMPARISON
   const penPerformance = barnAreas.map(area => {
-    const penMilk = filteredMilk.filter(m => m.barn_area_id === area.id).reduce((sum, m) => sum + (parseFloat(m.amount_liters) || 0), 0);
-    const penFeed = filteredFeed.filter(f => f.barn_area_id === area.id).reduce((sum, f) => sum + (parseFloat(f.amount_kg) || 0), 0);
+    const penMilkEntries = filteredMilk.filter(m => m.barn_area_id === area.id);
+    const penMilk = penMilkEntries.reduce((sum, m) => sum + (parseFloat(m.amount_liters) || 0), 0);
+    
+    const penFeedEntries = filteredFeed.filter(f => f.barn_area_id === area.id);
+    const penFeed = penFeedEntries.reduce((sum, f) => sum + getFeedKg(f), 0);
     const penGoats = goats.filter(g => g.area_id === area.id);
-    const penFCR = penFeed > 0 ? (penMilk / penFeed).toFixed(2) : '0.00';
+    const goatCount = penGoats.length || 1;
+
+    // Days milk was actually logged for this pen
+    const penMilkDays = Math.max(1, new Set(penMilkEntries.map(m => getBeirutDateString(m.date))).size);
+    // Days feed was actually logged for this pen
+    const penFeedDays = Math.max(1, new Set(penFeedEntries.map(f => getBeirutDateString(f.date))).size);
+
+    const milkPerGoatDay = (penMilk / penMilkDays) / goatCount;
+    const feedPerGoatDay = (penFeed / penFeedDays) / goatCount;
+    const penFCE = penFeed > 0 ? (penMilk / penFeed).toFixed(2) : '0.00';
+
     return {
       id: area.id,
       name: area.name,
       milkLiters: penMilk,
       feedKg: penFeed,
       goatCount: penGoats.length,
-      fcr: penFCR
+      milkPerGoatDay: milkPerGoatDay.toFixed(2),
+      feedPerGoatDay: feedPerGoatDay.toFixed(2),
+      fce: penFCE
     };
-  }).sort((a, b) => b.milkLiters - a.milkLiters);
+  }).sort((a, b) => parseFloat(b.milkPerGoatDay) - parseFloat(a.milkPerGoatDay));
 
-  // 6. HERD DEMOGRAPHICS & HEALTH COMPLIANCE
-  const healthyCount = goats.filter(g => g.status === 'Healthy').length;
-  const treatmentCount = goats.filter(g => g.status === 'Under Treatment').length;
-  const pregnantCount = goats.filter(g => g.status === 'Pregnant').length;
-  const dryCount = goats.filter(g => g.status === 'Dry').length;
-  const quarantineCount = goats.filter(g => g.status === 'Quarantine').length;
+  // 6. HERD STATUS PIE CHART DATA (PURE SVG)
+  const statusCounts = {
+    Healthy: goats.filter(g => g.status === 'Healthy').length,
+    Pregnant: goats.filter(g => g.status === 'Pregnant').length,
+    Dry: goats.filter(g => g.status === 'Dry').length,
+    'Under Treatment': goats.filter(g => g.status === 'Under Treatment').length,
+    Quarantine: goats.filter(g => g.status === 'Quarantine').length,
+    Sold: goats.filter(g => g.status === 'Sold').length
+  };
 
-  const femaleCount = goats.filter(g => (g.gender || '').toLowerCase().includes('female') || (g.gender || '').toLowerCase().includes('doe')).length;
-  const maleCount = goats.filter(g => (g.gender || '').toLowerCase().includes('male') || (g.gender || '').toLowerCase().includes('buck')).length;
-  const otherGenderCount = goats.length - femaleCount - maleCount;
+  const statusColors = {
+    Healthy: '#2E7D32',
+    Pregnant: '#0284c7',
+    Dry: '#8b5cf6',
+    'Under Treatment': '#dc2626',
+    Quarantine: '#d97706',
+    Sold: '#15803d'
+  };
 
-  // Hoof Trimming Compliance (3 months)
-  const threeMonthsAgo = new Date();
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-  const recentlyTrimmedGoatIds = new Set(
-    timelineEvents
-      .filter(e => e.type === 'Hoof Trimming' || e.title?.toLowerCase().includes('hoof'))
-      .filter(e => new Date(e.date) >= threeMonthsAgo)
-      .map(e => e.goat_id)
-  );
-  const hoofCompliancePct = goats.length > 0 ? Math.round((recentlyTrimmedGoatIds.size / goats.length) * 100) : 100;
+  const totalGoatsCount = goats.length || 1;
+  const pieSegments = [];
+  let cumulativeAngle = 0;
+
+  Object.entries(statusCounts).forEach(([status, count]) => {
+    if (count > 0) {
+      const percentage = count / totalGoatsCount;
+      const angle = percentage * 360;
+      const startAngle = cumulativeAngle;
+      const endAngle = cumulativeAngle + angle;
+      cumulativeAngle = endAngle;
+
+      const startRad = (startAngle - 90) * (Math.PI / 180);
+      const endRad = (endAngle - 90) * (Math.PI / 180);
+
+      const x1 = 100 + 80 * Math.cos(startRad);
+      const y1 = 100 + 80 * Math.sin(startRad);
+      const x2 = 100 + 80 * Math.cos(endRad);
+      const y2 = 100 + 80 * Math.sin(endRad);
+
+      const largeArc = angle > 180 ? 1 : 0;
+      const pathData = count === totalGoatsCount
+        ? 'M 100 20 A 80 80 0 1 1 99.99 20 Z'
+        : `M 100 100 L ${x1} ${y1} A 80 80 0 ${largeArc} 1 ${x2} ${y2} Z`;
+
+      pieSegments.push({ status, count, percentage: Math.round(percentage * 100), color: statusColors[status], pathData });
+    }
+  });
+
+  // MONTHLY BREAKDOWN â€” group ALL entries by calendar month (not filtered by time range)
+  // Uses ALL raw data so we get an honest historical picture
+  const monthlyData = (() => {
+    const months = {};
+
+    milkEntries.forEach(e => {
+      const d = new Date(e.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!months[key]) months[key] = { milk: 0, sellableMilk: 0, feed: 0, feedCost: 0, salesRevenue: 0, sessions: 0 };
+      const liters = parseFloat(e.amount_liters) || 0;
+      months[key].milk += liters;
+      if (e.destination !== 'home_use' && e.destination !== 'farm_use') {
+        months[key].sellableMilk += liters;
+      }
+      months[key].sessions += 1;
+    });
+
+    feedingEntries.forEach(e => {
+      const d = new Date(e.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!months[key]) months[key] = { milk: 0, sellableMilk: 0, feed: 0, feedCost: 0, salesRevenue: 0, sessions: 0 };
+      months[key].feed += parseFloat(e.total_weight) || parseFloat(e.daily_weight) || parseFloat(e.amount_kg) || 0;
+      // Compute cost for this entry
+      const alphaKg = parseFloat(e.alpha_kg) || 0;
+      const alphaP = parseFloat(e.alpha_price_per_kg) || parseFloat(alphaPricePerKg) || 0;
+      const mixedKg = parseFloat(e.mixed_grains_kg) || 0;
+      const mixedP = parseFloat(e.mixed_grains_price_per_kg) || parseFloat(mixedGrainsPricePerKg) || 0;
+      const strawKg = parseFloat(e.straw_kg) || 0;
+      const strawP = parseFloat(e.straw_price_per_kg) || parseFloat(strawPricePerKg) || 0;
+      const hasComponents = alphaKg > 0 || mixedKg > 0 || strawKg > 0;
+      if (hasComponents) {
+        months[key].feedCost += (alphaKg * alphaP + mixedKg * mixedP + strawKg * strawP);
+      } else {
+        const kg = parseFloat(e.total_weight) || parseFloat(e.daily_weight) || 0;
+        const avgPrice = ((parseFloat(alphaPricePerKg)||0.55) + (parseFloat(mixedGrainsPricePerKg)||0.40) + (parseFloat(strawPricePerKg)||0.20)) / 3;
+        months[key].feedCost += kg * avgPrice;
+      }
+    });
+
+    timelineEvents.forEach(e => {
+      if (e.type !== 'Sale') return;
+      const d = new Date(e.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!months[key]) months[key] = { milk: 0, sellableMilk: 0, feed: 0, feedCost: 0, salesRevenue: 0, sessions: 0 };
+      const val = parseFloat(e.custom_fields?.sale_price || e.custom_fields?.price || 0);
+      months[key].salesRevenue += val;
+    });
+
+    return Object.entries(months)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, v]) => {
+        const [year, month] = key.split('-');
+        const label = new Date(Number(year), Number(month) - 1, 1)
+          .toLocaleString('en-US', { month: 'short', year: '2-digit' });
+        const milkRevenue = v.sellableMilk * (parseFloat(milkPricePerLiter) || 1.25);
+        const feedCost = v.feedCost || 0;
+        const grossIncome = milkRevenue + v.salesRevenue;
+        const netProfit = grossIncome - feedCost;
+        const fce = v.feed > 0 ? (v.milk / v.feed) : null;
+        return { key, label, milk: v.milk, sellableMilk: v.sellableMilk, feed: v.feed, sessions: v.sessions, milkRevenue, feedCost, grossIncome, netProfit, fce };
+      });
+  })();
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content"
         onClick={e => e.stopPropagation()}
-        style={{ maxWidth: '820px', width: '95%', maxHeight: '90vh', overflowY: 'auto', padding: '20px' }}
+        style={{ maxWidth: '600px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 0 }}
       >
-        {/* HEADER */}
-        <div className="modal-header" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '14px', marginBottom: '16px' }}>
-          <div>
-            <h2 className="modal-title" style={{ fontSize: '18px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <BarChart2 size={22} color="var(--primary)" /> Farm Business Analytics & Smart Metrics
-            </h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-              Production yields, feed efficiency ratios, and financial projections.
-            </p>
-          </div>
-          <button className="close-btn" onClick={onClose}>
-            <X size={20} />
+        {/* STICKY HEADER */}
+        <div style={{
+          position: 'sticky',
+          top: 0,
+          background: 'rgba(255, 255, 255, 0.98)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid var(--border-color)',
+          padding: '14px 18px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          zIndex: 10
+        }}>
+          <button className="btn btn-secondary btn-sm" onClick={onClose} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ArrowLeft size={16} /> Back
           </button>
-        </div>
 
-        {/* TIME RANGE CONTROLS */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {[
-              { id: '7', label: 'Last 7 Days' },
-              { id: '30', label: 'Last 30 Days' },
-              { id: '90', label: 'Last 90 Days' },
-              { id: 'all', label: 'All Time' }
-            ].map(r => (
+          {/* TAB SWITCHER */}
+          <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', borderRadius: '10px', padding: '3px' }}>
+            {[{ id: 'overview', label: 'Overview' }, { id: 'monthly', label: 'Monthly' }].map(t => (
               <button
-                key={r.id}
+                key={t.id}
                 type="button"
-                onClick={() => setTimeRange(r.id)}
+                onClick={() => setActiveTab(t.id)}
                 style={{
-                  borderRadius: '20px',
+                  padding: '5px 14px',
+                  borderRadius: '8px',
                   fontSize: '11px',
-                  padding: '5px 12px',
-                  fontWeight: timeRange === r.id ? '800' : '600',
-                  border: timeRange === r.id ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
-                  background: timeRange === r.id ? 'var(--primary-light)' : '#ffffff',
-                  color: timeRange === r.id ? 'var(--primary-dark)' : 'var(--text-main)',
-                  cursor: 'pointer'
+                  fontWeight: '800',
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: activeTab === t.id ? '#ffffff' : 'transparent',
+                  color: activeTab === t.id ? 'var(--primary-dark)' : 'var(--text-muted)',
+                  boxShadow: activeTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.15s'
                 }}
               >
-                {r.label}
+                {t.label}
               </button>
             ))}
           </div>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>
-            Active Herd: <strong>{goats.length} Goats</strong> ({activeMilkingDoesCount} Milking Does)
-          </span>
+
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setShowPriceSettings(!showPriceSettings)}
+            style={{
+              borderRadius: '12px',
+              fontSize: '11px',
+              padding: '6px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: showPriceSettings ? 'var(--primary-light)' : '#ffffff',
+              borderColor: showPriceSettings ? 'var(--primary-border)' : 'var(--border-color)',
+              color: showPriceSettings ? 'var(--primary-dark)' : 'var(--text-main)',
+              fontWeight: '700'
+            }}
+          >
+            <Sliders size={13} /> Milk Price (${milkPricePerLiter.toFixed(2)}/L)
+          </button>
         </div>
 
-        {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <Activity className="animate-spin" size={28} style={{ margin: '0 auto 10px auto' }} />
-            <p style={{ fontSize: '13px' }}>Calculating business metrics & yield ratios...</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            {/* EXECUTIVE SUMMARY KPI CARDS */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
-              {/* MILK KPI */}
-              <div className="card" style={{ padding: '14px', borderLeft: '4px solid #0284c7', background: '#f0f9ff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#0369a1', textTransform: 'uppercase' }}>Total Milk</span>
-                  <Milk size={18} color="#0284c7" />
-                </div>
-                <div style={{ fontSize: '22px', fontWeight: '900', color: '#0c4a6e' }}>
-                  {combinedMilkLiters.toFixed(1)} <span style={{ fontSize: '13px', fontWeight: '600' }}>L</span>
-                </div>
-                <div style={{ fontSize: '11px', color: '#0369a1', marginTop: '4px', fontWeight: '600' }}>
-                  {dailyAverageMilk.toFixed(1)} L/day • {avgMilkPerDoePerDay.toFixed(2)} L/doe/day
-                </div>
-              </div>
+        {/* MAIN SCROLLABLE CONTENT */}
+        <div style={{ padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-              {/* FEED KPI */}
-              <div className="card" style={{ padding: '14px', borderLeft: '4px solid #d97706', background: '#fffbeb' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#b45309', textTransform: 'uppercase' }}>Feed Consumed</span>
-                  <Wheat size={18} color="#d97706" />
+          {/* MILK PRICE SETTING PANEL */}
+          {showPriceSettings && (
+            <div className="card" style={{ padding: '14px 16px', background: '#ffffff', border: '1.5px solid var(--primary-border)', borderRadius: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                <div>
+                  <strong style={{ fontSize: '13px', color: 'var(--text-main)', display: 'block' }}>Milk Selling Price ($/L)</strong>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Used to calculate commercial milk revenue & net profit</span>
                 </div>
-                <div style={{ fontSize: '22px', fontWeight: '900', color: '#78350f' }}>
-                  {totalFeedKg.toFixed(1)} <span style={{ fontSize: '13px', fontWeight: '600' }}>kg</span>
-                </div>
-                <div style={{ fontSize: '11px', color: '#b45309', marginTop: '4px', fontWeight: '600' }}>
-                  {dailyAverageFeed.toFixed(1)} kg/day • Est. ${estimatedFeedCost.toFixed(2)}
-                </div>
-              </div>
-
-              {/* FEED CONVERSION RATIO (FCR) */}
-              <div className="card" style={{ padding: '14px', borderLeft: '4px solid #16a34a', background: '#f0fdf4' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#15803d', textTransform: 'uppercase' }}>Feed Efficiency (FCR)</span>
-                  <TrendingUp size={18} color="#16a34a" />
-                </div>
-                <div style={{ fontSize: '22px', fontWeight: '900', color: '#14532d' }}>
-                  {fcrRatio} <span style={{ fontSize: '12px', fontWeight: '700' }}>L/kg</span>
-                </div>
-                <div style={{ fontSize: '11px', color: '#15803d', marginTop: '4px', fontWeight: '600' }}>
-                  {parseFloat(fcrRatio) >= 1.2 ? '🟢 High Production Efficiency' : '🟡 Moderate Feed Ratio'}
-                </div>
-              </div>
-
-              {/* NET MARGIN KPI */}
-              <div className="card" style={{ padding: '14px', borderLeft: '4px solid #8b5cf6', background: '#f5f3ff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#6d28d9', textTransform: 'uppercase' }}>Est. Net Margin</span>
-                  <DollarSign size={18} color="#8b5cf6" />
-                </div>
-                <div style={{ fontSize: '22px', fontWeight: '900', color: '#4c1d95' }}>
-                  ${estimatedNetMargin.toFixed(2)}
-                </div>
-                <div style={{ fontSize: '11px', color: '#6d28d9', marginTop: '4px', fontWeight: '600' }}>
-                  Revenue: ${estimatedGrossRevenue.toFixed(2)}
+                <div style={{ width: '120px', flexShrink: 0 }}>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    value={milkPricePerLiter}
+                    onChange={(e) => setMilkPricePerLiter(parseFloat(e.target.value) || 0)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      border: '1.5px solid var(--primary)',
+                      fontSize: '14px',
+                      fontWeight: '800',
+                      background: '#f0fdf4',
+                      color: 'var(--primary-dark)',
+                      textAlign: 'right'
+                    }}
+                  />
                 </div>
               </div>
             </div>
+          )}
 
-            {/* BARN PEN PERFORMANCE TABLE & FCR COMPARISON */}
-            <div className="card" style={{ padding: '16px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '800', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Award size={16} color="var(--primary)" /> Pen-by-Pen Production & Efficiency Breakdown
-              </h3>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
-                      <th style={{ padding: '8px' }}>Barn Area</th>
-                      <th style={{ padding: '8px' }}>Goats</th>
-                      <th style={{ padding: '8px' }}>Milk (L)</th>
-                      <th style={{ padding: '8px' }}>Feed (kg)</th>
-                      <th style={{ padding: '8px' }}>Efficiency (L/kg)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {penPerformance.map(pen => (
-                      <tr key={pen.id} style={{ borderBottom: '1px dashed var(--border-color)' }}>
-                        <td style={{ padding: '8px', fontWeight: '800', color: 'var(--text-main)' }}>{pen.name}</td>
-                        <td style={{ padding: '8px' }}>{pen.goatCount} goats</td>
-                        <td style={{ padding: '8px', fontWeight: '700', color: '#0284c7' }}>{pen.milkLiters.toFixed(1)} L</td>
-                        <td style={{ padding: '8px', color: '#d97706' }}>{pen.feedKg.toFixed(1)} kg</td>
-                        <td style={{ padding: '8px' }}>
-                          <span style={{
-                            padding: '2px 8px',
-                            borderRadius: '12px',
-                            fontWeight: '800',
-                            fontSize: '11px',
-                            background: parseFloat(pen.fcr) > 1.2 ? '#dcfce7' : '#fef9c3',
-                            color: parseFloat(pen.fcr) > 1.2 ? '#15803d' : '#a16207'
-                          }}>
-                            {pen.fcr} L/kg
-                          </span>
-                        </td>
-                      </tr>
+          {/* ===== OVERVIEW TAB ===== */}
+          {activeTab === 'overview' && (
+            <>
+              {/* TIME RANGE SELECTOR */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                    {[
+                      { id: '7', label: '7 Days' },
+                      { id: '30', label: '30 Days' },
+                      { id: '90', label: '90 Days' },
+                      { id: 'custom', label: 'Custom Range' },
+                      { id: 'all', label: 'All Time' }
+                    ].map(r => (
+                      <button key={r.id} type="button" onClick={() => setTimeRange(r.id)} style={{ borderRadius: '20px', fontSize: '11px', padding: '5px 12px', fontWeight: timeRange === r.id ? '800' : '600', border: timeRange === r.id ? '1.5px solid var(--primary)' : '1px solid var(--border-color)', background: timeRange === r.id ? 'var(--primary-light)' : '#ffffff', color: timeRange === r.id ? 'var(--primary-dark)' : 'var(--text-main)', cursor: 'pointer' }}>{r.label}</button>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700' }}>Herd: <strong>{goats.length} Goats</strong> ({milkingDoeCount} Females)</span>
+                </div>
+                {timeRange === 'custom' && (
+                  <div className="card" style={{ padding: '12px 14px', background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '14px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <Calendar size={18} color="var(--primary)" />
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '2px' }}>Start Date</span>
+                      <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} style={{ width: '100%', fontSize: '12px', fontWeight: '700', padding: '6px 10px', borderRadius: '10px', border: '1px solid var(--border-color)', background: '#ffffff' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '2px' }}>End Date</span>
+                      <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} style={{ width: '100%', fontSize: '12px', fontWeight: '700', padding: '6px 10px', borderRadius: '10px', border: '1px solid var(--border-color)', background: '#ffffff' }} />
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
 
-            {/* HERD COMPOSITION & COMPLIANCE SECTION */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
-              {/* HERD STATUS BREAKDOWN */}
-              <div className="card" style={{ padding: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '800', marginBottom: '12px' }}>Herd Status Distribution</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>🟢 Healthy:</span>
-                    <strong>{healthyCount} goats ({Math.round((healthyCount / (goats.length || 1)) * 100)}%)</strong>
+              {loading ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <Activity className="animate-spin" size={28} style={{ margin: '0 auto 10px auto' }} />
+                  <p style={{ fontSize: '13px' }}>Processing farm analytics...</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* KPI CARDS */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                    <div className="card" style={{ padding: '12px', borderLeft: '4px solid #0284c7', background: '#f0f9ff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '800', color: '#0369a1', textTransform: 'uppercase' }}>Milk Harvest</span>
+                        <Milk size={16} color="#0284c7" />
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: '900', color: '#0c4a6e' }}>{totalMilkVolume.toFixed(1)} <span style={{ fontSize: '11px', fontWeight: '600' }}>L</span></div>
+                      <div style={{ fontSize: '10px', color: '#0369a1', marginTop: '2px', fontWeight: '700' }}>{milkYieldPerActiveDoe.toFixed(2)} L/female/day</div>
+                    </div>
+
+                    <div className="card" style={{ padding: '12px', borderLeft: '4px solid #d97706', background: '#fffbeb' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '800', color: '#b45309', textTransform: 'uppercase' }}>Feed Intake</span>
+                        <Wheat size={16} color="#d97706" />
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: '900', color: '#78350f' }}>{totalFeedKg.toFixed(1)} <span style={{ fontSize: '11px', fontWeight: '600' }}>kg</span></div>
+                      <div style={{ fontSize: '10px', color: '#b45309', marginTop: '2px', fontWeight: '700' }}>${totalFeedCost.toFixed(2)} cost</div>
+                    </div>
+
+                    <div className="card" style={{ padding: '12px', borderLeft: '4px solid #8b5cf6', background: '#f5f3ff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '800', color: '#7c3aed', textTransform: 'uppercase' }}>Gross Income</span>
+                        <TrendingUp size={16} color="#8b5cf6" />
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: '900', color: '#4c1d95' }}>${estimatedGrossRevenue.toFixed(2)}</div>
+                      <div style={{ fontSize: '10px', color: '#7c3aed', marginTop: '2px', fontWeight: '700' }}>${milkRevenue.toFixed(0)} milk + ${totalGoatSalesRevenue.toFixed(0)} sales</div>
+                    </div>
+
+                    <div className="card" style={{ padding: '12px', borderLeft: feedMargin >= 0 ? '4px solid #16a34a' : '4px solid #dc2626', background: feedMargin >= 0 ? '#f0fdf4' : '#fef2f2' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '800', color: feedMargin >= 0 ? '#15803d' : '#b91c1c', textTransform: 'uppercase' }}>Net Profit</span>
+                        <DollarSign size={16} color={feedMargin >= 0 ? '#16a34a' : '#dc2626'} />
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: '900', color: feedMargin >= 0 ? '#14532d' : '#991b1b' }}>{feedMargin >= 0 ? '+' : ''}${feedMargin.toFixed(2)}</div>
+                      <div style={{ fontSize: '10px', color: feedMargin >= 0 ? '#15803d' : '#b91c1c', marginTop: '2px', fontWeight: '700' }}>Gross Income - Feed Expense</div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>🌸 Pregnant:</span>
-                    <strong>{pregnantCount} goats</strong>
+
+                  {/* PEN COMPARISON TABLE */}
+                  <div className="card" style={{ padding: '16px' }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: '800', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+                      <Award size={16} color="var(--primary)" /> Normalized Barn Pen Comparison
+                    </h3>
+                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                        <thead>
+                          <tr style={{ background: 'var(--primary-light)', borderBottom: '1.5px solid var(--primary-border)', color: 'var(--primary-dark)' }}>
+                            <th style={{ padding: '10px 14px', fontWeight: '800', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Barn Area</th>
+                            <th style={{ padding: '10px 14px', fontWeight: '800', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Goats</th>
+                            <th style={{ padding: '10px 14px', fontWeight: '800', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Milk / Goat / Day</th>
+                            <th style={{ padding: '10px 14px', fontWeight: '800', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Feed / Goat / Day</th>
+                            <th style={{ padding: '10px 14px', fontWeight: '800', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Efficiency (FCE)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {penPerformance.map((pen, idx) => (
+                            <tr key={pen.id} style={{ borderBottom: idx === penPerformance.length - 1 ? 'none' : '1px solid var(--border-color)', background: '#ffffff' }}>
+                              <td style={{ padding: '12px 14px', fontWeight: '800', color: 'var(--text-main)' }}>{pen.name}</td>
+                              <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontWeight: '600' }}>{pen.goatCount} goats</td>
+                              <td style={{ padding: '12px 14px', fontWeight: '800', color: 'var(--text-main)' }}>{pen.milkPerGoatDay} L/goat/day</td>
+                              <td style={{ padding: '12px 14px', color: 'var(--text-main)', fontWeight: '600' }}>{pen.feedPerGoatDay} kg/goat/day</td>
+                              <td style={{ padding: '12px 14px', fontWeight: '700', color: 'var(--text-main)' }}>{pen.fce} L milk / kg feed</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>🌾 Dry:</span>
-                    <strong>{dryCount} goats</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>💊 Under Treatment:</span>
-                    <strong style={{ color: '#dc2626' }}>{treatmentCount} goats</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>⚠️ Quarantine:</span>
-                    <strong style={{ color: '#d97706' }}>{quarantineCount} goats</strong>
+
+                  {/* HERD STATUS DONUT */}
+                  <div className="card" style={{ padding: '16px' }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: '800', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+                      <PieChart size={16} color="var(--primary)" /> Herd Status Distribution
+                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', flexWrap: 'wrap', gap: '16px' }}>
+                      <div style={{ position: 'relative', width: '160px', height: '160px' }}>
+                        <svg width="160" height="160" viewBox="0 0 200 200">
+                          {pieSegments.map(seg => (
+                            <path key={seg.status} d={seg.pathData} fill={seg.color} stroke="#ffffff" strokeWidth="2" />
+                          ))}
+                          <circle cx="100" cy="100" r="48" fill="#ffffff" />
+                        </svg>
+                        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                          <strong style={{ fontSize: '18px', fontWeight: '900', color: 'var(--text-main)', display: 'block', lineHeight: 1 }}>{goats.length}</strong>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase' }}>Goats</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '160px' }}>
+                        {Object.entries(statusCounts).map(([status, count]) => (
+                          <div key={status} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', fontSize: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: statusColors[status] }} />
+                              <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{status}</span>
+                            </div>
+                            <strong style={{ color: 'var(--text-main)' }}>{count} ({Math.round((count / totalGoatsCount) * 100)}%)</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
+              )}
+            </>
+          )}
+
+          {/* ===== MONTHLY TAB ===== */}
+          {activeTab === 'monthly' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+              {/* DISCLAIMER NOTE */}
+              <div style={{ background: '#f8fafc', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '10px 14px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                <BarChart2 size={14} color="var(--text-muted)" style={{ flexShrink: 0, marginTop: '1px' }} />
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+                  All months shown using recorded data. "Per goat" metrics are omitted here â€” goat pen assignments are not tracked historically, so those numbers would be inaccurate.
+                </p>
               </div>
 
-              {/* COMPLIANCE & RISK SCORECARD */}
-              <div className="card" style={{ padding: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '800', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <ShieldAlert size={16} color="var(--primary)" /> Health & Compliance Indicators
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                      <span>Hoof Trimming Compliance (3 Mo):</span>
-                      <strong>{hoofCompliancePct}%</strong>
-                    </div>
-                    <div style={{ height: '6px', width: '100%', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${hoofCompliancePct}%`, background: hoofCompliancePct >= 80 ? '#16a34a' : '#d97706' }} />
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: '12px', borderTop: '1px dashed var(--border-color)', paddingTop: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span>Gender Demographics:</span>
-                      <strong>{femaleCount} Female • {maleCount} Male {otherGenderCount > 0 ? `• ${otherGenderCount} Other` : ''}</strong>
-                    </div>
-                  </div>
+              {monthlyData.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+                  <BarChart2 size={32} style={{ margin: '0 auto 10px', opacity: 0.3 }} />
+                  <p style={{ fontSize: '13px' }}>No milk or feed data recorded yet.</p>
                 </div>
-              </div>
+              ) : (
+                <>
+                  {/* MONTH CARDS */}
+                  {[...monthlyData].reverse().map((m, idx) => {
+                    const prevMonth = monthlyData[monthlyData.length - 2 - idx];
+                    const milkDelta = prevMonth ? m.milk - prevMonth.milk : null;
+                    const profitDelta = prevMonth ? m.netProfit - prevMonth.netProfit : null;
+                    return (
+                      <div key={m.key} className="card" style={{ padding: '14px 16px' }}>
+                        {/* MONTH HEADER */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <div>
+                            <span style={{ fontSize: '15px', fontWeight: '900', color: 'var(--text-main)' }}>{m.label}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px' }}>{m.sessions} milk sessions</span>
+                          </div>
+                          {milkDelta !== null && (
+                            <span style={{ fontSize: '11px', fontWeight: '800', color: milkDelta >= 0 ? '#16a34a' : '#dc2626', background: milkDelta >= 0 ? '#f0fdf4' : '#fef2f2', padding: '2px 8px', borderRadius: '6px' }}>
+                              {milkDelta >= 0 ? '+' : ''}{milkDelta.toFixed(1)} L vs prev
+                            </span>
+                          )}
+                        </div>
+
+                        {/* METRIC GRID */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          {/* MILK */}
+                          <div style={{ background: '#f0f9ff', borderRadius: '10px', padding: '10px 12px' }}>
+                            <span style={{ fontSize: '10px', fontWeight: '800', color: '#0369a1', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Milk</span>
+                            <span style={{ fontSize: '16px', fontWeight: '900', color: '#0c4a6e' }}>{m.milk.toFixed(1)} L</span>
+                            <span style={{ fontSize: '10px', color: '#0369a1', display: 'block' }}>${m.milkRevenue.toFixed(0)} revenue</span>
+                          </div>
+
+                          {/* FEED */}
+                          <div style={{ background: '#fffbeb', borderRadius: '10px', padding: '10px 12px' }}>
+                            <span style={{ fontSize: '10px', fontWeight: '800', color: '#b45309', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Feed</span>
+                            <span style={{ fontSize: '16px', fontWeight: '900', color: '#78350f' }}>{m.feed.toFixed(1)} kg</span>
+                            <span style={{ fontSize: '10px', color: '#b45309', display: 'block' }}>${m.feedCost.toFixed(0)} cost</span>
+                          </div>
+
+                          {/* FCE */}
+                          <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px 12px' }}>
+                            <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Feed Efficiency</span>
+                            {m.fce !== null ? (
+                              <><span style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-main)' }}>{m.fce.toFixed(2)}</span>
+                              <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>L milk / kg feed</span></>
+                            ) : <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No feed data</span>}
+                          </div>
+
+                          {/* NET PROFIT */}
+                          <div style={{ background: m.netProfit >= 0 ? '#f0fdf4' : '#fef2f2', borderRadius: '10px', padding: '10px 12px' }}>
+                            <span style={{ fontSize: '10px', fontWeight: '800', color: m.netProfit >= 0 ? '#15803d' : '#b91c1c', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Net Profit</span>
+                            <span style={{ fontSize: '16px', fontWeight: '900', color: m.netProfit >= 0 ? '#14532d' : '#991b1b' }}>{m.netProfit >= 0 ? '+' : ''}${m.netProfit.toFixed(0)}</span>
+                            {profitDelta !== null && (
+                              <span style={{ fontSize: '10px', color: profitDelta >= 0 ? '#15803d' : '#b91c1c', display: 'block' }}>{profitDelta >= 0 ? '+' : ''}${profitDelta.toFixed(0)} vs prev</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
-          </div>
-        )}
+          )}
+
+        </div>
       </div>
     </div>
   );

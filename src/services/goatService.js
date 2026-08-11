@@ -84,6 +84,8 @@ export async function addPenMilkEntry(entryData) {
     barn_area_id: entryData.barn_area_id,
     date: entryData.date || new Date().toISOString(),
     amount_liters: Number(entryData.amount_liters) || 0,
+    shift: entryData.shift || null,
+    destination: entryData.destination || 'for_sale',
     notes: entryData.notes || ''
   };
 
@@ -133,15 +135,44 @@ export async function getPenFeedingEntries() {
 }
 
 export async function addPenFeedingEntry(entryData) {
+  const goatCount = Number(entryData.goat_count) || 0;
+
+  // alpha_kg, mixed_grains_kg, straw_kg = TOTAL kg for the WHOLE PEN (not per head)
+  const alphaKg = Number(entryData.alpha_kg) || 0;
+  const alphaPricePerKg = Number(entryData.alpha_price_per_kg) || 0;
+  const mixedGrainsKg = Number(entryData.mixed_grains_kg) || 0;
+  const mixedGrainsPricePerKg = Number(entryData.mixed_grains_price_per_kg) || 0;
+  const strawKg = Number(entryData.straw_kg) || 0;
+  const strawPricePerKg = Number(entryData.straw_price_per_kg) || 0;
+
+  // total_weight = sum of all pen totals; daily_weight = per-head (total / goat_count)
+  const totalWeight = parseFloat((alphaKg + mixedGrainsKg + strawKg).toFixed(3));
+  const dailyWeight = goatCount > 0 ? parseFloat((totalWeight / goatCount).toFixed(4)) : null;
+
+  // Auto-generate food_type from active components
+  const activeComponents = [];
+  if (alphaKg > 0) activeComponents.push('Alpha');
+  if (mixedGrainsKg > 0) activeComponents.push('Mixed Grains');
+  if (strawKg > 0) activeComponents.push('Straw');
+  const foodType = activeComponents.length > 0 ? activeComponents.join(' + ') : (entryData.food_type || '');
+
   const newEntry = {
     id: `pfe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     barn_area_id: entryData.barn_area_id,
     date: entryData.date || new Date().toISOString(),
-    food_type: entryData.food_type || '',
-    daily_weight: Number(entryData.daily_weight) || 0,
+    food_type: foodType,
+    daily_weight: dailyWeight,   // kg per goat head (derived)
+    goat_count: goatCount,
+    total_weight: totalWeight,   // total kg for the whole pen
     composition: entryData.composition || '',
     schedule: entryData.schedule || '',
-    notes: entryData.notes || ''
+    notes: entryData.notes || '',
+    alpha_kg: alphaKg,
+    alpha_price_per_kg: alphaPricePerKg,
+    mixed_grains_kg: mixedGrainsKg,
+    mixed_grains_price_per_kg: mixedGrainsPricePerKg,
+    straw_kg: strawKg,
+    straw_price_per_kg: strawPricePerKg,
   };
 
   const { data, error } = await supabase.from('pen_feeding_entries').insert([newEntry]).select().single();

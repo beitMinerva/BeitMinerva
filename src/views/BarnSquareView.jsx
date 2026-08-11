@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, ArrowRightLeft, Pencil, Edit2, Trash2, X, Loader2, Wheat, History, GripVertical, Check, Move, Milk } from 'lucide-react';
+import { Search, Plus, ArrowRightLeft, Pencil, Edit2, Trash2, X, Loader2, Wheat, History, GripVertical, Check, Move, Milk, BarChart2 } from 'lucide-react';
 import GoatCard from '../components/GoatCard';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import PenFeedingFormModal from '../components/PenFeedingFormModal';
@@ -21,7 +21,8 @@ export default function BarnSquareView({
   onDeletePenMilkEntry,
   penFeedingEntries = [],
   onSavePenFeedingEntry,
-  onDeletePenFeedingEntry
+  onDeletePenFeedingEntry,
+  onOpenAnalytics
 }) {
   const rawPens = barnAreas.length > 0 ? barnAreas : [
     { id: 'area-1', letter: 'A', name: 'Pen A' },
@@ -270,6 +271,16 @@ export default function BarnSquareView({
             >
               <Pencil size={13} /> Edit Pens
             </button>
+
+            {onOpenAnalytics && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={onOpenAnalytics}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: "'Outfit', sans-serif" }}
+              >
+                <BarChart2 size={13} /> Analytics
+              </button>
+            )}
           </div>
         </div>
 

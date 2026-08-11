@@ -1,43 +1,45 @@
 import { User, LogIn, LogOut, ShieldCheck, Info, BarChart2, ChevronRight } from 'lucide-react';
 
-export default function SettingsView({ goats = [], barnAreas = [], session = null, onOpenLogin, onSignOut, onOpenAnalytics }) {
+export default function SettingsView({
+  goats = [],
+  barnAreas = [],
+  session = null,
+  onOpenLogin,
+  onSignOut,
+  onOpenAnalytics
+}) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div>
-        <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Settings & Access</h2>
+        <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Settings & Farm Intelligence</h2>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          Manage admin access and farm business analytics.
+          Manage admin access and farm business intelligence.
         </p>
       </div>
 
-      {/* FARM BUSINESS ANALYTICS CARD */}
+      {/* ANALYTICS BUTTON - MINIMAL ROW */}
       <div
         className="card"
         onClick={onOpenAnalytics}
         style={{
-          padding: '16px',
-          background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
-          border: '1px solid var(--primary-border)',
+          padding: '14px 16px',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          border: '1px solid var(--border-color)'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ background: 'var(--primary-light)', padding: '10px', borderRadius: '12px' }}>
-            <BarChart2 size={22} color="var(--primary-dark)" />
+          <div style={{ background: 'var(--primary-light)', padding: '9px', borderRadius: '10px' }}>
+            <BarChart2 size={20} color="var(--primary-dark)" />
           </div>
           <div>
-            <strong style={{ fontSize: '15px', color: 'var(--primary-dark)', display: 'block' }}>
-              Farm Business Analytics & Smart Metrics
-            </strong>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Milk yields, feed conversion ratios (FCR), & financial projections
-            </span>
+            <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)', display: 'block' }}>Farm Analytics</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Milk, feed, income & herd insights</span>
           </div>
         </div>
-        <ChevronRight size={20} color="var(--primary-dark)" />
+        <ChevronRight size={16} color="var(--text-muted)" />
       </div>
 
       {/* ACCOUNT ACCESS CARD */}

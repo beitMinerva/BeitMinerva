@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, FileText, Scissors, Check, Users, Home, CheckSquare, Square, Search, Plus, Trash2, Sparkles } from 'lucide-react';
+import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, FileText, Scissors, Check, Users, Home, CheckSquare, Square, Search, Plus, Trash2, Sparkles, DollarSign } from 'lucide-react';
 import CustomRepeatPicker from './CustomRepeatPicker';
 import { calculateNextDueDate } from '../services/goatService';
 
@@ -13,6 +13,7 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
     { id: 'Milking Yield', label: 'Milking Yield', icon: Milk, color: '#0369a1', bg: '#f0f9ff', border: '#e0f2fe' },
     { id: 'Weight Check', label: 'Weight Measurement', icon: Weight, color: '#7e22ce', bg: '#faf5ff', border: '#f3e8ff' },
     { id: 'Pregnancy Check', label: 'Pregnancy & Birth', icon: Heart, color: '#be185d', bg: '#fdf2f8', border: '#fbcfe8' },
+    { id: 'Sale', label: 'Goat Sale / Transfer', icon: DollarSign, color: '#15803d', bg: '#f0fdf4', border: '#a7f3d0' },
     { id: 'General', label: 'General Task / Note', icon: FileText, color: '#475569', bg: '#f8fafc', border: '#e2e8f0' },
   ];
 
@@ -101,6 +102,11 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
   const [pregnancyNotes, setPregnancyNotes] = useState(getInitialCustomField('pregnancy_notes', 'Confirmed pregnant'));
   const [maleKidsCount, setMaleKidsCount] = useState(getInitialCustomField('male_kids', '0'));
   const [femaleKidsCount, setFemaleKidsCount] = useState(getInitialCustomField('female_kids', '0'));
+
+  // Goat Sale & Transfer specific states
+  const [salePrice, setSalePrice] = useState(getInitialCustomField('sale_price', '250.00'));
+  const [buyerNotes, setBuyerNotes] = useState(getInitialCustomField('buyer_notes', ''));
+  const [markAsSold, setMarkAsSold] = useState(true);
 
   const getInitialDateStr = () => {
     if (initialDate) {
@@ -257,6 +263,9 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
         female_kids: females,
         total_kids: totalKids,
         medicines_list: medicines,
+        sale_price: parseFloat(salePrice) || 0,
+        buyer_notes: buyerNotes.trim(),
+        mark_as_sold: markAsSold,
         repeat_frequency: repeatFrequency,
         custom_repeat_days: customRepeatDays
       }
@@ -761,6 +770,46 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* GOAT SALE / TRANSFER FORM FIELDS */}
+                {selectedCategory.id === 'Sale' && (
+                  <div className="form-group" style={{ background: '#f0fdf4', padding: '12px', borderRadius: '12px', border: '1px solid #a7f3d0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div>
+                      <label className="form-label" style={{ color: '#15803d', fontWeight: '800' }}>Sale Price ($) *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="form-input"
+                        placeholder="e.g. 250.00"
+                        value={salePrice}
+                        onChange={(e) => setSalePrice(e.target.value)}
+                        required
+                        disabled={submitting}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ color: '#15803d' }}>Buyer Info / Transfer Notes</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g. Sold to Green Pastures Farm"
+                        value={buyerNotes}
+                        onChange={(e) => setBuyerNotes(e.target.value)}
+                        disabled={submitting}
+                      />
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: '700', color: '#15803d', cursor: 'pointer', marginTop: '2px' }}>
+                      <input
+                        type="checkbox"
+                        checked={markAsSold}
+                        onChange={(e) => setMarkAsSold(e.target.checked)}
+                        disabled={submitting}
+                      />
+                      Automatically mark selected goat(s) status as "Sold"
+                    </label>
                   </div>
                 )}
               </>

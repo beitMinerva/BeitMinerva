@@ -219,6 +219,8 @@ export default function App() {
         const updated = await updatePenMilkEntry(entryId, {
           date: milkEntry.date || new Date().toISOString(),
           amount_liters: amountLiters,
+          shift: milkEntry.shift || null,
+          destination: milkEntry.destination || 'for_sale',
           notes: milkEntry.notes || ''
         });
         setPenMilkEntries((prev) => prev.map((item) => (item.id === entryId ? updated : item)));
@@ -230,6 +232,8 @@ export default function App() {
         barn_area_id: barnAreaId,
         date: milkEntry.date || new Date().toISOString(),
         amount_liters: amountLiters,
+        shift: milkEntry.shift || null,
+        destination: milkEntry.destination || 'for_sale',
         notes: milkEntry.notes || ''
       });
       setPenMilkEntries((prev) => [created, ...prev]);
@@ -265,22 +269,48 @@ export default function App() {
         entryId = param3;
       }
 
+      // Snapshot goat count for this pen at time of entry
+      const penGoatCount = goats.filter(g => g.area_id === barnAreaId).length;
+
       if (entryId) {
+        // Update: recompute totals from component kg values (pen totals)
+        const alphaKg = Number(feedingData.alpha_kg) || 0;
+        const mixedGrainsKg = Number(feedingData.mixed_grains_kg) || 0;
+        const strawKg = Number(feedingData.straw_kg) || 0;
+        const totalWeight = parseFloat((alphaKg + mixedGrainsKg + strawKg).toFixed(3));
+        const dailyWeight = penGoatCount > 0 ? parseFloat((totalWeight / penGoatCount).toFixed(4)) : null;
+
+        const activeComponents = [];
+        if (alphaKg > 0) activeComponents.push('Alpha');
+        if (mixedGrainsKg > 0) activeComponents.push('Mixed Grains');
+        if (strawKg > 0) activeComponents.push('Straw');
+        const foodType = activeComponents.length > 0 ? activeComponents.join(' + ') : (feedingData.food_type || '');
+
         const updated = await updatePenFeedingEntry(entryId, {
-          food_type: feedingData.food_type || '',
-          daily_weight: Number(feedingData.daily_weight) || 0,
+          food_type: foodType,
+          daily_weight: dailyWeight,
+          goat_count: penGoatCount,
+          total_weight: totalWeight,
           composition: feedingData.composition || '',
           schedule: feedingData.schedule || '',
-          notes: feedingData.notes || ''
+          notes: feedingData.notes || '',
+          alpha_kg: alphaKg,
+          alpha_price_per_kg: Number(feedingData.alpha_price_per_kg) || 0,
+          mixed_grains_kg: mixedGrainsKg,
+          mixed_grains_price_per_kg: Number(feedingData.mixed_grains_price_per_kg) || 0,
+          straw_kg: strawKg,
+          straw_price_per_kg: Number(feedingData.straw_price_per_kg) || 0,
         });
         setPenFeedingEntries((prev) => prev.map((item) => (item.id === entryId ? updated : item)));
         showToast('Updated pen feeding entry.');
         return updated;
       }
 
+      // Create: addPenFeedingEntry handles all math (pen totals → per-head derivation)
       const created = await addPenFeedingEntry({
         barn_area_id: barnAreaId,
         date: feedingData.date || new Date().toISOString(),
+        goat_count: penGoatCount,
         ...feedingData
       });
       setPenFeedingEntries((prev) => [created, ...prev]);
@@ -313,6 +343,15 @@ export default function App() {
       } else {
         await addTimelineEvent(eventData);
         showToast(`Logged ${eventData.type} event.`);
+      }
+
+      // If logging a Sale event with mark_as_sold set to true, update target goat status to 'Sold'
+      const singleEvent = Array.isArray(eventData) ? eventData[0] : eventData;
+      if (singleEvent?.type === 'Sale' && singleEvent.custom_fields?.mark_as_sold) {
+        const targetIds = singleEvent.custom_fields.target_goat_ids || (singleEvent.goat_id ? [singleEvent.goat_id] : []);
+        for (const gId of targetIds) {
+          if (gId) await updateGoat(gId, { status: 'Sold' });
+        }
       }
 
       // If completing an active scheduled task
@@ -471,6 +510,7 @@ export default function App() {
                 onDeletePenMilkEntry={(entryId) => requireAdmin(() => handleDeletePenMilkEntry(entryId))}
                 onSavePenFeedingEntry={(p1, p2, p3) => requireAdmin(() => handleSavePenFeedingEntry(p1, p2, p3))}
                 onDeletePenFeedingEntry={(entryId) => requireAdmin(() => handleDeletePenFeedingEntry(entryId))}
+                onOpenAnalytics={() => setShowAnalyticsModal(true)}
               />
             )}
 
@@ -611,6 +651,9 @@ export default function App() {
         <FarmAnalyticsModal
           goats={goats}
           barnAreas={barnAreas}
+          milkEntries={penMilkEntries}
+          feedingEntries={penFeedingEntries}
+          timelineEvents={recentEvents}
           onClose={() => setShowAnalyticsModal(false)}
         />
       )}

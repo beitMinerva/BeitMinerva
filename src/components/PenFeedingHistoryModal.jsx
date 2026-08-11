@@ -7,7 +7,7 @@ import { getBeirutDateTimeString, formatBeirutDisplay } from '../services/goatSe
 export function parsePenFeeding(infoStr) {
   if (!infoStr) {
     return {
-      current: { food_type: '', daily_weight: '', composition: '', schedule: '', notes: '' },
+      current: { food_type: '', daily_weight: '', composition: '', schedule: '', notes: '', alpha_kg: 0, alpha_price_per_kg: 0, mixed_grains_kg: 0, mixed_grains_price_per_kg: 0, straw_kg: 0, straw_price_per_kg: 0 },
       history: [],
       milk_tracking: []
     };
@@ -15,7 +15,7 @@ export function parsePenFeeding(infoStr) {
 
   if (typeof infoStr === 'object' && infoStr !== null) {
     return {
-      current: infoStr.current || { food_type: infoStr.food_type || '', daily_weight: infoStr.daily_weight || '', composition: infoStr.composition || '', schedule: infoStr.schedule || '', notes: infoStr.notes || '' },
+      current: infoStr.current || { food_type: infoStr.food_type || '', daily_weight: infoStr.daily_weight || '', composition: infoStr.composition || '', schedule: infoStr.schedule || '', notes: infoStr.notes || '', alpha_kg: infoStr.alpha_kg || 0, alpha_price_per_kg: infoStr.alpha_price_per_kg || 0, mixed_grains_kg: infoStr.mixed_grains_kg || 0, mixed_grains_price_per_kg: infoStr.mixed_grains_price_per_kg || 0, straw_kg: infoStr.straw_kg || 0, straw_price_per_kg: infoStr.straw_price_per_kg || 0 },
       history: Array.isArray(infoStr.history) ? infoStr.history : [],
       milk_tracking: Array.isArray(infoStr.milk_tracking) ? infoStr.milk_tracking : []
     };
@@ -26,7 +26,7 @@ export function parsePenFeeding(infoStr) {
     if (typeof parsed === 'object' && parsed !== null) {
       if (parsed.current || parsed.history || parsed.milk_tracking) {
         return {
-          current: parsed.current || { food_type: '', daily_weight: '', composition: '', schedule: '', notes: '' },
+          current: parsed.current || { food_type: '', daily_weight: '', composition: '', schedule: '', notes: '', alpha_kg: 0, alpha_price_per_kg: 0, mixed_grains_kg: 0, mixed_grains_price_per_kg: 0, straw_kg: 0, straw_price_per_kg: 0 },
           history: Array.isArray(parsed.history) ? parsed.history : [],
           milk_tracking: Array.isArray(parsed.milk_tracking) ? parsed.milk_tracking : []
         };
@@ -132,7 +132,13 @@ export default function PenFeedingHistoryModal({
     daily_weight: latestDbEntry.daily_weight ? `${latestDbEntry.daily_weight} kg` : '',
     composition: latestDbEntry.composition || '',
     schedule: latestDbEntry.schedule || '',
-    notes: latestDbEntry.notes || ''
+    notes: latestDbEntry.notes || '',
+    alpha_kg: latestDbEntry.alpha_kg || 0,
+    alpha_price_per_kg: latestDbEntry.alpha_price_per_kg || 0,
+    mixed_grains_kg: latestDbEntry.mixed_grains_kg || 0,
+    mixed_grains_price_per_kg: latestDbEntry.mixed_grains_price_per_kg || 0,
+    straw_kg: latestDbEntry.straw_kg || 0,
+    straw_price_per_kg: latestDbEntry.straw_price_per_kg || 0,
   } : parsed.current;
 
   const historyList = dbFeedingEntries.length > 0 ? dbFeedingEntries : parsed.history;
@@ -145,6 +151,8 @@ export default function PenFeedingHistoryModal({
   const [milkDate, setMilkDate] = useState(() => getBeirutDateTimeString());
   const [milkAmount, setMilkAmount] = useState('');
   const [milkNotes, setMilkNotes] = useState('');
+  const [milkShift, setMilkShift] = useState('Morning');
+  const [milkDestination, setMilkDestination] = useState('for_sale'); // 'for_sale' | 'home_use' | 'farm_use'
   const [submittingMilk, setSubmittingMilk] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [entryToDelete, setEntryToDelete] = useState(null);
@@ -155,6 +163,12 @@ export default function PenFeedingHistoryModal({
   const [feedingComposition, setFeedingComposition] = useState('');
   const [feedingSchedule, setFeedingSchedule] = useState('');
   const [feedingNotes, setFeedingNotes] = useState('');
+  const [feedingAlphaKg, setFeedingAlphaKg] = useState('');
+  const [feedingAlphaPrice, setFeedingAlphaPrice] = useState('');
+  const [feedingMixedKg, setFeedingMixedKg] = useState('');
+  const [feedingMixedPrice, setFeedingMixedPrice] = useState('');
+  const [feedingStrawKg, setFeedingStrawKg] = useState('');
+  const [feedingStrawPrice, setFeedingStrawPrice] = useState('');
   const [feedingEntryToDelete, setFeedingEntryToDelete] = useState(null);
   const [submittingFeeding, setSubmittingFeeding] = useState(false);
 
@@ -165,6 +179,12 @@ export default function PenFeedingHistoryModal({
     setFeedingComposition(item.composition || '');
     setFeedingSchedule(item.schedule || '');
     setFeedingNotes(item.notes || '');
+    setFeedingAlphaKg(item.alpha_kg || '');
+    setFeedingAlphaPrice(item.alpha_price_per_kg || '');
+    setFeedingMixedKg(item.mixed_grains_kg || '');
+    setFeedingMixedPrice(item.mixed_grains_price_per_kg || '');
+    setFeedingStrawKg(item.straw_kg || '');
+    setFeedingStrawPrice(item.straw_price_per_kg || '');
   };
 
   const handleCancelEditFeedingEntry = () => {
@@ -182,7 +202,13 @@ export default function PenFeedingHistoryModal({
         composition: feedingComposition.trim(),
         schedule: feedingSchedule.trim(),
         notes: feedingNotes.trim(),
-        date: editingFeedingEntry.date || new Date().toISOString()
+        date: editingFeedingEntry.date || new Date().toISOString(),
+        alpha_kg: Number(feedingAlphaKg) || 0,
+        alpha_price_per_kg: Number(feedingAlphaPrice) || 0,
+        mixed_grains_kg: Number(feedingMixedKg) || 0,
+        mixed_grains_price_per_kg: Number(feedingMixedPrice) || 0,
+        straw_kg: Number(feedingStrawKg) || 0,
+        straw_price_per_kg: Number(feedingStrawPrice) || 0,
       }, editingFeedingEntry.id);
       setEditingFeedingEntry(null);
     } catch (err) {
@@ -264,11 +290,15 @@ export default function PenFeedingHistoryModal({
       await onSaveMilkEntry(pen.id, {
         date: new Date(milkDate).toISOString(),
         amount_liters: Number(milkAmount) || 0,
+        shift: milkShift,
+        destination: milkDestination,
         notes: milkNotes.trim()
       }, editingEntry?.id || null);
       setMilkDate(getBeirutDateTimeString());
       setMilkAmount('');
       setMilkNotes('');
+      setMilkShift('Morning');
+      setMilkDestination('for_sale');
       setEditingEntry(null);
     } catch (err) {
       console.error(err);
@@ -282,6 +312,8 @@ export default function PenFeedingHistoryModal({
     setEditingEntry(item);
     setMilkDate(getBeirutDateTimeString(item.date || item.created_at || new Date()));
     setMilkAmount(String(amount));
+    setMilkShift(item.shift || 'Morning');
+    setMilkDestination(item.destination || 'for_sale');
     setMilkNotes(item.notes || '');
   };
 
@@ -290,6 +322,8 @@ export default function PenFeedingHistoryModal({
     setMilkDate(getBeirutDateTimeString());
     setMilkAmount('');
     setMilkNotes('');
+    setMilkShift('Morning');
+    setMilkDestination('for_sale');
   };
 
   const handleDeleteEntry = async (item) => {
@@ -350,6 +384,61 @@ export default function PenFeedingHistoryModal({
 
               {!editingEntry && (
                 <form onSubmit={handleSaveMilkEntry} style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* SHIFT & DESTINATION SELECTORS */}
+                  <div>
+                    <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Shift</label>
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                      {['Morning', 'Evening', 'Night'].map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setMilkShift(s)}
+                          style={{
+                            flex: 1,
+                            padding: '5px 0',
+                            borderRadius: '8px',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            border: milkShift === s ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                            background: milkShift === s ? 'var(--primary-light)' : '#f8fafc',
+                            color: milkShift === s ? 'var(--primary-dark)' : 'var(--text-muted)'
+                          }}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+
+                    <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Milk Purpose</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {[
+                        { id: 'for_sale', label: 'For Sale', desc: 'Adds to Revenue' },
+                        { id: 'home_use', label: 'Home Use', desc: 'No Revenue' },
+                        { id: 'farm_use', label: 'Kid Feeding', desc: 'No Revenue' }
+                      ].map(d => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => setMilkDestination(d.id)}
+                          style={{
+                            flex: 1,
+                            padding: '5px 2px',
+                            borderRadius: '8px',
+                            fontSize: '10px',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            border: milkDestination === d.id ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                            background: milkDestination === d.id ? 'var(--primary-light)' : '#f8fafc',
+                            color: milkDestination === d.id ? 'var(--primary-dark)' : 'var(--text-muted)'
+                          }}
+                          title={d.desc}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
                       <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Date & Time</label>
@@ -361,8 +450,8 @@ export default function PenFeedingHistoryModal({
                     </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Notes</label>
-                    <input type="text" className="form-input" value={milkNotes} onChange={(e) => setMilkNotes(e.target.value)} placeholder="Morning session, team notes..." disabled={submittingMilk} />
+                    <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Notes (optional)</label>
+                    <input type="text" className="form-input" value={milkNotes} onChange={(e) => setMilkNotes(e.target.value)} placeholder="Any notes..." disabled={submittingMilk} />
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="submit" className="btn btn-primary btn-sm" disabled={submittingMilk}>
@@ -438,9 +527,34 @@ export default function PenFeedingHistoryModal({
                     return (
                       <div key={item.id || `${item.date}-${amount}`} style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                          <strong style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-main)' }}>
-                            {amount.toFixed(1)} L
-                          </strong>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <strong style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-main)' }}>
+                              {amount.toFixed(1)} L
+                            </strong>
+                            {item.shift && (() => {
+                              const shiftColors = { Morning: '#f59e0b', Evening: '#8b5cf6', Night: '#1e40af' };
+                              const shiftBg = { Morning: '#fffbeb', Evening: '#f5f3ff', Night: '#eff6ff' };
+                              return (
+                                <span style={{ fontSize: '9px', fontWeight: '800', color: shiftColors[item.shift], background: shiftBg[item.shift], border: `1px solid ${shiftColors[item.shift]}30`, borderRadius: '5px', padding: '1px 6px' }}>
+                                  {item.shift}
+                                </span>
+                              );
+                            })()}
+                            {(() => {
+                              const dest = item.destination || 'for_sale';
+                              const destStyles = {
+                                for_sale: { label: '🏷️ Sale', color: '#15803d', bg: '#f0fdf4', border: '#a7f3d0' },
+                                home_use: { label: '🏠 Home', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+                                farm_use: { label: '🍼 Farm', color: '#b45309', bg: '#fffbeb', border: '#fde68a' }
+                              };
+                              const style = destStyles[dest] || destStyles.for_sale;
+                              return (
+                                <span style={{ fontSize: '9px', fontWeight: '800', color: style.color, background: style.bg, border: `1px solid ${style.border}`, borderRadius: '5px', padding: '1px 6px' }}>
+                                  {style.label}
+                                </span>
+                              );
+                            })()}
+                          </div>
                           <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
                             {formatDateLabel(item.date || item.created_at)}
                           </span>
@@ -458,11 +572,7 @@ export default function PenFeedingHistoryModal({
                             </button>
                           </div>
                         </div>
-                        {item.notes && (
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                            {item.notes}
-                          </span>
-                        )}
+                        {item.notes && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{item.notes}</span>}
                       </div>
                     );
                   })}
@@ -507,6 +617,24 @@ export default function PenFeedingHistoryModal({
                 {currentRation.composition && (
                   <div style={{ fontSize: '11px', background: '#ffffff', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>
                     <strong>Composition:</strong> {currentRation.composition}
+                  </div>
+                )}
+
+                {/* Feed components breakdown */}
+                {(currentRation.alpha_kg > 0 || currentRation.mixed_grains_kg > 0 || currentRation.straw_kg > 0) && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {[
+                      { label: 'Alpha', kg: currentRation.alpha_kg, price: currentRation.alpha_price_per_kg },
+                      { label: 'Mixed Grains', kg: currentRation.mixed_grains_kg, price: currentRation.mixed_grains_price_per_kg },
+                      { label: 'Straw', kg: currentRation.straw_kg, price: currentRation.straw_price_per_kg },
+                    ].filter(c => c.kg > 0).map(c => (
+                      <div key={c.label} style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '5px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-main)' }}>{c.label}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--primary-dark)', fontWeight: '700' }}>
+                          {c.kg} kg pen total {c.price > 0 ? `· $${c.price}/kg` : ''}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -582,6 +710,20 @@ export default function PenFeedingHistoryModal({
                           </span>
                         )}
 
+                        {(item.alpha_kg > 0 || item.mixed_grains_kg > 0 || item.straw_kg > 0) && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+                            {[
+                              { label: 'Alpha', kg: item.alpha_kg, price: item.alpha_price_per_kg },
+                              { label: 'Mixed Grains', kg: item.mixed_grains_kg, price: item.mixed_grains_price_per_kg },
+                              { label: 'Straw', kg: item.straw_kg, price: item.straw_price_per_kg },
+                            ].filter(c => c.kg > 0).map(c => (
+                              <span key={c.label} style={{ fontSize: '10px', fontWeight: '700', color: 'var(--primary-dark)', background: '#f0fdf4', border: '1px solid #a7f3d0', padding: '1px 6px', borderRadius: '5px' }}>
+                                {c.label}: {c.kg}kg {c.price > 0 ? `@$${c.price}/kg` : ''}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
                         {item.composition && (
                           <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                             Composition: {item.composition}
@@ -646,6 +788,28 @@ export default function PenFeedingHistoryModal({
                 <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Notes</label>
                 <input type="text" className="form-input" value={feedingNotes} onChange={(e) => setFeedingNotes(e.target.value)} placeholder="Ration notes..." disabled={submittingFeeding} />
               </div>
+              <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-main)' }}>Feed Components — Pen Totals (kg) & Price ($/kg)</span>
+                {[
+                  { label: 'Alpha', kg: feedingAlphaKg, setKg: setFeedingAlphaKg, price: feedingAlphaPrice, setPrice: setFeedingAlphaPrice },
+                  { label: 'Mixed Grains', kg: feedingMixedKg, setKg: setFeedingMixedKg, price: feedingMixedPrice, setPrice: setFeedingMixedPrice },
+                  { label: 'Straw', kg: feedingStrawKg, setKg: setFeedingStrawKg, price: feedingStrawPrice, setPrice: setFeedingStrawPrice },
+                ].map(c => (
+                  <div key={c.label} style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 10px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>{c.label}</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      <div>
+                        <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '2px' }}>Total kg (Pen)</label>
+                        <input type="number" step="0.1" min="0" className="form-input" value={c.kg} onChange={(e) => c.setKg(e.target.value)} disabled={submittingFeeding} placeholder="0.0" />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '2px' }}>$/kg</label>
+                        <input type="number" step="0.01" min="0" className="form-input" value={c.price} onChange={(e) => c.setPrice(e.target.value)} disabled={submittingFeeding} placeholder="0.00" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={handleCancelEditFeedingEntry} disabled={submittingFeeding}>
                   Cancel
@@ -683,6 +847,61 @@ export default function PenFeedingHistoryModal({
             </div>
 
             <form onSubmit={handleSaveMilkEntry} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+              {/* SHIFT & DESTINATION SELECTORS */}
+              <div>
+                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Shift</label>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                  {['Morning', 'Evening', 'Night'].map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setMilkShift(s)}
+                      style={{
+                        flex: 1,
+                        padding: '5px 0',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        border: milkShift === s ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                        background: milkShift === s ? 'var(--primary-light)' : '#f8fafc',
+                        color: milkShift === s ? 'var(--primary-dark)' : 'var(--text-muted)'
+                      }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+
+                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Milk Purpose (Financial Profit Option)</label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {[
+                    { id: 'for_sale', label: '🏷️ For Sale', desc: 'Adds to Revenue' },
+                    { id: 'home_use', label: '🏠 Home Use', desc: 'No Revenue' },
+                    { id: 'farm_use', label: '🍼 Kid Feeding', desc: 'No Revenue' }
+                  ].map(d => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setMilkDestination(d.id)}
+                      style={{
+                        flex: 1,
+                        padding: '5px 2px',
+                        borderRadius: '8px',
+                        fontSize: '10px',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        border: milkDestination === d.id ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                        background: milkDestination === d.id ? 'var(--primary-light)' : '#f8fafc',
+                        color: milkDestination === d.id ? 'var(--primary-dark)' : 'var(--text-muted)'
+                      }}
+                      title={d.desc}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
                   <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Date & Time</label>
@@ -694,8 +913,8 @@ export default function PenFeedingHistoryModal({
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Notes</label>
-                <input type="text" className="form-input" value={milkNotes} onChange={(e) => setMilkNotes(e.target.value)} placeholder="Morning session, team notes..." disabled={submittingMilk} />
+                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Notes (optional)</label>
+                <input type="text" className="form-input" value={milkNotes} onChange={(e) => setMilkNotes(e.target.value)} placeholder="Any notes..." disabled={submittingMilk} />
               </div>
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={handleCancelEditEntry} disabled={submittingMilk}>

@@ -127,12 +127,12 @@ export default function PenFeedingModal({ pen, onClose, onSave }) {
             {/* DAILY QUANTITY / WEIGHT */}
             <div className="form-group">
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Scale size={14} color="var(--primary)" /> Daily Feed Weight / Quantity (kg)
+                <Scale size={14} color="var(--primary)" /> Total Feed Weight put in Trough (kg)
               </label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. 4.5 kg / head / day"
+                placeholder="e.g. 25 kg total feed put in trough for whole pen"
                 value={dailyWeight}
                 onChange={(e) => setDailyWeight(e.target.value)}
                 disabled={submitting}
