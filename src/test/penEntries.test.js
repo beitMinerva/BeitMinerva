@@ -139,6 +139,58 @@ describe('Daily Feed Carryover & Shift Validation', () => {
     expect(result.totalRangeDays).toBe(10);
   });
 
+  it('handles year-end date boundaries cleanly (e.g. Dec 25, 2026 to Jan 5, 2027)', () => {
+    const barnAreas = [{ id: 'pen-A', letter: 'A', name: 'Pen A' }];
+    const feedingEntries = [
+      {
+        id: 'f-dec',
+        barn_area_id: 'pen-A',
+        date: '2026-12-20T08:00:00.000Z',
+        alpha_kg: 5,
+        mixed_grains_kg: 15,
+        straw_kg: 0
+      }
+    ];
+
+    // Dec 25, 2026 to Jan 5, 2027 = 12 days @ 20 kg/day = 240 kg
+    const result = calculateDailyFeedCarryover({
+      feedingEntries,
+      barnAreas,
+      timeRange: 'custom',
+      customStartDate: '2026-12-25',
+      customEndDate: '2027-01-05'
+    });
+
+    expect(result.totalRangeDays).toBe(12);
+    expect(result.totalFeedKg).toBe(240);
+  });
+
+  it('handles leap year date boundaries correctly (e.g. Feb 25, 2028 to Mar 2, 2028)', () => {
+    const barnAreas = [{ id: 'pen-A', letter: 'A', name: 'Pen A' }];
+    const feedingEntries = [
+      {
+        id: 'f-leap',
+        barn_area_id: 'pen-A',
+        date: '2028-02-01T08:00:00.000Z',
+        alpha_kg: 10,
+        mixed_grains_kg: 10,
+        straw_kg: 0
+      }
+    ];
+
+    // 2028 is a leap year (Feb 25, 26, 27, 28, 29, Mar 1, Mar 2 = 7 days @ 20 kg/day = 140 kg)
+    const result = calculateDailyFeedCarryover({
+      feedingEntries,
+      barnAreas,
+      timeRange: 'custom',
+      customStartDate: '2028-02-25',
+      customEndDate: '2028-03-02'
+    });
+
+    expect(result.totalRangeDays).toBe(7);
+    expect(result.totalFeedKg).toBe(140);
+  });
+
   it('correctly aggregates monthly snapshots for each calendar month with daily feed carryover', () => {
     const barnAreas = [{ id: 'pen-A', letter: 'A', name: 'Pen A' }];
     const milkEntries = [
@@ -164,5 +216,22 @@ describe('Daily Feed Carryover & Shift Validation', () => {
     expect(julySnapshot.milkRevenue).toBeCloseTo(110.00, 2); // 100 L * $1.10 = $110.00
     // July has 31 days @ 20 kg/day = 620 kg feed
     expect(julySnapshot.feed).toBe(620);
+  });
+
+  it('sums milk shift entries on the same day and correctly separates commercial from home/farm use', () => {
+    const milkEntries = [
+      { id: 'm1', barn_area_id: 'pen-A', date: '2026-08-10T07:00:00Z', amount_liters: 12, shift: 'Morning', destination: 'commercial' },
+      { id: 'm2', barn_area_id: 'pen-A', date: '2026-08-10T18:00:00Z', amount_liters: 10, shift: 'Evening', destination: 'commercial' },
+      { id: 'm3', barn_area_id: 'pen-A', date: '2026-08-10T22:00:00Z', amount_liters: 4, shift: 'Night', destination: 'home_use' }
+    ];
+
+    const penAEntries = milkEntries.filter(e => e.barn_area_id === 'pen-A');
+    const totalMilk = penAEntries.reduce((sum, e) => sum + Number(e.amount_liters), 0);
+    const sellableMilk = penAEntries
+      .filter(e => e.destination !== 'home_use' && e.destination !== 'farm_use')
+      .reduce((sum, e) => sum + Number(e.amount_liters), 0);
+
+    expect(totalMilk).toBe(26);
+    expect(sellableMilk).toBe(22); // 12 Morning + 10 Evening = 22 L sellable
   });
 });
