@@ -108,6 +108,107 @@ export function calculateDailyFeedCarryover({
   return { totalFeedKg: grandTotalKg, totalFeedCost: grandTotalCost, penFeedPerformanceMap: penMap, totalRangeDays: Math.max(1, dayList.length) };
 }
 
+// Standalone helper for Monthly Snapshots with daily feed carryover (exported for testing)
+export function calculateMonthlySnapshots({
+  milkEntries = [],
+  feedingEntries = [],
+  timelineEvents = [],
+  barnAreas = [],
+  milkPricePerLiter = 1.1,
+  alphaPricePerKg = 0.55,
+  mixedGrainsPricePerKg = 0.40,
+  strawPricePerKg = 0.20
+}) {
+  const monthsMap = {};
+  const now = new Date();
+
+  const getMonthObj = (year, monthZeroIndexed) => {
+    const key = `${year}-${String(monthZeroIndexed + 1).padStart(2, '0')}`;
+    if (!monthsMap[key]) {
+      monthsMap[key] = {
+        key,
+        year,
+        monthZeroIndexed,
+        milk: 0,
+        sellableMilk: 0,
+        feed: 0,
+        feedCost: 0,
+        salesRevenue: 0,
+        sessions: 0
+      };
+    }
+    return monthsMap[key];
+  };
+
+  milkEntries.forEach(e => {
+    const d = new Date(e.date);
+    const mObj = getMonthObj(d.getFullYear(), d.getMonth());
+    const liters = parseFloat(e.amount_liters) || 0;
+    mObj.milk += liters;
+    if (e.destination !== 'home_use' && e.destination !== 'farm_use') {
+      mObj.sellableMilk += liters;
+    }
+    mObj.sessions += 1;
+  });
+
+  timelineEvents.forEach(e => {
+    if (e.type !== 'Sale') return;
+    const d = new Date(e.date);
+    const mObj = getMonthObj(d.getFullYear(), d.getMonth());
+    const val = parseFloat(e.custom_fields?.sale_price || e.custom_fields?.price || 0);
+    mObj.salesRevenue += val;
+  });
+
+  feedingEntries.forEach(e => {
+    const d = new Date(e.date);
+    getMonthObj(d.getFullYear(), d.getMonth());
+  });
+  getMonthObj(now.getFullYear(), now.getMonth());
+
+  const sortedMonthKeys = Object.keys(monthsMap).sort((a, b) => a.localeCompare(b));
+
+  sortedMonthKeys.forEach(key => {
+    const mObj = monthsMap[key];
+    const year = mObj.year;
+    const month = mObj.monthZeroIndexed;
+
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const endDayNum = (year === now.getFullYear() && month === now.getMonth())
+      ? now.getDate()
+      : lastDayOfMonth.getDate();
+
+    const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const endStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(endDayNum).padStart(2, '0')}`;
+
+    const feedResult = calculateDailyFeedCarryover({
+      feedingEntries,
+      barnAreas,
+      timeRange: 'custom',
+      customStartDate: startStr,
+      customEndDate: endStr,
+      alphaPricePerKg,
+      mixedGrainsPricePerKg,
+      strawPricePerKg
+    });
+
+    mObj.feed = feedResult.totalFeedKg;
+    mObj.feedCost = feedResult.totalFeedCost;
+  });
+
+  return sortedMonthKeys.map(key => {
+    const v = monthsMap[key];
+    const [year, month] = key.split('-');
+    const label = new Date(Number(year), Number(month) - 1, 1)
+      .toLocaleString('en-US', { month: 'short', year: '2-digit' });
+    const milkRevenue = v.sellableMilk * (parseFloat(milkPricePerLiter) || 1.1);
+    const feedCost = v.feedCost || 0;
+    const grossIncome = milkRevenue + v.salesRevenue;
+    const netProfit = grossIncome - feedCost;
+    const fce = v.feed > 0 ? (v.milk / v.feed) : null;
+    return { key, label, milk: v.milk, sellableMilk: v.sellableMilk, feed: v.feed, sessions: v.sessions, milkRevenue, feedCost, grossIncome, netProfit, fce };
+  });
+}
+
 export default function FarmAnalyticsModal({
   goats = [],
   barnAreas = [],
@@ -336,68 +437,19 @@ export default function FarmAnalyticsModal({
     }
   });
 
-  // MONTHLY BREAKDOWN â€” group ALL entries by calendar month (not filtered by time range)
-  // Uses ALL raw data so we get an honest historical picture
-  const monthlyData = (() => {
-    const months = {};
-
-    milkEntries.forEach(e => {
-      const d = new Date(e.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (!months[key]) months[key] = { milk: 0, sellableMilk: 0, feed: 0, feedCost: 0, salesRevenue: 0, sessions: 0 };
-      const liters = parseFloat(e.amount_liters) || 0;
-      months[key].milk += liters;
-      if (e.destination !== 'home_use' && e.destination !== 'farm_use') {
-        months[key].sellableMilk += liters;
-      }
-      months[key].sessions += 1;
+  // MONTHLY BREAKDOWN — group ALL entries by calendar month with daily feed carryover
+  const monthlyData = React.useMemo(() => {
+    return calculateMonthlySnapshots({
+      milkEntries,
+      feedingEntries,
+      timelineEvents,
+      barnAreas,
+      milkPricePerLiter,
+      alphaPricePerKg,
+      mixedGrainsPricePerKg,
+      strawPricePerKg
     });
-
-    feedingEntries.forEach(e => {
-      const d = new Date(e.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (!months[key]) months[key] = { milk: 0, sellableMilk: 0, feed: 0, feedCost: 0, salesRevenue: 0, sessions: 0 };
-      months[key].feed += parseFloat(e.total_weight) || parseFloat(e.daily_weight) || parseFloat(e.amount_kg) || 0;
-      // Compute cost for this entry
-      const alphaKg = parseFloat(e.alpha_kg) || 0;
-      const alphaP = parseFloat(e.alpha_price_per_kg) || parseFloat(alphaPricePerKg) || 0;
-      const mixedKg = parseFloat(e.mixed_grains_kg) || 0;
-      const mixedP = parseFloat(e.mixed_grains_price_per_kg) || parseFloat(mixedGrainsPricePerKg) || 0;
-      const strawKg = parseFloat(e.straw_kg) || 0;
-      const strawP = parseFloat(e.straw_price_per_kg) || parseFloat(strawPricePerKg) || 0;
-      const hasComponents = alphaKg > 0 || mixedKg > 0 || strawKg > 0;
-      if (hasComponents) {
-        months[key].feedCost += (alphaKg * alphaP + mixedKg * mixedP + strawKg * strawP);
-      } else {
-        const kg = parseFloat(e.total_weight) || parseFloat(e.daily_weight) || 0;
-        const avgPrice = ((parseFloat(alphaPricePerKg)||0.55) + (parseFloat(mixedGrainsPricePerKg)||0.40) + (parseFloat(strawPricePerKg)||0.20)) / 3;
-        months[key].feedCost += kg * avgPrice;
-      }
-    });
-
-    timelineEvents.forEach(e => {
-      if (e.type !== 'Sale') return;
-      const d = new Date(e.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (!months[key]) months[key] = { milk: 0, sellableMilk: 0, feed: 0, feedCost: 0, salesRevenue: 0, sessions: 0 };
-      const val = parseFloat(e.custom_fields?.sale_price || e.custom_fields?.price || 0);
-      months[key].salesRevenue += val;
-    });
-
-    return Object.entries(months)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, v]) => {
-        const [year, month] = key.split('-');
-        const label = new Date(Number(year), Number(month) - 1, 1)
-          .toLocaleString('en-US', { month: 'short', year: '2-digit' });
-        const milkRevenue = v.sellableMilk * (parseFloat(milkPricePerLiter) || 1.25);
-        const feedCost = v.feedCost || 0;
-        const grossIncome = milkRevenue + v.salesRevenue;
-        const netProfit = grossIncome - feedCost;
-        const fce = v.feed > 0 ? (v.milk / v.feed) : null;
-        return { key, label, milk: v.milk, sellableMilk: v.sellableMilk, feed: v.feed, sessions: v.sessions, milkRevenue, feedCost, grossIncome, netProfit, fce };
-      });
-  })();
+  }, [milkEntries, feedingEntries, timelineEvents, barnAreas, milkPricePerLiter, alphaPricePerKg, mixedGrainsPricePerKg, strawPricePerKg]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>

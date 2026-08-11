@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getBeirutDateTimeString, formatBeirutDisplay } from '../services/goatService';
-import { calculateDailyFeedCarryover } from '../components/FarmAnalyticsModal';
+import { calculateDailyFeedCarryover, calculateMonthlySnapshots } from '../components/FarmAnalyticsModal';
 
 describe('Pen Milk & Feeding Entries - Beirut Timezone & Amount Calculations', () => {
   it('correctly parses amount_liters for pen milk entries', () => {
@@ -139,17 +139,30 @@ describe('Daily Feed Carryover & Shift Validation', () => {
     expect(result.totalRangeDays).toBe(10);
   });
 
-  it('correctly aggregates multiple milk shift entries on the same day', () => {
+  it('correctly aggregates monthly snapshots for each calendar month with daily feed carryover', () => {
+    const barnAreas = [{ id: 'pen-A', letter: 'A', name: 'Pen A' }];
     const milkEntries = [
-      { id: 'm1', barn_area_id: 'pen-A', date: '2026-08-10T07:00:00Z', amount_liters: 12, shift: 'Morning' },
-      { id: 'm2', barn_area_id: 'pen-A', date: '2026-08-10T18:00:00Z', amount_liters: 10, shift: 'Evening' },
-      { id: 'm3', barn_area_id: 'pen-A', date: '2026-08-10T22:00:00Z', amount_liters: 4, shift: 'Night' }
+      { id: 'm1', barn_area_id: 'pen-A', date: '2026-07-15T08:00:00Z', amount_liters: 100, destination: 'commercial' },
+      { id: 'm2', barn_area_id: 'pen-A', date: '2026-08-05T08:00:00Z', amount_liters: 150, destination: 'commercial' }
+    ];
+    const feedingEntries = [
+      { id: 'f1', barn_area_id: 'pen-A', date: '2026-07-01T08:00:00Z', alpha_kg: 10, mixed_grains_kg: 10, straw_kg: 0 } // 20 kg/day
     ];
 
-    const sameDayMilk = milkEntries
-      .filter(e => e.barn_area_id === 'pen-A')
-      .reduce((sum, e) => sum + Number(e.amount_liters), 0);
+    const monthlySnapshots = calculateMonthlySnapshots({
+      milkEntries,
+      feedingEntries,
+      timelineEvents: [],
+      barnAreas,
+      milkPricePerLiter: 1.1
+    });
 
-    expect(sameDayMilk).toBe(26);
+    expect(monthlySnapshots.length).toBeGreaterThanOrEqual(2);
+    const julySnapshot = monthlySnapshots.find(m => m.key === '2026-07');
+    expect(julySnapshot).toBeDefined();
+    expect(julySnapshot.milk).toBe(100);
+    expect(julySnapshot.milkRevenue).toBeCloseTo(110.00, 2); // 100 L * $1.10 = $110.00
+    // July has 31 days @ 20 kg/day = 620 kg feed
+    expect(julySnapshot.feed).toBe(620);
   });
 });
