@@ -135,8 +135,8 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
     setSelectedCategory(cat);
     // Reset medicine list when switching categories
     setMedicines([{ id: `med-${Date.now()}`, name: '', dosage: '' }]);
-    // Default recurrence for hoof trimming
-    setRepeatFrequency(cat.id === 'Hoof Trimming' ? 'every_2_months' : 'none');
+    // Default recurrence for hoof trimming (every 3 months)
+    setRepeatFrequency(cat.id === 'Hoof Trimming' ? 'every_3_months' : 'none');
   };
 
   const handleAddMedicineRow = () => {
