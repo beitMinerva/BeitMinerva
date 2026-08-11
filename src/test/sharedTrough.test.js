@@ -39,7 +39,7 @@ export function calculateSharedTroughAllocation({ pens, totalAlpha = 0, totalMix
   });
 }
 
-describe('Shared Feed Trough Recipe Proportion Allocation Math', () => {
+describe('Shared Feed Trough & Single Pen Recipe Proportion Allocation Math', () => {
   it('correctly calculates feed intake per pen based on recipe proportions and (goats * target rate)', () => {
     const pens = [
       { id: 'pen-A', count: 10, targetRate: 2.5 }, // 25.0 kg target intake
@@ -71,6 +71,26 @@ describe('Shared Feed Trough Recipe Proportion Allocation Math', () => {
     expect(penB.alphaAllocated).toBe(5.0); // 10 * 50%
     expect(penB.mixedAllocated).toBe(2.5); // 10 * 25%
     expect(penB.strawAllocated).toBe(2.5); // 10 * 25%
+  });
+
+  it('correctly calculates Single Pen mode (Pen A: 8 goats @ 2.5 kg/goat) with recipe mix 1kg Alpha, 18kg Mixed, 1kg Straw', () => {
+    const pens = [
+      { id: 'pen-A', count: 8, targetRate: 2.5 } // 8 * 2.5 = 20.0 kg total intake
+    ];
+
+    const result = calculateSharedTroughAllocation({
+      pens,
+      totalAlpha: 1,
+      totalMixed: 18,
+      totalStraw: 1
+    });
+
+    const penA = result[0];
+    expect(penA.perHeadKg).toBe(2.5);
+    expect(penA.totalAllocatedKg).toBe(20.0);
+    expect(penA.alphaAllocated).toBe(1.0);   // 20 * 5% = 1.0 kg
+    expect(penA.mixedAllocated).toBe(18.0);  // 20 * 90% = 18.0 kg
+    expect(penA.strawAllocated).toBe(1.0);   // 20 * 5% = 1.0 kg
   });
 
   it('correctly calculates Mlk A (8 goats) and Mlk B (15 goats) with 1kg Alpha, 18kg Mixed, 1kg Straw recipe', () => {

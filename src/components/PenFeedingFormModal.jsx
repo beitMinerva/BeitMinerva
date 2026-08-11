@@ -124,41 +124,31 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
 
     try {
       if (onSave) {
-        if (!isSharedTrough || allocatedPenData.length <= 1) {
-          // Single Pen Entry
-          const feedingData = {
-            alpha_kg: totalAlpha,
-            alpha_price_per_kg: Number(alphaPricePerKg) || 0,
-            mixed_grains_kg: totalMixed,
-            mixed_grains_price_per_kg: Number(mixedGrainsPricePerKg) || 0,
-            straw_kg: totalStraw,
-            straw_price_per_kg: Number(strawPricePerKg) || 0,
-            schedule: schedule.trim(),
-            notes: notes.trim(),
-            date: new Date(feedingDate).toISOString()
-          };
-          await onSave(pen.id, feedingData);
-        } else {
-          // Shared Trough Multi-Pen Proportional Allocation
-          const sharedPenNames = activePens.map(p => `Pen ${p.letter}`).join(' & ');
-          for (const item of allocatedPenData) {
+        const isMultiPenShared = isSharedTrough && activePens.length > 1;
+        const sharedPenNames = isMultiPenShared
+          ? activePens.map(p => `Pen ${p.letter}`).join(' & ')
+          : '';
+
+        for (const item of allocatedPenData) {
+          let finalNote = notes.trim();
+          if (isMultiPenShared) {
             const ratioPct = (item.ratio * 100).toFixed(1);
             const sharedNoteTag = `[Shared Trough with ${sharedPenNames} · ${ratioPct}% share]`;
-            const finalNote = notes.trim() ? `${sharedNoteTag} ${notes.trim()}` : sharedNoteTag;
-
-            const feedingData = {
-              alpha_kg: item.alphaAllocated,
-              alpha_price_per_kg: Number(alphaPricePerKg) || 0,
-              mixed_grains_kg: item.mixedAllocated,
-              mixed_grains_price_per_kg: Number(mixedGrainsPricePerKg) || 0,
-              straw_kg: item.strawAllocated,
-              straw_price_per_kg: Number(strawPricePerKg) || 0,
-              schedule: schedule.trim(),
-              notes: finalNote,
-              date: new Date(feedingDate).toISOString()
-            };
-            await onSave(item.pen.id, feedingData);
+            finalNote = finalNote ? `${sharedNoteTag} ${finalNote}` : sharedNoteTag;
           }
+
+          const feedingData = {
+            alpha_kg: item.alphaAllocated,
+            alpha_price_per_kg: Number(alphaPricePerKg) || 0,
+            mixed_grains_kg: item.mixedAllocated,
+            mixed_grains_price_per_kg: Number(mixedGrainsPricePerKg) || 0,
+            straw_kg: item.strawAllocated,
+            straw_price_per_kg: Number(strawPricePerKg) || 0,
+            schedule: schedule.trim(),
+            notes: finalNote,
+            date: new Date(feedingDate).toISOString()
+          };
+          await onSave(item.pen.id, feedingData);
         }
       }
       handleClose();
@@ -423,6 +413,51 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
               </div>
             )}
 
+            {!isSharedTrough && (
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '14px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={16} color="#059669" />
+                  <div>
+                    <strong style={{ fontSize: '13px', color: '#0f172a', fontWeight: '800', display: 'block', lineHeight: 1.2 }}>
+                      Pen {pen?.letter} Target Rate
+                    </strong>
+                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
+                      {primaryPenGoatCount} goats · Est. Intake: {allocatedPenData[0]?.totalAllocatedKg || 0} kg
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ fontSize: '11px', color: '#475569', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                    Rate:
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    className="form-input"
+                    placeholder="2.5"
+                    value={targetRates[pen?.id] !== undefined ? targetRates[pen?.id] : '2.5'}
+                    onChange={(e) => handleTargetRateChange(pen?.id, e.target.value)}
+                    disabled={submitting}
+                    style={{ fontSize: '12px', fontWeight: '700', padding: '4px 8px', height: '28px', width: '75px', background: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
+                  />
+                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>kg/goat</span>
+                </div>
+              </div>
+            )}
+
             {/* FEED COMPONENTS CARDS */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -430,7 +465,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                   <Scale size={15} color="#059669" />
                   {isSharedTrough && activePens.length > 1
                     ? `Feed Components (Total put into Shared Trough)`
-                    : `Feed Components (Total kg for Pen ${pen?.letter})`}
+                    : `Feed Components (Enter Mix Recipe Amounts)`}
                 </label>
               </div>
 
