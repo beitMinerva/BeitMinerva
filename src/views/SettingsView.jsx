@@ -1,14 +1,43 @@
-import React from 'react';
-import { User, LogIn, LogOut, ShieldCheck, Info } from 'lucide-react';
+import { User, LogIn, LogOut, ShieldCheck, Info, BarChart2, ChevronRight } from 'lucide-react';
 
-export default function SettingsView({ goats = [], session = null, onOpenLogin, onSignOut }) {
+export default function SettingsView({ goats = [], barnAreas = [], session = null, onOpenLogin, onSignOut, onOpenAnalytics }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div>
         <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Settings & Access</h2>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          Manage admin access and farm overview information.
+          Manage admin access and farm business analytics.
         </p>
+      </div>
+
+      {/* FARM BUSINESS ANALYTICS CARD */}
+      <div
+        className="card"
+        onClick={onOpenAnalytics}
+        style={{
+          padding: '16px',
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+          border: '1px solid var(--primary-border)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ background: 'var(--primary-light)', padding: '10px', borderRadius: '12px' }}>
+            <BarChart2 size={22} color="var(--primary-dark)" />
+          </div>
+          <div>
+            <strong style={{ fontSize: '15px', color: 'var(--primary-dark)', display: 'block' }}>
+              Farm Business Analytics & Smart Metrics
+            </strong>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              Milk yields, feed conversion ratios (FCR), & financial projections
+            </span>
+          </div>
+        </div>
+        <ChevronRight size={20} color="var(--primary-dark)" />
       </div>
 
       {/* ACCOUNT ACCESS CARD */}

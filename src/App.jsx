@@ -5,6 +5,7 @@ import GoatDetailModal from './components/GoatDetailModal';
 import AddGoatModal from './components/AddGoatModal';
 import AddEventModal from './components/AddEventModal';
 import AdminLoginModal from './components/AdminLoginModal';
+import FarmAnalyticsModal from './components/FarmAnalyticsModal';
 import { supabase } from './config/supabase';
 
 import BarnSquareView from './views/BarnSquareView';
@@ -89,6 +90,7 @@ export default function App() {
   const [goatForEvent, setGoatForEvent] = useState(null);
   const [initialAddEventMode, setInitialAddEventMode] = useState('LOG');
   const [initialAddEventDate, setInitialAddEventDate] = useState(null);
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
   const loadData = async () => {
@@ -516,9 +518,11 @@ export default function App() {
             {activeTab === 'settings' && (
               <SettingsView
                 goats={goats}
+                barnAreas={barnAreas}
                 session={session}
                 onOpenLogin={() => setShowLoginModal(true)}
                 onSignOut={handleSignOut}
+                onOpenAnalytics={() => setShowAnalyticsModal(true)}
               />
             )}
           </>
@@ -599,6 +603,15 @@ export default function App() {
             setSession(s);
             showToast('✅ Signed in as Admin. Full edit access granted.');
           }}
+        />
+      )}
+
+      {/* Farm Business Analytics & Smart Metrics Modal */}
+      {showAnalyticsModal && (
+        <FarmAnalyticsModal
+          goats={goats}
+          barnAreas={barnAreas}
+          onClose={() => setShowAnalyticsModal(false)}
         />
       )}
     </div>
