@@ -358,28 +358,37 @@ export default function FarmAnalyticsModal({
   const estimatedGrossRevenue = milkRevenue + totalGoatSalesRevenue;
   const feedMargin = estimatedGrossRevenue - totalFeedCost;
 
-  // 5. NORMALIZED PEN COMPARISON
+  // 5. NORMALIZED PEN COMPARISON (Synchronized over exact same date range days)
   const penPerformance = barnAreas.map(area => {
-    const penMilkEntries = filteredMilk.filter(m => m.barn_area_id === area.id);
-    const penMilk = penMilkEntries.reduce((sum, m) => sum + (parseFloat(m.amount_liters) || 0), 0);
-    
     const penGoats = goats.filter(g => g.area_id === area.id);
+    const penGoatIds = new Set(penGoats.map(g => g.id));
     const goatCount = penGoats.length || 1;
+
+    // 1. Pen-level milk entries
+    const penMilkEntries = filteredMilk.filter(m => m.barn_area_id === area.id);
+    const penMilkDirect = penMilkEntries.reduce((sum, m) => sum + (parseFloat(m.amount_liters) || 0), 0);
+
+    // 2. Individual goat milking events for goats in this pen
+    const goatMilkDirect = filteredEvents
+      .filter(e => e.type === 'Milking' && penGoatIds.has(e.goat_id))
+      .reduce((sum, e) => sum + (parseFloat(e.custom_fields?.amount_liters) || 0), 0);
+
+    const penMilk = penMilkDirect + goatMilkDirect;
 
     const penFeedData = penFeedPerformanceMap[area.id] || { feedKg: 0, feedCost: 0, daysCount: totalRangeDays };
     const penFeed = penFeedData.feedKg;
 
-    // Days milk was actually logged for this pen
-    const penMilkDays = Math.max(1, new Set(penMilkEntries.map(m => getBeirutDateString(m.date))).size);
-    const penFeedDays = Math.max(1, penFeedData.daysCount);
+    // Standardize divisor to totalRangeDays for both Milk & Feed so metrics align 100%
+    const daysDivisor = Math.max(1, totalRangeDays);
 
-    const milkPerGoatDay = (penMilk / penMilkDays) / goatCount;
-    const feedPerGoatDay = (penFeed / penFeedDays) / goatCount;
+    const milkPerGoatDay = (penMilk / daysDivisor) / goatCount;
+    const feedPerGoatDay = (penFeed / daysDivisor) / goatCount;
     const penFCE = penFeed > 0 ? (penMilk / penFeed).toFixed(2) : '0.00';
 
     return {
       id: area.id,
-      name: area.name,
+      name: (area.name || '').replace(/\s*\[NURSERY\]/gi, '').trim(),
+      isNursery: isNurseryPenCheck(area),
       milkLiters: penMilk,
       feedKg: penFeed,
       goatCount: penGoats.length,
