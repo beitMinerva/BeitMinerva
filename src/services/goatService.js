@@ -42,10 +42,7 @@ export async function getBarnAreas() {
 
 export function isNurseryPenCheck(pen) {
   if (!pen) return false;
-  if (pen.is_nursery === true || pen.isNursery === true) return true;
-  const nameStr = String(pen.name || '').toLowerCase();
-  const letterStr = String(pen.letter || '').toLowerCase();
-  return /nursery|kid|kids|lamb|lambs/i.test(nameStr) || letterStr === 'n' || /^n$/i.test(nameStr);
+  return pen.is_nursery === true || pen.isNursery === true;
 }
 
 export async function addBarnArea(areaData) {
