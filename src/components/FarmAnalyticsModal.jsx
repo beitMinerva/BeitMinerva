@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, X, TrendingUp, Milk, Wheat, DollarSign, Activity, Award, BarChart2, PieChart, Sliders, Calendar } from 'lucide-react';
-import { getPenMilkEntries, getPenFeedingEntries, getTimelineEvents, getBeirutDateString } from '../services/goatService';
+import { getPenMilkEntries, getPenFeedingEntries, getTimelineEvents, getBeirutDateString, isNurseryPenCheck } from '../services/goatService';
 
 // Standalone helper function for daily feed carryover calculation (exported for testing)
 export function calculateDailyFeedCarryover({
