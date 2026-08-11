@@ -40,6 +40,14 @@ export async function getBarnAreas() {
   return [];
 }
 
+export function isNurseryPenCheck(pen) {
+  if (!pen) return false;
+  if (pen.is_nursery === true || pen.isNursery === true) return true;
+  const nameStr = String(pen.name || '').toLowerCase();
+  const letterStr = String(pen.letter || '').toLowerCase();
+  return /nursery|kid|kids|lamb|lambs/i.test(nameStr) || letterStr === 'n' || /^n$/i.test(nameStr);
+}
+
 export async function addBarnArea(areaData) {
   const currentAreas = await getBarnAreas();
   const nextLetter = String.fromCharCode(65 + currentAreas.length);
@@ -48,7 +56,8 @@ export async function addBarnArea(areaData) {
     id: areaData.id || makeId('ba'),
     letter: areaData.letter || nextLetter,
     name: areaData.name || `Pen ${areaData.letter || nextLetter}`,
-    order_index: areaData.order_index !== undefined ? areaData.order_index : currentAreas.length
+    order_index: areaData.order_index !== undefined ? areaData.order_index : currentAreas.length,
+    is_nursery: areaData.is_nursery || false
   };
 
   const { data, error } = await supabase.from('barn_areas').insert([newArea]).select().single();

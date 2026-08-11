@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles, Share2, Layers, Check, Info, Plus } from 'lucide-react';
+import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles, Share2, Layers, Check, Info, Plus, Milk } from 'lucide-react';
 import { parsePenFeeding } from './PenFeedingHistoryModal';
-import { getBeirutDateTimeString } from '../services/goatService';
+import { getBeirutDateTimeString, isNurseryPenCheck } from '../services/goatService';
 
 export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], onClose, onSave }) {
   const parsed = parsePenFeeding(pen?.feeding_info || pen?.note);
@@ -159,11 +159,15 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
     }
   };
 
+  const isNursery = isNurseryPenCheck(pen);
+
   const FEED_COMPONENTS = [
     {
       key: 'alpha',
-      label: 'Alpha',
-      subtitle: 'Alfalfa Hay',
+      label: isNursery ? 'Milk' : 'Alpha',
+      subtitle: isNursery ? 'Milk / Milk Replacer' : 'Alfalfa Hay',
+      unit: isNursery ? 'L' : 'kg',
+      priceUnit: isNursery ? '/L' : '/kg',
       kg: alphaKg,
       setKg: setAlphaKg,
       price: alphaPricePerKg,
@@ -172,8 +176,10 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
     },
     {
       key: 'mixedGrains',
-      label: 'Mixed Grains',
-      subtitle: 'Grain & Pellets',
+      label: isNursery ? 'Starter Grains' : 'Mixed Grains',
+      subtitle: isNursery ? 'Kid Starter Feed & Pellets' : 'Grain & Pellets',
+      unit: 'kg',
+      priceUnit: '/kg',
       kg: mixedGrainsKg,
       setKg: setMixedGrainsKg,
       price: mixedGrainsPricePerKg,
@@ -182,8 +188,10 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
     },
     {
       key: 'straw',
-      label: 'Straw',
+      label: isNursery ? 'Straw / Hay' : 'Straw',
       subtitle: 'Roughage Straw',
+      unit: 'kg',
+      priceUnit: '/kg',
       kg: strawKg,
       setKg: setStrawKg,
       price: strawPricePerKg,
@@ -192,7 +200,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
     }
   ];
 
-  const otherBarnPens = allBarnPens.filter(p => p.id !== pen?.id);
+  const otherBarnPens = allBarnPens.filter(p => p.id !== pen?.id && !isNurseryPenCheck(p));
 
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} onClick={handleClose} style={{ zIndex: 110, fontFamily: "'Outfit', sans-serif" }}>
@@ -241,8 +249,32 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
               />
             </div>
 
-            {/* SHARED TROUGH TOGGLE SECTION - PREMIUM CARD */}
-            {otherBarnPens.length > 0 && (
+            {/* NURSERY DEDICATED BANNER OR SHARED TROUGH TOGGLE */}
+            {isNursery ? (
+              <div
+                style={{
+                  background: '#f0f9ff',
+                  border: '1.5px solid #bae6fd',
+                  borderRadius: '14px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}
+              >
+                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#e0f2fe', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                  <Milk size={18} color="#0284c7" />
+                </div>
+                <div>
+                  <strong style={{ fontSize: '13px', color: '#0369a1', fontWeight: '800', display: 'block', lineHeight: 1.2 }}>
+                    Nursery Pen Feeding (Dedicated)
+                  </strong>
+                  <span style={{ fontSize: '11px', color: '#0284c7', fontWeight: '600' }}>
+                    Kids feeding uses Milk (L) & Starter Feed (kg). Dedicated pen feed (never shared).
+                  </span>
+                </div>
+              </div>
+            ) : otherBarnPens.length > 0 && (
               <div
                 style={{
                   background: isSharedTrough ? '#f0fdf4' : '#ffffff',
@@ -453,7 +485,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                       disabled={submitting}
                       style={{ fontSize: '12px', fontWeight: '700', padding: '4px 8px', height: '28px', width: '75px', background: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
                     />
-                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>kg/goat</span>
+                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>{isNursery ? 'L or kg/goat' : 'kg/goat'}</span>
                   </div>
                 </div>
 
@@ -467,7 +499,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                       {totalKgPen > 0 && (
                         <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', background: '#ecfdf5', padding: '2px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
                           {[
-                            totalAlpha > 0 ? `${((totalAlpha / totalKgPen) * 100).toFixed(0)}% Alpha` : null,
+                            totalAlpha > 0 ? `${((totalAlpha / totalKgPen) * 100).toFixed(0)}% ${isNursery ? 'Milk' : 'Alpha'}` : null,
                             totalMixed > 0 ? `${((totalMixed / totalKgPen) * 100).toFixed(0)}% Grains` : null,
                             totalStraw > 0 ? `${((totalStraw / totalKgPen) * 100).toFixed(0)}% Straw` : null,
                           ].filter(Boolean).join(' · ')}
@@ -478,17 +510,17 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                       {allocatedPenData[0].alphaAllocated > 0 && (
                         <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#f0fdf4', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '6px' }}>
-                          Alpha: {allocatedPenData[0].alphaAllocated} kg
+                          {isNursery ? 'Milk' : 'Alpha'}: {allocatedPenData[0].alphaAllocated} {isNursery ? 'L' : 'kg'}
                         </span>
                       )}
                       {allocatedPenData[0].mixedAllocated > 0 && (
                         <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#f0fdf4', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '6px' }}>
-                          Mixed Grains: {allocatedPenData[0].mixedAllocated} kg
+                          {isNursery ? 'Starter Grains' : 'Mixed Grains'}: {allocatedPenData[0].mixedAllocated} kg
                         </span>
                       )}
                       {allocatedPenData[0].strawAllocated > 0 && (
                         <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#f0fdf4', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '6px' }}>
-                          Straw: {allocatedPenData[0].strawAllocated} kg
+                          {isNursery ? 'Straw / Hay' : 'Straw'}: {allocatedPenData[0].strawAllocated} kg
                         </span>
                       )}
                     </div>
@@ -504,7 +536,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                   <Scale size={15} color="#059669" />
                   {isSharedTrough && activePens.length > 1
                     ? `Feed Components (Total put into Shared Trough)`
-                    : `Feed Components (Total kg for Pen ${pen?.letter})`}
+                    : `Feed Components (Pen ${pen?.letter})`}
                 </label>
               </div>
 
@@ -537,7 +569,23 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
                       <label style={{ fontSize: '11px', color: '#475569', fontWeight: '700', display: 'block', marginBottom: '3px' }}>
-                        {isSharedTrough && activePens.length > 1 ? 'Total Trough kg' : 'Total kg (Pen)'}
+                        {isSharedTrough && activePens.length > 1 ? `Total Trough ${comp.unit}` : `Total ${comp.unit} (Pen)`}
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        className="form-input"
+                        placeholder="e.g. 2.0"
+                        value={comp.kg}
+                        onChange={(e) => comp.setKg(e.target.value)}
+                        disabled={submitting}
+                        style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#475569', fontWeight: '700', display: 'block', marginBottom: '3px' }}>
+                        Price ({comp.priceUnit})
                       </label>
                       <input
                         type="number"

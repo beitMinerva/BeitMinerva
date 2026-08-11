@@ -4,6 +4,7 @@ import GoatCard from '../components/GoatCard';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import PenFeedingFormModal from '../components/PenFeedingFormModal';
 import PenFeedingHistoryModal from '../components/PenFeedingHistoryModal';
+import { isNurseryPenCheck } from '../services/goatService';
 
 export default function BarnSquareView({
   goats = [],
@@ -76,11 +77,13 @@ export default function BarnSquareView({
   const [editingPenId, setEditingPenId] = useState(null);
   const [editLetter, setEditLetter] = useState('');
   const [editName, setEditName] = useState('');
+  const [editIsNursery, setEditIsNursery] = useState(false);
 
   // Add New Pen Form State
   const [showAddForm, setShowAddForm] = useState(false);
   const [newLetter, setNewLetter] = useState('');
   const [newNote, setNewNote] = useState('');
+  const [newIsNursery, setNewIsNursery] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const selectedPen = pens.find((p) => p.id === selectedPenId) || pens[0];
@@ -151,6 +154,7 @@ export default function BarnSquareView({
     setEditingPenId(pen.id);
     setEditLetter(pen.letter);
     setEditName(pen.name || `Pen ${pen.letter}`);
+    setEditIsNursery(Boolean(pen.is_nursery || isNurseryPenCheck(pen)));
   };
 
   const handleSaveEdit = async (penId) => {
@@ -159,7 +163,8 @@ export default function BarnSquareView({
       if (onUpdateBarnArea) {
         await onUpdateBarnArea(penId, {
           letter: editLetter.trim().toUpperCase(),
-          name: editName.trim()
+          name: editName.trim(),
+          is_nursery: editIsNursery
         });
       }
       setEditingPenId(null);
@@ -189,11 +194,13 @@ export default function BarnSquareView({
         const letter = newLetter.trim().toUpperCase() || String.fromCharCode(65 + pens.length);
         await onAddBarnArea({
           letter,
-          name: newNote.trim() || `Pen ${letter}`
+          name: newNote.trim() || `Pen ${letter}`,
+          is_nursery: newIsNursery
         });
       }
       setNewLetter('');
       setNewNote('');
+      setNewIsNursery(false);
       setShowAddForm(false);
     } catch (err) {
       console.error(err);
@@ -593,22 +600,32 @@ export default function BarnSquareView({
                               style={{ flex: 1 }}
                             />
                           </div>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-xs"
-                              onClick={() => setEditingPenId(null)}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-primary btn-xs"
-                              onClick={() => handleSaveEdit(pen.id)}
-                              disabled={submitting}
-                            >
-                              {submitting ? <Loader2 size={12} className="spinner" /> : 'Save'}
-                            </button>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '700', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={editIsNursery}
+                                onChange={(e) => setEditIsNursery(e.target.checked)}
+                              />
+                              Nursery Pen (For Kids / Lambs — Milk Feed)
+                            </label>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-xs"
+                                onClick={() => setEditingPenId(null)}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-xs"
+                                onClick={() => handleSaveEdit(pen.id)}
+                                disabled={submitting}
+                              >
+                                {submitting ? <Loader2 size={12} className="spinner" /> : 'Save'}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ) : (
@@ -620,16 +637,23 @@ export default function BarnSquareView({
 
                             <div style={{
                               width: '34px', height: '34px', borderRadius: '10px',
-                              background: 'var(--primary-gradient)', display: 'grid', placeItems: 'center',
+                              background: isNurseryPenCheck(pen) ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : 'var(--primary-gradient)', display: 'grid', placeItems: 'center',
                               fontSize: '16px', fontWeight: '900', color: 'white'
                             }}>
                               {pen.letter}
                             </div>
 
                             <div style={{ minWidth: 0 }}>
-                              <strong style={{ fontSize: '13px', fontWeight: '800', display: 'block', lineHeight: 1.2 }}>
-                                {pen.name}
-                              </strong>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <strong style={{ fontSize: '13px', fontWeight: '800', display: 'block', lineHeight: 1.2 }}>
+                                  {pen.name}
+                                </strong>
+                                {isNurseryPenCheck(pen) && (
+                                  <span style={{ fontSize: '10px', fontWeight: '800', background: '#e0f2fe', color: '#0284c7', padding: '1px 6px', borderRadius: '4px' }}>
+                                    Nursery
+                                  </span>
+                                )}
+                              </div>
                               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                                 {count} {count === 1 ? 'goat' : 'goats'}
                               </span>
@@ -692,6 +716,15 @@ export default function BarnSquareView({
                       />
                     </div>
                   </div>
+
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={newIsNursery}
+                      onChange={(e) => setNewIsNursery(e.target.checked)}
+                    />
+                    Nursery Pen (For Kids / Lambs — Milk Feed)
+                  </label>
 
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
