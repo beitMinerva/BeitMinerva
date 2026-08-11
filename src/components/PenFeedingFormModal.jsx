@@ -464,10 +464,13 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                       <span style={{ fontSize: '11px', fontWeight: '700', color: '#334155' }}>
                         Expected Component Breakdown:
                       </span>
-                      {totalCostPen > 0 && (
+                      {totalKgPen > 0 && (
                         <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', background: '#ecfdf5', padding: '2px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
-                          Cost: ${(totalCostPen * (allocatedPenData[0].totalAllocatedKg / totalKgPen)).toFixed(2)}
-                          {primaryPenGoatCount > 0 ? ` ($${((totalCostPen * (allocatedPenData[0].totalAllocatedKg / totalKgPen)) / primaryPenGoatCount).toFixed(2)}/goat)` : ''}
+                          {[
+                            totalAlpha > 0 ? `${((totalAlpha / totalKgPen) * 100).toFixed(0)}% Alpha` : null,
+                            totalMixed > 0 ? `${((totalMixed / totalKgPen) * 100).toFixed(0)}% Grains` : null,
+                            totalStraw > 0 ? `${((totalStraw / totalKgPen) * 100).toFixed(0)}% Straw` : null,
+                          ].filter(Boolean).join(' · ')}
                         </span>
                       )}
                     </div>
