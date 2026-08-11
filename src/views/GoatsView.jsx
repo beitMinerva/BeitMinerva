@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Search, ClipboardPlus } from 'lucide-react';
+import { Search, ClipboardPlus, MapPin } from 'lucide-react';
 import GoatCard from '../components/GoatCard';
+import { isNurseryPenCheck } from '../services/goatService';
 
 export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, onOpenLogEvent }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedGender, setSelectedGender] = useState('All');
+  const [selectedPenId, setSelectedPenId] = useState('All');
 
   const statuses = ['All', 'Healthy', 'Under Treatment', 'Pregnant', 'Dry', 'Quarantine'];
   const genders = ['All', 'Female', 'Male', 'Other'];
@@ -17,6 +19,7 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, on
       (goat.breed || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = selectedStatus === 'All' || goat.status === selectedStatus;
+    const matchesPen = selectedPenId === 'All' || goat.area_id === selectedPenId;
 
     const matchesGender = (() => {
       if (selectedGender === 'All') return true;
@@ -27,7 +30,7 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, on
       return true;
     })();
 
-    return matchesSearch && matchesStatus && matchesGender;
+    return matchesSearch && matchesStatus && matchesGender && matchesPen;
   });
 
   return (
@@ -44,8 +47,61 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, on
         />
       </div>
 
-      {/* Gender & Status Filter Bar */}
+      {/* Filter Bar: Pen, Gender & Status */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {/* Pen Filter Pills */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+            <MapPin size={12} /> Pen:
+          </span>
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px', scrollbarWidth: 'none' }}>
+            <button
+              type="button"
+              onClick={() => setSelectedPenId('All')}
+              style={{
+                borderRadius: '20px',
+                fontSize: '11px',
+                padding: '4px 12px',
+                fontWeight: selectedPenId === 'All' ? '800' : '600',
+                border: selectedPenId === 'All' ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                background: selectedPenId === 'All' ? 'var(--primary-light)' : '#ffffff',
+                color: selectedPenId === 'All' ? 'var(--primary-dark)' : 'var(--text-main)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              All Pens
+            </button>
+            {barnAreas.map((area) => {
+              const isSelected = selectedPenId === area.id;
+              const isNur = isNurseryPenCheck(area);
+              const count = goats.filter(g => g.area_id === area.id).length;
+              return (
+                <button
+                  key={area.id}
+                  type="button"
+                  onClick={() => setSelectedPenId(area.id)}
+                  style={{
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    padding: '4px 12px',
+                    fontWeight: isSelected ? '800' : '600',
+                    border: isSelected ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                    background: isSelected ? 'var(--primary-light)' : '#ffffff',
+                    color: isSelected ? 'var(--primary-dark)' : 'var(--text-main)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Pen {area.letter} ({count}) {isNur ? '🌱' : ''}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Gender Filter Pills */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
