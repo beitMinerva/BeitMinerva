@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles, Share2, Check } from 'lucide-react';
+import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles, Share2, Layers, Check, Info } from 'lucide-react';
 import { parsePenFeeding } from './PenFeedingHistoryModal';
 import { getBeirutDateTimeString } from '../services/goatService';
 
@@ -208,16 +208,16 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
       >
         {/* HEADER */}
         <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#ecfdf5', border: '1px solid #a7f3d0', display: 'grid', placeItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#ecfdf5', border: '1px solid #a7f3d0', display: 'grid', placeItems: 'center' }}>
               <Wheat size={18} color="#047857" />
             </div>
             <div>
               <h2 className="modal-title" style={{ fontSize: '17px', fontFamily: "'Outfit', sans-serif", margin: 0, fontWeight: '800' }}>
                 Log Pen Feeding — Pen {pen?.letter}
               </h2>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Users size={11} /> {primaryPenGoatCount} goats in Pen {pen?.letter}
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                <Users size={12} color="#047857" /> {primaryPenGoatCount} goats in Pen {pen?.letter}
                 {isSharedTrough && activePens.length > 1 && ` · (${totalGroupGoats} total in ${activePens.length} shared pens)`}
               </span>
             </div>
@@ -281,8 +281,8 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
 
                 {isSharedTrough && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '4px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
-                      Select other pens sharing this feeder trough. Feed will be allocated proportionally based on target rates & headcounts.
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Info size={13} color="var(--primary)" /> Select pens sharing this feeder trough to allocate feed proportionally.
                     </p>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -439,7 +439,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Sparkles size={14} color="var(--primary)" />
-                      {isSharedTrough && activePens.length > 1 ? 'Total Trough Dump:' : 'Pen Total Feed:'}
+                      {isSharedTrough && activePens.length > 1 ? 'Total Trough Feed:' : 'Pen Total Feed:'}
                     </span>
                     <strong style={{ fontSize: '16px', fontWeight: '900', color: 'var(--primary-dark)' }}>
                       {totalKgPen.toFixed(1)} kg {totalCostPen > 0 && `· $${totalCostPen.toFixed(2)}`}
@@ -457,8 +457,8 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                     )
                   ) : (
                     <div style={{ borderTop: '1px dashed #a7f3d0', paddingTop: '6px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857' }}>
-                        Proportional Feed Allocation Breakdown ({totalGroupGoats} total goats):
+                      <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Layers size={13} color="#047857" /> Proportional Feed Allocation ({totalGroupGoats} total goats):
                       </span>
                       {allocatedPenData.map(item => (
                         <div key={item.pen.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>

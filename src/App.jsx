@@ -74,7 +74,7 @@ export default function App() {
 
   const requireAdmin = (actionFn) => {
     if (!session) {
-      showToast('🔒 Please sign in as Admin to perform this action.');
+      showToast('Please sign in as Admin to perform this action.');
       setShowLoginModal(true);
       return false;
     }
@@ -161,7 +161,7 @@ export default function App() {
       setShowAddGoatModal(false);
       setGoatToEdit(null);
     } catch (err) {
-      showToast(`❌ Error: ${err.message}`);
+      showToast(`Error: ${err.message}`);
     }
   };
 
@@ -172,7 +172,7 @@ export default function App() {
       setSelectedGoat(null);
       await loadData();
     } catch (err) {
-      showToast(`❌ Error: ${err.message}`);
+      showToast(`Error: ${err.message}`);
     }
   };
 
@@ -240,7 +240,7 @@ export default function App() {
       showToast(`Saved pen milk entry (${amountLiters.toFixed(1)} L).`);
       return created;
     } catch (err) {
-      showToast(`❌ Error: ${err.message}`);
+      showToast(`Error: ${err.message}`);
       throw err;
     }
   };
@@ -251,7 +251,7 @@ export default function App() {
       setPenMilkEntries((prev) => prev.filter((item) => item.id !== entryId));
       showToast('Deleted pen milk entry.');
     } catch (err) {
-      showToast(`❌ Error: ${err.message}`);
+      showToast(`Error: ${err.message}`);
       throw err;
     }
   };
@@ -317,7 +317,7 @@ export default function App() {
       showToast('Saved pen feeding entry.');
       return created;
     } catch (err) {
-      showToast(`❌ Error: ${err.message}`);
+      showToast(`Error: ${err.message}`);
       throw err;
     }
   };
@@ -328,7 +328,7 @@ export default function App() {
       setPenFeedingEntries((prev) => prev.filter((item) => item.id !== entryId));
       showToast('Deleted pen feeding entry.');
     } catch (err) {
-      showToast(`❌ Error: ${err.message}`);
+      showToast(`Error: ${err.message}`);
       throw err;
     }
   };
