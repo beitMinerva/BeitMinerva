@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { X, Wheat, Scale, Clock, Sparkles, History, Calendar, Milk, TrendingUp, Filter, Pencil, Trash2, Loader2, FileText } from 'lucide-react';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { isMilkingEvent, getEventMetricValue } from '../utils/metricEventUtils';
-import { getBeirutDateTimeString, formatBeirutDisplay, isNurseryPenCheck } from '../services/goatService';
+import { getBeirutDateTimeString, getBeirutDateString, formatBeirutDisplay, isNurseryPenCheck } from '../services/goatService';
 
 export function parsePenFeeding(infoStr) {
   if (!infoStr) {
@@ -609,7 +609,7 @@ export default function PenFeedingHistoryModal({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <strong style={{ fontSize: '14px', color: 'var(--text-main)' }}>
-                    {currentRation.food_type}
+                    {(currentRation.food_type || '').replace(/\bAlpha\b/gi, isNurseryPenCheck(pen) ? 'Milk' : 'Alpha')}
                   </strong>
                   {currentRation.daily_weight && (
                     <span style={{ fontSize: '11px', fontWeight: '800', background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '2px 8px', borderRadius: '9999px' }}>
@@ -620,7 +620,7 @@ export default function PenFeedingHistoryModal({
 
                 {currentRation.composition && (
                   <div style={{ fontSize: '11px', background: '#ffffff', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>
-                    <strong>Composition:</strong> {currentRation.composition}
+                    <strong>Composition:</strong> {(currentRation.composition || '').replace(/\bAlpha\b/gi, isNurseryPenCheck(pen) ? 'Milk' : 'Alpha')}
                   </div>
                 )}
 
