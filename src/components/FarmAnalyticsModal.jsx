@@ -2,6 +2,112 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, X, TrendingUp, Milk, Wheat, DollarSign, Activity, Award, BarChart2, PieChart, Sliders, Calendar } from 'lucide-react';
 import { getPenMilkEntries, getPenFeedingEntries, getTimelineEvents, getBeirutDateString } from '../services/goatService';
 
+// Standalone helper function for daily feed carryover calculation (exported for testing)
+export function calculateDailyFeedCarryover({
+  feedingEntries = [],
+  barnAreas = [],
+  timeRange = '30',
+  customStartDate = '',
+  customEndDate = '',
+  alphaPricePerKg = 0.55,
+  mixedGrainsPricePerKg = 0.40,
+  strawPricePerKg = 0.20
+}) {
+  if (!feedingEntries || feedingEntries.length === 0) {
+    return { totalFeedKg: 0, totalFeedCost: 0, penFeedPerformanceMap: {}, totalRangeDays: 1 };
+  }
+
+  const getFeedKg = (e) => {
+    const alphaKg = parseFloat(e.alpha_kg) || 0;
+    const mixedKg = parseFloat(e.mixed_grains_kg) || 0;
+    const strawKg = parseFloat(e.straw_kg) || 0;
+    if (alphaKg > 0 || mixedKg > 0 || strawKg > 0) {
+      return alphaKg + mixedKg + strawKg;
+    }
+    if (parseFloat(e.total_weight) > 0) {
+      return parseFloat(e.total_weight);
+    }
+    const perHead = parseFloat(e.daily_weight) || 0;
+    const count = parseFloat(e.goat_count) || 1;
+    return perHead * count;
+  };
+
+  const getFeedEntryCost = (e) => {
+    const alphaKg = parseFloat(e.alpha_kg) || 0;
+    const alphaPrice = parseFloat(e.alpha_price_per_kg) || parseFloat(alphaPricePerKg) || 0;
+    const mixedKg = parseFloat(e.mixed_grains_kg) || 0;
+    const mixedPrice = parseFloat(e.mixed_grains_price_per_kg) || parseFloat(mixedGrainsPricePerKg) || 0;
+    const strawKg = parseFloat(e.straw_kg) || 0;
+    const strawPrice = parseFloat(e.straw_price_per_kg) || parseFloat(strawPricePerKg) || 0;
+
+    const hasComponents = alphaKg > 0 || mixedKg > 0 || strawKg > 0;
+    if (hasComponents) {
+      return (alphaKg * alphaPrice + mixedKg * mixedPrice + strawKg * strawPrice);
+    }
+    const totalKg = getFeedKg(e);
+    const avgPrice = ((parseFloat(alphaPricePerKg)||0.55) + (parseFloat(mixedGrainsPricePerKg)||0.40) + (parseFloat(strawPricePerKg)||0.20)) / 3;
+    return (totalKg * avgPrice);
+  };
+
+  const end = timeRange === 'custom' && customEndDate ? new Date(customEndDate) : new Date();
+  end.setHours(23, 59, 59, 999);
+
+  let start = new Date(end);
+  if (timeRange === 'custom' && customStartDate) {
+    start = new Date(customStartDate);
+  } else if (timeRange === 'all') {
+    const earliest = feedingEntries.reduce((earliestDate, entry) => {
+      const d = new Date(entry.date);
+      return d < earliestDate ? d : earliestDate;
+    }, new Date());
+    start = earliest;
+  } else {
+    const days = parseInt(timeRange) || 30;
+    start.setDate(start.getDate() - (days - 1));
+  }
+  start.setHours(0, 0, 0, 0);
+
+  const dayList = [];
+  let curr = new Date(start);
+  while (curr <= end) {
+    dayList.push(new Date(curr));
+    curr.setDate(curr.getDate() + 1);
+  }
+
+  const sortedEntries = [...feedingEntries].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const allPens = barnAreas.length > 0 ? barnAreas : Array.from(new Set(feedingEntries.map(e => e.barn_area_id))).map(id => ({ id }));
+
+  let grandTotalKg = 0;
+  let grandTotalCost = 0;
+  const penMap = {};
+  allPens.forEach(p => { penMap[p.id] = { feedKg: 0, feedCost: 0, daysCount: 0 }; });
+
+  dayList.forEach(day => {
+    const dayEnd = new Date(day);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    allPens.forEach(p => {
+      const penEntries = sortedEntries.filter(e => e.barn_area_id === p.id && new Date(e.date) <= dayEnd);
+      const activeEntry = penEntries[penEntries.length - 1];
+
+      if (activeEntry) {
+        const kg = getFeedKg(activeEntry);
+        const cost = getFeedEntryCost(activeEntry);
+        grandTotalKg += kg;
+        grandTotalCost += cost;
+
+        if (penMap[p.id]) {
+          penMap[p.id].feedKg += kg;
+          penMap[p.id].feedCost += cost;
+          penMap[p.id].daysCount += 1;
+        }
+      }
+    });
+  });
+
+  return { totalFeedKg: grandTotalKg, totalFeedCost: grandTotalCost, penFeedPerformanceMap: penMap, totalRangeDays: Math.max(1, dayList.length) };
+}
+
 export default function FarmAnalyticsModal({
   goats = [],
   barnAreas = [],
@@ -124,103 +230,18 @@ export default function FarmAnalyticsModal({
   const dailyAverageMilk = totalMilkVolume / activeMilkingDays;
   const milkYieldPerActiveDoe = dailyAverageMilk / Math.max(1, milkingDoeCount);
 
-  // 2. FEED CONSUMPTION & DYNAMIC COST METRICS
   // 2. FEED CONSUMPTION & DYNAMIC CUMULATIVE CARRYOVER METRICS
-  const getFeedKg = (e) => {
-    const alphaKg = parseFloat(e.alpha_kg) || 0;
-    const mixedKg = parseFloat(e.mixed_grains_kg) || 0;
-    const strawKg = parseFloat(e.straw_kg) || 0;
-    if (alphaKg > 0 || mixedKg > 0 || strawKg > 0) {
-      return alphaKg + mixedKg + strawKg;
-    }
-    if (parseFloat(e.total_weight) > 0) {
-      return parseFloat(e.total_weight);
-    }
-    const perHead = parseFloat(e.daily_weight) || 0;
-    const count = parseFloat(e.goat_count) || 1;
-    return perHead * count;
-  };
-
-  const getFeedEntryCost = (e) => {
-    const alphaKg = parseFloat(e.alpha_kg) || 0;
-    const alphaPrice = parseFloat(e.alpha_price_per_kg) || parseFloat(alphaPricePerKg) || 0;
-    const mixedKg = parseFloat(e.mixed_grains_kg) || 0;
-    const mixedPrice = parseFloat(e.mixed_grains_price_per_kg) || parseFloat(mixedGrainsPricePerKg) || 0;
-    const strawKg = parseFloat(e.straw_kg) || 0;
-    const strawPrice = parseFloat(e.straw_price_per_kg) || parseFloat(strawPricePerKg) || 0;
-
-    const hasComponents = alphaKg > 0 || mixedKg > 0 || strawKg > 0;
-    if (hasComponents) {
-      return (alphaKg * alphaPrice + mixedKg * mixedPrice + strawKg * strawPrice);
-    }
-    const totalKg = getFeedKg(e);
-    const avgPrice = ((parseFloat(alphaPricePerKg)||0.55) + (parseFloat(mixedGrainsPricePerKg)||0.40) + (parseFloat(strawPricePerKg)||0.20)) / 3;
-    return (totalKg * avgPrice);
-  };
-
-  // Compute daily cumulative feed carryover for each day in selected date range
   const { totalFeedKg, totalFeedCost, penFeedPerformanceMap, totalRangeDays } = React.useMemo(() => {
-    if (!feedingEntries || feedingEntries.length === 0) {
-      return { totalFeedKg: 0, totalFeedCost: 0, penFeedPerformanceMap: {}, totalRangeDays: 1 };
-    }
-
-    const end = timeRange === 'custom' && customEndDate ? new Date(customEndDate) : new Date();
-    end.setHours(23, 59, 59, 999);
-
-    let start = new Date(end);
-    if (timeRange === 'custom' && customStartDate) {
-      start = new Date(customStartDate);
-    } else if (timeRange === 'all') {
-      const earliest = feedingEntries.reduce((earliestDate, entry) => {
-        const d = new Date(entry.date);
-        return d < earliestDate ? d : earliestDate;
-      }, new Date());
-      start = earliest;
-    } else {
-      const days = parseInt(timeRange) || 30;
-      start.setDate(start.getDate() - (days - 1));
-    }
-    start.setHours(0, 0, 0, 0);
-
-    const dayList = [];
-    let curr = new Date(start);
-    while (curr <= end) {
-      dayList.push(new Date(curr));
-      curr.setDate(curr.getDate() + 1);
-    }
-
-    const sortedEntries = [...feedingEntries].sort((a, b) => new Date(a.date) - new Date(b.date));
-    const allPens = barnAreas.length > 0 ? barnAreas : Array.from(new Set(feedingEntries.map(e => e.barn_area_id))).map(id => ({ id }));
-
-    let grandTotalKg = 0;
-    let grandTotalCost = 0;
-    const penMap = {};
-    allPens.forEach(p => { penMap[p.id] = { feedKg: 0, feedCost: 0, daysCount: 0 }; });
-
-    dayList.forEach(day => {
-      const dayEnd = new Date(day);
-      dayEnd.setHours(23, 59, 59, 999);
-
-      allPens.forEach(p => {
-        const penEntries = sortedEntries.filter(e => e.barn_area_id === p.id && new Date(e.date) <= dayEnd);
-        const activeEntry = penEntries[penEntries.length - 1];
-
-        if (activeEntry) {
-          const kg = getFeedKg(activeEntry);
-          const cost = getFeedEntryCost(activeEntry);
-          grandTotalKg += kg;
-          grandTotalCost += cost;
-
-          if (penMap[p.id]) {
-            penMap[p.id].feedKg += kg;
-            penMap[p.id].feedCost += cost;
-            penMap[p.id].daysCount += 1;
-          }
-        }
-      });
+    return calculateDailyFeedCarryover({
+      feedingEntries,
+      barnAreas,
+      timeRange,
+      customStartDate,
+      customEndDate,
+      alphaPricePerKg,
+      mixedGrainsPricePerKg,
+      strawPricePerKg
     });
-
-    return { totalFeedKg: grandTotalKg, totalFeedCost: grandTotalCost, penFeedPerformanceMap: penMap, totalRangeDays: Math.max(1, dayList.length) };
   }, [feedingEntries, barnAreas, timeRange, customStartDate, customEndDate, alphaPricePerKg, mixedGrainsPricePerKg, strawPricePerKg]);
 
   const feedCostPerLiter = totalMilkVolume > 0 ? (totalFeedCost / totalMilkVolume).toFixed(2) : '0.00';
