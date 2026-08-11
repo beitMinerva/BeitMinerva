@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles, Share2, Layers, Check, Info } from 'lucide-react';
+import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles, Share2, Layers, Check, Info, Plus } from 'lucide-react';
 import { parsePenFeeding } from './PenFeedingHistoryModal';
 import { getBeirutDateTimeString } from '../services/goatService';
 
@@ -204,20 +204,20 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
       <div
         className={`modal-content ${isClosing ? 'closing' : ''}`}
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '500px', width: '100%', padding: '18px', borderRadius: '16px', fontFamily: "'Outfit', sans-serif" }}
+        style={{ maxWidth: '520px', width: '100%', padding: '20px', borderRadius: '18px', fontFamily: "'Outfit', sans-serif" }}
       >
         {/* HEADER */}
-        <div className="modal-header">
+        <div className="modal-header" style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#ecfdf5', border: '1px solid #a7f3d0', display: 'grid', placeItems: 'center' }}>
-              <Wheat size={18} color="#047857" />
+            <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#ecfdf5', border: '1.5px solid #a7f3d0', display: 'grid', placeItems: 'center' }}>
+              <Wheat size={20} color="#047857" />
             </div>
             <div>
-              <h2 className="modal-title" style={{ fontSize: '17px', fontFamily: "'Outfit', sans-serif", margin: 0, fontWeight: '800' }}>
+              <h2 className="modal-title" style={{ fontSize: '18px', fontFamily: "'Outfit', sans-serif", margin: 0, fontWeight: '800', color: '#0f172a' }}>
                 Log Pen Feeding — Pen {pen?.letter}
               </h2>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                <Users size={12} color="#047857" /> {primaryPenGoatCount} goats in Pen {pen?.letter}
+              <span style={{ fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', fontWeight: '600' }}>
+                <Users size={13} color="#059669" /> {primaryPenGoatCount} goats in Pen {pen?.letter}
                 {isSharedTrough && activePens.length > 1 && ` · (${totalGroupGoats} total in ${activePens.length} shared pens)`}
               </span>
             </div>
@@ -228,12 +228,12 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
         </div>
 
         <form onSubmit={handleSaveRation}>
-          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
             {/* DATE & TIME */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Clock size={14} color="var(--primary)" /> Date & Time (Beirut Time) *
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '700', color: '#334155' }}>
+                <Clock size={14} color="#059669" /> Date & Time (Beirut Time) *
               </label>
               <input
                 type="datetime-local"
@@ -242,50 +242,81 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                 onChange={(e) => setFeedingDate(e.target.value)}
                 required
                 disabled={submitting}
+                style={{ fontWeight: '600' }}
               />
             </div>
 
-            {/* SHARED TROUGH TOGGLE SECTION */}
+            {/* SHARED TROUGH TOGGLE SECTION - PREMIUM CARD */}
             {otherBarnPens.length > 0 && (
               <div
                 style={{
-                  background: isSharedTrough ? '#f0fdf4' : '#f8fafc',
-                  border: isSharedTrough ? '1.5px solid var(--primary-border)' : '1px solid var(--border-color)',
-                  borderRadius: '12px',
-                  padding: '10px 12px',
+                  background: isSharedTrough ? '#f0fdf4' : '#ffffff',
+                  border: isSharedTrough ? '2px solid #059669' : '1.5px solid #e2e8f0',
+                  borderRadius: '14px',
+                  padding: '12px 14px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px',
+                  gap: '10px',
+                  boxShadow: isSharedTrough ? '0 4px 12px rgba(5,150,105,0.08)' : '0 1px 3px rgba(0,0,0,0.04)',
                   transition: 'all 0.15s ease'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Share2 size={15} color={isSharedTrough ? 'var(--primary-dark)' : 'var(--text-muted)'} />
-                    <strong style={{ fontSize: '13px', fontWeight: '800', color: isSharedTrough ? 'var(--primary-dark)' : 'var(--text-main)' }}>
-                      Shared Feed Trough
-                    </strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: isSharedTrough ? '#dcfce7' : '#f1f5f9', display: 'grid', placeItems: 'center' }}>
+                      <Share2 size={16} color={isSharedTrough ? '#047857' : '#64748b'} />
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', display: 'block', lineHeight: 1.2 }}>
+                        Shared Feed Trough
+                      </strong>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>
+                        Feed multiple pens sharing the same trough
+                      </span>
+                    </div>
                   </div>
 
-                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '6px', fontSize: '11px', fontWeight: '700', color: 'var(--primary-dark)' }}>
-                    <input
-                      type="checkbox"
-                      checked={isSharedTrough}
-                      onChange={(e) => setIsSharedTrough(e.target.checked)}
-                      disabled={submitting}
-                      style={{ width: '16px', height: '16px', accentColor: '#059669', cursor: 'pointer' }}
+                  {/* VISUALLY VIBRANT TOGGLE SWITCH */}
+                  <button
+                    type="button"
+                    onClick={() => setIsSharedTrough(!isSharedTrough)}
+                    disabled={submitting}
+                    style={{
+                      background: isSharedTrough ? '#059669' : '#cbd5e1',
+                      border: 'none',
+                      borderRadius: '9999px',
+                      width: '46px',
+                      height: '26px',
+                      padding: '3px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      transition: 'all 0.2s ease',
+                      flexShrink: 0
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        background: '#ffffff',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                        transform: isSharedTrough ? 'translateX(20px)' : 'translateX(0)',
+                        transition: 'transform 0.2s ease'
+                      }}
                     />
-                    <span>{isSharedTrough ? 'Shared Active' : 'Enable Shared Trough'}</span>
-                  </label>
+                  </button>
                 </div>
 
                 {isSharedTrough && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '4px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Info size={13} color="var(--primary)" /> Select pens sharing this feeder trough to allocate feed proportionally.
-                    </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '4px', borderTop: '1px solid #dcfce7' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#047857', fontSize: '11px', fontWeight: '700' }}>
+                      <Info size={13} color="#059669" /> Select pens sharing this trough to auto-calculate proportional feed shares:
+                    </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {/* VIBRANT INTERACTIVE PEN CARDS */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {allBarnPens.map(p => {
                         const count = goats.filter(g => g.area_id === p.id).length;
                         const isPrimary = p.id === pen?.id;
@@ -295,45 +326,73 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                         return (
                           <div
                             key={p.id}
+                            onClick={() => !isPrimary && handleToggleSharedPen(p.id)}
                             style={{
-                              background: isSelected ? '#ffffff' : 'rgba(255,255,255,0.6)',
-                              border: isSelected ? '1px solid #a7f3d0' : '1px solid var(--border-color)',
-                              borderRadius: '10px',
-                              padding: '8px 10px',
+                              background: '#ffffff',
+                              border: isSelected ? '2px solid #059669' : '1.5px solid #e2e8f0',
+                              borderRadius: '12px',
+                              padding: '10px 12px',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '6px'
+                              gap: '8px',
+                              cursor: isPrimary ? 'default' : 'pointer',
+                              boxShadow: isSelected ? '0 2px 8px rgba(5,150,105,0.08)' : 'none',
+                              transition: 'all 0.15s ease'
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isPrimary ? 'default' : 'pointer', flex: 1 }}>
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => handleToggleSharedPen(p.id)}
-                                  disabled={isPrimary || submitting}
-                                  style={{ accentColor: '#059669' }}
-                                />
-                                <div>
-                                  <strong style={{ fontSize: '12px', color: 'var(--text-main)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                {/* CUSTOM VIBRANT CHECKBOX BUTTON */}
+                                <div
+                                  style={{
+                                    width: '22px',
+                                    height: '22px',
+                                    borderRadius: '7px',
+                                    background: isSelected ? '#059669' : '#ffffff',
+                                    border: isSelected ? '2px solid #059669' : '2px solid #cbd5e1',
+                                    display: 'grid',
+                                    placeItems: 'center',
+                                    transition: 'all 0.15s ease',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  {isSelected ? (
+                                    <Check size={14} color="#ffffff" strokeWidth={3} />
+                                  ) : (
+                                    <Plus size={12} color="#94a3b8" strokeWidth={2.5} />
+                                  )}
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <strong style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a' }}>
                                     Pen {p.letter} {p.name && p.name !== `Pen ${p.letter}` ? `(${p.name})` : ''}
                                   </strong>
-                                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '6px' }}>
-                                    {count} goats
-                                  </span>
+
+                                  {isPrimary ? (
+                                    <span style={{ fontSize: '10px', fontWeight: '800', background: '#dcfce7', color: '#047857', padding: '1px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                                      Current Pen
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
+                                      {count} {count === 1 ? 'goat' : 'goats'}
+                                    </span>
+                                  )}
                                 </div>
-                              </label>
+                              </div>
 
                               {isSelected && allocatedInfo && (
-                                <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', background: '#ecfdf5', padding: '2px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                                <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', background: '#ecfdf5', padding: '3px 9px', borderRadius: '6px', border: '1.5px solid #a7f3d0' }}>
                                   {(allocatedInfo.ratio * 100).toFixed(1)}% Share
                                 </span>
                               )}
                             </div>
 
                             {isSelected && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '22px' }}>
-                                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '32px', borderTop: '1px dashed #f1f5f9', paddingTop: '6px' }}
+                              >
+                                <label style={{ fontSize: '11px', color: '#475569', fontWeight: '700', whiteSpace: 'nowrap' }}>
                                   Target Rate:
                                 </label>
                                 <input
@@ -345,9 +404,9 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                                   value={targetRates[p.id] !== undefined ? targetRates[p.id] : '2.5'}
                                   onChange={(e) => handleTargetRateChange(p.id, e.target.value)}
                                   disabled={submitting}
-                                  style={{ fontSize: '11px', padding: '3px 6px', height: '26px', width: '70px' }}
+                                  style={{ fontSize: '12px', fontWeight: '700', padding: '4px 8px', height: '28px', width: '75px', background: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
                                 />
-                                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>kg/goat target</span>
+                                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>kg/goat target</span>
                               </div>
                             )}
                           </div>
@@ -360,10 +419,10 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
             )}
 
             {/* FEED COMPONENTS CARDS */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px', margin: 0 }}>
-                  <Scale size={14} color="var(--primary)" />
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0, fontWeight: '700', color: '#334155' }}>
+                  <Scale size={15} color="#059669" />
                   {isSharedTrough && activePens.length > 1
                     ? `Feed Components (Total put into Shared Trough)`
                     : `Feed Components (Total kg for Pen ${pen?.letter})`}
@@ -375,30 +434,30 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                   key={comp.key}
                   style={{
                     background: '#ffffff',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '12px',
-                    padding: '10px 12px',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '14px',
+                    padding: '12px 14px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '6px'
+                    gap: '8px'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <strong style={{ fontSize: '13px', color: 'var(--text-main)', fontWeight: '800' }}>{comp.label}</strong>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>({comp.subtitle})</span>
+                      <strong style={{ fontSize: '14px', color: '#0f172a', fontWeight: '800' }}>{comp.label}</strong>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>({comp.subtitle})</span>
                     </div>
 
                     {comp.totalKg > 0 && Number(comp.price) > 0 && (
-                      <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-dark)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--primary-border)' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', background: '#ecfdf5', padding: '2px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
                         ${(comp.totalKg * Number(comp.price)).toFixed(2)}
                       </span>
                     )}
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
-                      <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
+                      <label style={{ fontSize: '11px', color: '#475569', fontWeight: '700', display: 'block', marginBottom: '3px' }}>
                         {isSharedTrough && activePens.length > 1 ? 'Total Trough kg' : 'Total kg (Pen)'}
                       </label>
                       <input
@@ -410,11 +469,11 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                         value={comp.kg}
                         onChange={(e) => comp.setKg(e.target.value)}
                         disabled={submitting}
-                        style={{ fontSize: '13px' }}
+                        style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
+                      <label style={{ fontSize: '11px', color: '#475569', fontWeight: '700', display: 'block', marginBottom: '3px' }}>
                         Price ($/kg)
                       </label>
                       <input
@@ -426,7 +485,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                         value={comp.price}
                         onChange={(e) => comp.setPrice(e.target.value)}
                         disabled={submitting}
-                        style={{ fontSize: '13px' }}
+                        style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}
                       />
                     </div>
                   </div>
@@ -435,37 +494,37 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
 
               {/* PEN TOTAL & ALLOCATION SUMMARY CARD */}
               {totalKgPen > 0 && (
-                <div style={{ background: '#f0fdf4', border: '1.5px solid var(--primary-border)', borderRadius: '12px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ background: '#f0fdf4', border: '2px solid #a7f3d0', borderRadius: '14px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Sparkles size={14} color="var(--primary)" />
+                    <span style={{ fontSize: '13px', fontWeight: '800', color: '#047857', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Sparkles size={15} color="#059669" />
                       {isSharedTrough && activePens.length > 1 ? 'Total Trough Feed:' : 'Pen Total Feed:'}
                     </span>
-                    <strong style={{ fontSize: '16px', fontWeight: '900', color: 'var(--primary-dark)' }}>
+                    <strong style={{ fontSize: '17px', fontWeight: '900', color: '#047857' }}>
                       {totalKgPen.toFixed(1)} kg {totalCostPen > 0 && `· $${totalCostPen.toFixed(2)}`}
                     </strong>
                   </div>
 
                   {!isSharedTrough || activePens.length <= 1 ? (
                     primaryPenGoatCount > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#475569', fontWeight: '600' }}>
                         <span>Per goat ({primaryPenGoatCount} goats):</span>
-                        <strong style={{ color: 'var(--primary-dark)' }}>
+                        <strong style={{ color: '#047857', fontWeight: '800' }}>
                           {perHeadKgPrimary.toFixed(2)} kg/head {perHeadCostPrimary > 0 && `· $${perHeadCostPrimary.toFixed(3)}/head`}
                         </strong>
                       </div>
                     )
                   ) : (
-                    <div style={{ borderTop: '1px dashed #a7f3d0', paddingTop: '6px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Layers size={13} color="#047857" /> Proportional Feed Allocation ({totalGroupGoats} total goats):
+                    <div style={{ borderTop: '1px dashed #a7f3d0', paddingTop: '8px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: '#047857', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Layers size={14} color="#047857" /> Proportional Feed Allocation ({totalGroupGoats} total goats):
                       </span>
                       {allocatedPenData.map(item => (
-                        <div key={item.pen.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
-                          <span>
-                            <strong>Pen {item.pen.letter}</strong> ({item.count} goats @ {item.targetRate} kg target):
+                        <div key={item.pen.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                          <span style={{ color: '#334155', fontWeight: '600' }}>
+                            <strong style={{ color: '#0f172a' }}>Pen {item.pen.letter}</strong> ({item.count} goats @ {item.targetRate} kg target):
                           </span>
-                          <strong style={{ color: '#047857' }}>
+                          <strong style={{ color: '#047857', fontWeight: '800' }}>
                             {item.totalAllocatedKg.toFixed(2)} kg ({(item.ratio * 100).toFixed(1)}%) {item.perHeadKg ? `· ${item.perHeadKg.toFixed(2)} kg/goat` : ''}
                           </strong>
                         </div>
@@ -478,8 +537,8 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
 
             {/* FEEDING SCHEDULE */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Clock size={14} color="var(--primary)" /> Feeding Schedule & Timing
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '700', color: '#334155' }}>
+                <Clock size={14} color="#059669" /> Feeding Schedule & Timing
               </label>
               <input
                 type="text"
@@ -488,13 +547,14 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                 value={schedule}
                 onChange={(e) => setSchedule(e.target.value)}
                 disabled={submitting}
+                style={{ fontWeight: '600' }}
               />
             </div>
 
             {/* SPECIAL NOTES */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <FileText size={14} color="var(--primary)" /> Special Notes & Instructions
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '700', color: '#334155' }}>
+                <FileText size={14} color="#059669" /> Special Notes & Instructions
               </label>
               <textarea
                 className="form-textarea"
@@ -503,15 +563,16 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 disabled={submitting}
+                style={{ fontWeight: '600' }}
               />
             </div>
           </div>
 
-          <div className="modal-footer" style={{ marginTop: '14px' }}>
-            <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={submitting}>
+          <div className="modal-footer" style={{ marginTop: '16px' }}>
+            <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={submitting} style={{ fontWeight: '700' }}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
+            <button type="submit" className="btn btn-primary" disabled={submitting} style={{ fontWeight: '800' }}>
               {submitting ? <Loader2 size={16} className="spinner" /> : (isSharedTrough && activePens.length > 1 ? `Save Shared Feed (${activePens.length} Pens)` : 'Save Feed Entry')}
             </button>
           </div>
