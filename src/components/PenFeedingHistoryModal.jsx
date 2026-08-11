@@ -546,12 +546,12 @@ export default function PenFeedingHistoryModal({
                               );
                             })()}
                             {(() => {
-                              const dest = item.destination || 'for_sale';
                               const destStyles = {
-                                for_sale: { label: '🏷️ Sale', color: '#15803d', bg: '#f0fdf4', border: '#a7f3d0' },
-                                home_use: { label: '🏠 Home', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-                                farm_use: { label: '🍼 Farm', color: '#b45309', bg: '#fffbeb', border: '#fde68a' }
+                                for_sale: { label: 'Sale', color: '#15803d', bg: '#f0fdf4', border: '#a7f3d0' },
+                                home_use: { label: 'Home Use', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+                                farm_use: { label: 'Farm Use', color: '#b45309', bg: '#fffbeb', border: '#fde68a' }
                               };
+                              const dest = item.destination || 'for_sale';
                               const style = destStyles[dest] || destStyles.for_sale;
                               return (
                                 <span style={{ fontSize: '9px', fontWeight: '800', color: style.color, background: style.bg, border: `1px solid ${style.border}`, borderRadius: '5px', padding: '1px 6px' }}>
@@ -880,9 +880,9 @@ export default function PenFeedingHistoryModal({
                 <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Milk Purpose (Financial Profit Option)</label>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {[
-                    { id: 'for_sale', label: '🏷️ For Sale', desc: 'Adds to Revenue' },
-                    { id: 'home_use', label: '🏠 Home Use', desc: 'No Revenue' },
-                    { id: 'farm_use', label: '🍼 Kid Feeding', desc: 'No Revenue' }
+                    { id: 'for_sale', label: 'For Sale', desc: 'Adds to Revenue' },
+                    { id: 'home_use', label: 'Home Use', desc: 'No Revenue' },
+                    { id: 'farm_use', label: 'Kid Feeding', desc: 'No Revenue' }
                   ].map(d => (
                     <button
                       key={d.id}
