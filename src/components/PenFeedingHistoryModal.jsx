@@ -591,7 +591,6 @@ export default function PenFeedingHistoryModal({
                 <button
                   className="btn btn-primary btn-xs"
                   onClick={() => {
-                    handleClose();
                     onOpenEditForm(pen);
                   }}
                   style={{ fontSize: '11px', padding: '4px 10px', fontWeight: '800' }}
