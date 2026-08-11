@@ -39,7 +39,8 @@ import {
   addBatchTimelineEvents,
   updateTimelineEvent,
   deleteTimelineEvent,
-  calculateNextDueDate
+  calculateNextDueDate,
+  isNurseryPenCheck
 } from './services/goatService';
 
 export default function App() {
@@ -271,6 +272,8 @@ export default function App() {
 
       // Snapshot goat count for this pen at time of entry
       const penGoatCount = goats.filter(g => g.area_id === barnAreaId).length;
+      const targetPen = barnAreas.find(a => a.id === barnAreaId);
+      const isNur = isNurseryPenCheck(targetPen);
 
       if (entryId) {
         // Update: recompute totals from component kg values (pen totals)
@@ -281,7 +284,7 @@ export default function App() {
         const dailyWeight = penGoatCount > 0 ? parseFloat((totalWeight / penGoatCount).toFixed(4)) : null;
 
         const activeComponents = [];
-        if (alphaKg > 0) activeComponents.push('Alpha');
+        if (alphaKg > 0) activeComponents.push(isNur ? 'Milk' : 'Alpha');
         if (mixedGrainsKg > 0) activeComponents.push('Mixed Grains');
         if (strawKg > 0) activeComponents.push('Straw');
         const foodType = activeComponents.length > 0 ? activeComponents.join(' + ') : (feedingData.food_type || '');
@@ -311,6 +314,8 @@ export default function App() {
         barn_area_id: barnAreaId,
         date: feedingData.date || new Date().toISOString(),
         goat_count: penGoatCount,
+        is_nursery: isNur,
+        pen: targetPen,
         ...feedingData
       });
       setPenFeedingEntries((prev) => [created, ...prev]);
