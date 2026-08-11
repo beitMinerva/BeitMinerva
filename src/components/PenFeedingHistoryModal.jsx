@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { X, Wheat, Scale, Clock, Sparkles, History, Calendar, Milk, TrendingUp, Filter, Pencil, Trash2, Loader2, FileText } from 'lucide-react';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { isMilkingEvent, getEventMetricValue } from '../utils/metricEventUtils';
-import { getBeirutDateTimeString, formatBeirutDisplay } from '../services/goatService';
+import { getBeirutDateTimeString, formatBeirutDisplay, isNurseryPenCheck } from '../services/goatService';
 
 export function parsePenFeeding(infoStr) {
   if (!infoStr) {
@@ -623,7 +623,7 @@ export default function PenFeedingHistoryModal({
                 {(currentRation.alpha_kg > 0 || currentRation.mixed_grains_kg > 0 || currentRation.straw_kg > 0) && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {[
-                      { label: 'Alpha', kg: currentRation.alpha_kg, price: currentRation.alpha_price_per_kg },
+                      { label: isNurseryPenCheck(pen) ? 'Milk' : 'Alpha', kg: currentRation.alpha_kg, price: currentRation.alpha_price_per_kg },
                       { label: 'Mixed Grains', kg: currentRation.mixed_grains_kg, price: currentRation.mixed_grains_price_per_kg },
                       { label: 'Straw', kg: currentRation.straw_kg, price: currentRation.straw_price_per_kg },
                     ].filter(c => c.kg > 0).map(c => (
@@ -712,7 +712,7 @@ export default function PenFeedingHistoryModal({
                         {(item.alpha_kg > 0 || item.mixed_grains_kg > 0 || item.straw_kg > 0) && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
                             {[
-                              { label: 'Alpha', kg: item.alpha_kg, price: item.alpha_price_per_kg },
+                              { label: isNurseryPenCheck(pen) ? 'Milk' : 'Alpha', kg: item.alpha_kg, price: item.alpha_price_per_kg },
                               { label: 'Mixed Grains', kg: item.mixed_grains_kg, price: item.mixed_grains_price_per_kg },
                               { label: 'Straw', kg: item.straw_kg, price: item.straw_price_per_kg },
                             ].filter(c => c.kg > 0).map(c => (

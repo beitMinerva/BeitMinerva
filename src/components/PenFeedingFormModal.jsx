@@ -570,22 +570,6 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                         step="any"
                         min="0"
                         className="form-input"
-                        placeholder="e.g. 2.0"
-                        value={comp.kg}
-                        onChange={(e) => comp.setKg(e.target.value)}
-                        disabled={submitting}
-                        style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '11px', color: '#475569', fontWeight: '700', display: 'block', marginBottom: '3px' }}>
-                        Price ($/kg)
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        className="form-input"
                         placeholder="e.g. 18.0"
                         value={comp.kg}
                         onChange={(e) => comp.setKg(e.target.value)}
