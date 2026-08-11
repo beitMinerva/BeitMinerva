@@ -158,6 +158,20 @@ export default function Header({ onOpenScanner, onOpenAddGoat, showToast }) {
                 </div>
               </div>
 
+              {/* IPHONE UNBLOCK GUIDANCE WHEN DENIED */}
+              {isIPhone && notifPermission === 'denied' && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991b1b', fontWeight: '700', fontSize: '13px', marginBottom: '6px' }}>
+                    <Smartphone size={16} /> How to Unblock Notifications on iPhone
+                  </div>
+                  <ol style={{ fontSize: '12px', color: '#7f1d1d', margin: '4px 0 0 18px', padding: 0, lineHeight: '1.5' }}>
+                    <li>Open <strong>Settings ➔ Safari ➔ Advanced ➔ Website Data</strong> on your iPhone.</li>
+                    <li>Swipe left to <strong>Delete</strong> website data for this site.</li>
+                    <li>Re-open <strong>Beit Minerva</strong> from your iPhone Home Screen & tap <strong>Enable Notifications</strong>.</li>
+                  </ol>
+                </div>
+              )}
+
               {/* IOS SAFARI INSTRUCTIONS */}
               {isIPhone && !isAppStandalone && (
                 <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '12px', padding: '14px' }}>

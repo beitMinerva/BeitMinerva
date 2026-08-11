@@ -25,6 +25,13 @@ describe('goatService & Helper Functions Unit Tests', () => {
       expect(next).toBe(expected);
     });
 
+    it('calculates 3-month recurrence for Hoof Trimming correctly', () => {
+      const base = '2026-08-10T09:00:00.000Z';
+      const next = calculateNextDueDate(base, 'every_3_months');
+      const expected = new Date('2026-11-10T09:00:00.000Z').toISOString();
+      expect(next).toBe(expected);
+    });
+
     it('calculates 6-month recurrence correctly', () => {
       const base = '2026-08-10T09:00:00.000Z';
       const next = calculateNextDueDate(base, 'every_6_months');
@@ -41,9 +48,9 @@ describe('goatService & Helper Functions Unit Tests', () => {
   });
 
   describe('getRepeatLabel', () => {
-    it('returns correct label for every_2_months', () => {
-      const event = { custom_fields: { repeat_frequency: 'every_2_months' } };
-      expect(getRepeatLabel(event)).toBe('Every 2 Months');
+    it('returns correct label for every_3_months', () => {
+      const event = { custom_fields: { repeat_frequency: 'every_3_months' } };
+      expect(getRepeatLabel(event)).toBe('Every 3 Months');
     });
 
     it('returns One-time Task for none frequency', () => {

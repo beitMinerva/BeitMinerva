@@ -7,7 +7,7 @@ const mockGoats = [
   { id: '4', tag_id: '#104', name: 'Luna', area_id: 'area-b', status: 'Sold', gender: 'Female', breed: 'Shami' },
 ];
 
-function filterGoats(goats, { searchTerm = '', areaId = 'ALL', status = 'ALL' }) {
+function filterGoats(goats, { searchTerm = '', areaId = 'ALL', status = 'ALL', gender = 'ALL' }) {
   return goats.filter((g) => {
     const matchesSearch = !searchTerm.trim() ||
       g.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -17,7 +17,15 @@ function filterGoats(goats, { searchTerm = '', areaId = 'ALL', status = 'ALL' })
     const matchesArea = areaId === 'ALL' || g.area_id === areaId;
     const matchesStatus = status === 'ALL' || g.status === status;
 
-    return matchesSearch && matchesArea && matchesStatus;
+    const matchesGender = (() => {
+      if (gender === 'ALL') return true;
+      const genStr = (g.gender || '').toLowerCase();
+      if (gender === 'Female') return genStr.includes('female') || genStr.includes('doe') || genStr === 'f';
+      if (gender === 'Male') return !genStr.includes('female') && (genStr.includes('male') || genStr.includes('buck') || genStr === 'm');
+      return true;
+    })();
+
+    return matchesSearch && matchesArea && matchesStatus && matchesGender;
   });
 }
 
@@ -43,5 +51,15 @@ describe('Goat Search & Filtering Logic', () => {
     const result = filterGoats(mockGoats, { status: 'Active' });
     expect(result).toHaveLength(3);
     expect(result.some((g) => g.name === 'Luna')).toBe(false);
+  });
+
+  it('filters goats by gender (Female vs Male)', () => {
+    const females = filterGoats(mockGoats, { gender: 'Female' });
+    expect(females).toHaveLength(3);
+    expect(females.every((g) => g.gender === 'Female')).toBe(true);
+
+    const males = filterGoats(mockGoats, { gender: 'Male' });
+    expect(males).toHaveLength(1);
+    expect(males[0].name).toBe('Max');
   });
 });

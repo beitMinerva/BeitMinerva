@@ -5,18 +5,28 @@ import GoatCard from '../components/GoatCard';
 export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, onOpenLogEvent }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('All');
+  const [selectedGender, setSelectedGender] = useState('All');
 
   const statuses = ['All', 'Healthy', 'Under Treatment', 'Pregnant', 'Dry', 'Quarantine'];
+  const genders = ['All', 'Female', 'Male'];
 
   const filteredGoats = goats.filter((goat) => {
     const matchesSearch =
-      goat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      goat.tag_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      goat.breed.toLowerCase().includes(searchTerm.toLowerCase());
+      (goat.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (goat.tag_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (goat.breed || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = selectedStatus === 'All' || goat.status === selectedStatus;
 
-    return matchesSearch && matchesStatus;
+    const matchesGender = (() => {
+      if (selectedGender === 'All') return true;
+      const g = (goat.gender || '').toLowerCase();
+      if (selectedGender === 'Female') return g.includes('female') || g.includes('doe') || g === 'f';
+      if (selectedGender === 'Male') return !g.includes('female') && (g.includes('male') || g.includes('buck') || g === 'm');
+      return true;
+    })();
+
+    return matchesSearch && matchesStatus && matchesGender;
   });
 
   return (
@@ -33,18 +43,46 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, on
         />
       </div>
 
-      {/* Status Filter Chips */}
-      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
-        {statuses.map((status) => (
-          <button
-            key={status}
-            className={`btn btn-sm ${selectedStatus === status ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setSelectedStatus(status)}
-            style={{ whiteSpace: 'nowrap', borderRadius: '9999px', fontSize: '11px', padding: '4px 10px' }}
-          >
-            {status}
-          </button>
-        ))}
+      {/* Gender & Status Filter Bar */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {/* Gender Filter Pills */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Gender:
+          </span>
+          <div style={{ display: 'flex', gap: '5px' }}>
+            {genders.map((gender) => (
+              <button
+                key={gender}
+                type="button"
+                className={`btn btn-sm ${selectedGender === gender ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setSelectedGender(gender)}
+                style={{
+                  borderRadius: '9999px',
+                  fontSize: '11px',
+                  padding: '3px 10px',
+                  fontWeight: selectedGender === gender ? '800' : '600'
+                }}
+              >
+                {gender === 'Female' ? '♀ Female' : gender === 'Male' ? '♂ Male' : 'All'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Status Filter Chips */}
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+          {statuses.map((status) => (
+            <button
+              key={status}
+              className={`btn btn-sm ${selectedStatus === status ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setSelectedStatus(status)}
+              style={{ whiteSpace: 'nowrap', borderRadius: '9999px', fontSize: '11px', padding: '4px 10px' }}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Herd List Count & Record Event Button */}

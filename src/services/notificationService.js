@@ -45,15 +45,29 @@ export async function requestNotificationPermission() {
   await registerServiceWorker();
 
   try {
-    let permission = 'default';
     if ('Notification' in window && typeof Notification.requestPermission === 'function') {
-      permission = await Notification.requestPermission();
+      let permission = 'default';
+      try {
+        const res = Notification.requestPermission();
+        if (res && typeof res.then === 'function') {
+          permission = await res;
+        } else {
+          permission = await new Promise((resolve) => {
+            Notification.requestPermission((p) => resolve(p));
+          });
+        }
+      } catch (innerErr) {
+        permission = await new Promise((resolve) => {
+          Notification.requestPermission((p) => resolve(p));
+        });
+      }
+      return permission;
     }
-    return permission;
   } catch (err) {
     console.error('Error requesting notification permission:', err);
     return 'denied';
   }
+  return 'default';
 }
 
 // Convert Base64 VAPID key to Uint8Array for PushManager
