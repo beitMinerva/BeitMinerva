@@ -89,11 +89,16 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
       ratio = 1 / groupPenMetrics.length;
     }
 
-    const alphaAllocated = parseFloat((totalAlpha * ratio).toFixed(3));
-    const mixedAllocated = parseFloat((totalMixed * ratio).toFixed(3));
-    const strawAllocated = parseFloat((totalStraw * ratio).toFixed(3));
-    const totalAllocatedKg = parseFloat((totalKgPen * ratio).toFixed(3));
-    const perHeadKg = item.count > 0 ? (totalAllocatedKg / item.count) : null;
+    const penTargetIntake = item.targetNeed; // count * targetRate
+    const alphaProp = totalKgPen > 0 ? (totalAlpha / totalKgPen) : 0;
+    const mixedProp = totalKgPen > 0 ? (totalMixed / totalKgPen) : 0;
+    const strawProp = totalKgPen > 0 ? (totalStraw / totalKgPen) : 0;
+
+    const alphaAllocated = parseFloat((penTargetIntake * alphaProp).toFixed(3));
+    const mixedAllocated = parseFloat((penTargetIntake * mixedProp).toFixed(3));
+    const strawAllocated = parseFloat((penTargetIntake * strawProp).toFixed(3));
+    const totalAllocatedKg = parseFloat((penTargetIntake).toFixed(3));
+    const perHeadKg = item.count > 0 ? parseFloat((totalAllocatedKg / item.count).toFixed(3)) : null;
 
     return {
       ...item,
@@ -204,10 +209,10 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
       <div
         className={`modal-content ${isClosing ? 'closing' : ''}`}
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '520px', width: '100%', padding: '20px', borderRadius: '18px', fontFamily: "'Outfit', sans-serif" }}
+        style={{ maxWidth: '520px', width: '100%', fontFamily: "'Outfit', sans-serif" }}
       >
         {/* HEADER */}
-        <div className="modal-header" style={{ marginBottom: '16px' }}>
+        <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#ecfdf5', border: '1.5px solid #a7f3d0', display: 'grid', placeItems: 'center' }}>
               <Wheat size={20} color="#047857" />
@@ -227,7 +232,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
           </button>
         </div>
 
-        <form onSubmit={handleSaveRation}>
+        <form onSubmit={handleSaveRation} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
             {/* DATE & TIME */}
@@ -568,7 +573,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
             </div>
           </div>
 
-          <div className="modal-footer" style={{ marginTop: '16px' }}>
+          <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={submitting} style={{ fontWeight: '700' }}>
               Cancel
             </button>

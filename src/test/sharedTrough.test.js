@@ -1,25 +1,31 @@
 import { describe, it, expect } from 'vitest';
 
-function calculateSharedTroughAllocation({ pens, totalAlpha, totalMixed, totalStraw }) {
+export function calculateSharedTroughAllocation({ pens, totalAlpha = 0, totalMixed = 0, totalStraw = 0 }) {
+  const totalComponentInput = totalAlpha + totalMixed + totalStraw;
+
+  const alphaProp = totalComponentInput > 0 ? totalAlpha / totalComponentInput : 0;
+  const mixedProp = totalComponentInput > 0 ? totalMixed / totalComponentInput : 0;
+  const strawProp = totalComponentInput > 0 ? totalStraw / totalComponentInput : 0;
+
   const totalGroupGoats = pens.reduce((sum, p) => sum + p.count, 0);
   const combinedTargetNeed = pens.reduce((sum, p) => sum + (p.count * p.targetRate), 0);
 
   return pens.map(p => {
-    const targetNeed = p.count * p.targetRate;
+    const penTargetIntake = p.count * p.targetRate;
     let ratio = 0;
     if (combinedTargetNeed > 0) {
-      ratio = targetNeed / combinedTargetNeed;
+      ratio = penTargetIntake / combinedTargetNeed;
     } else if (totalGroupGoats > 0) {
       ratio = p.count / totalGroupGoats;
     } else if (pens.length > 0) {
       ratio = 1 / pens.length;
     }
 
-    const alphaAllocated = parseFloat((totalAlpha * ratio).toFixed(3));
-    const mixedAllocated = parseFloat((totalMixed * ratio).toFixed(3));
-    const strawAllocated = parseFloat((totalStraw * ratio).toFixed(3));
-    const totalAllocatedKg = parseFloat(((totalAlpha + totalMixed + totalStraw) * ratio).toFixed(3));
-    const perHeadKg = p.count > 0 ? (totalAllocatedKg / p.count) : null;
+    const alphaAllocated = parseFloat((penTargetIntake * alphaProp).toFixed(3));
+    const mixedAllocated = parseFloat((penTargetIntake * mixedProp).toFixed(3));
+    const strawAllocated = parseFloat((penTargetIntake * strawProp).toFixed(3));
+    const totalAllocatedKg = parseFloat((penTargetIntake).toFixed(3));
+    const perHeadKg = p.count > 0 ? parseFloat((totalAllocatedKg / p.count).toFixed(3)) : null;
 
     return {
       penId: p.id,
@@ -33,62 +39,75 @@ function calculateSharedTroughAllocation({ pens, totalAlpha, totalMixed, totalSt
   });
 }
 
-describe('Shared Feed Trough Allocation Math', () => {
-  it('correctly calculates proportional feed split for Pen A (10 goats @ 2.5 kg) & Pen B (5 goats @ 2.0 kg)', () => {
+describe('Shared Feed Trough Recipe Proportion Allocation Math', () => {
+  it('correctly calculates feed intake per pen based on recipe proportions and (goats * target rate)', () => {
     const pens = [
-      { id: 'pen-A', count: 10, targetRate: 2.5 },
-      { id: 'pen-B', count: 5, targetRate: 2.0 }
+      { id: 'pen-A', count: 10, targetRate: 2.5 }, // 25.0 kg target intake
+      { id: 'pen-B', count: 5, targetRate: 2.0 }   // 10.0 kg target intake
     ];
-    // Total Target Need: 10*2.5 + 5*2.0 = 25 + 10 = 35 kg.
-    // Pen A ratio: 25/35 = 0.7142857 (71.43%)
-    // Pen B ratio: 10/35 = 0.2857142 (28.57%)
 
+    // Entered mix components: 10 kg Alpha, 5 kg Mixed Grains, 5 kg Straw (Total 20 kg mix)
+    // Recipe proportions: 50% Alpha, 25% Mixed Grains, 25% Straw
     const result = calculateSharedTroughAllocation({
       pens,
-      totalAlpha: 0,
-      totalMixed: 13,
-      totalStraw: 2
+      totalAlpha: 10,
+      totalMixed: 5,
+      totalStraw: 5
     });
 
     const penA = result.find(r => r.penId === 'pen-A');
     const penB = result.find(r => r.penId === 'pen-B');
 
-    expect(penA.ratio).toBeCloseTo(0.7143, 3);
-    expect(penB.ratio).toBeCloseTo(0.2857, 3);
+    // Pen A Intake: 10 goats * 2.5 kg/head = 25 kg total
+    expect(penA.totalAllocatedKg).toBe(25);
+    expect(penA.perHeadKg).toBe(2.5);
+    expect(penA.alphaAllocated).toBe(12.5); // 25 * 50%
+    expect(penA.mixedAllocated).toBe(6.25); // 25 * 25%
+    expect(penA.strawAllocated).toBe(6.25); // 25 * 25%
 
-    // Mixed Grains allocation (13 kg total)
-    expect(penA.mixedAllocated).toBe(9.286); // 13 * (25/35) = 9.2857 -> 9.286
-    expect(penB.mixedAllocated).toBe(3.714); // 13 * (10/35) = 3.7143 -> 3.714
-    expect(penA.mixedAllocated + penB.mixedAllocated).toBe(13);
-
-    // Straw allocation (2 kg total)
-    expect(penA.strawAllocated).toBe(1.429); // 2 * (25/35) = 1.4285 -> 1.429
-    expect(penB.strawAllocated).toBe(0.571); // 2 * (10/35) = 0.5714 -> 0.571
-    expect(penA.strawAllocated + penB.strawAllocated).toBe(2);
-
-    // Total feed sum across pens equals original 15 kg
-    expect(penA.totalAllocatedKg + penB.totalAllocatedKg).toBe(15);
+    // Pen B Intake: 5 goats * 2.0 kg/head = 10 kg total
+    expect(penB.totalAllocatedKg).toBe(10);
+    expect(penB.perHeadKg).toBe(2.0);
+    expect(penB.alphaAllocated).toBe(5.0); // 10 * 50%
+    expect(penB.mixedAllocated).toBe(2.5); // 10 * 25%
+    expect(penB.strawAllocated).toBe(2.5); // 10 * 25%
   });
 
-  it('fallbacks cleanly to headcount ratio if target rates are 0', () => {
+  it('handles single component recipe (e.g. 100% Alfalfa)', () => {
     const pens = [
-      { id: 'pen-A', count: 10, targetRate: 0 },
-      { id: 'pen-B', count: 5, targetRate: 0 }
+      { id: 'pen-A', count: 8, targetRate: 3.0 } // 24 kg target intake
     ];
 
     const result = calculateSharedTroughAllocation({
       pens,
-      totalAlpha: 15,
+      totalAlpha: 15, // 100% Alpha mix
       totalMixed: 0,
       totalStraw: 0
     });
 
-    const penA = result.find(r => r.penId === 'pen-A');
-    const penB = result.find(r => r.penId === 'pen-B');
+    const penA = result[0];
+    expect(penA.totalAllocatedKg).toBe(24);
+    expect(penA.alphaAllocated).toBe(24);
+    expect(penA.mixedAllocated).toBe(0);
+    expect(penA.strawAllocated).toBe(0);
+  });
 
-    expect(penA.ratio).toBeCloseTo(10 / 15, 3);
-    expect(penB.ratio).toBeCloseTo(5 / 15, 3);
-    expect(penA.alphaAllocated).toBe(10);
-    expect(penB.alphaAllocated).toBe(5);
+  it('handles zero component input gracefully without NaN errors', () => {
+    const pens = [
+      { id: 'pen-A', count: 10, targetRate: 2.5 }
+    ];
+
+    const result = calculateSharedTroughAllocation({
+      pens,
+      totalAlpha: 0,
+      totalMixed: 0,
+      totalStraw: 0
+    });
+
+    const penA = result[0];
+    expect(penA.alphaAllocated).toBe(0);
+    expect(penA.mixedAllocated).toBe(0);
+    expect(penA.strawAllocated).toBe(0);
+    expect(penA.totalAllocatedKg).toBe(25);
   });
 });
