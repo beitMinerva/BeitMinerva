@@ -20,14 +20,24 @@ export default function Header({ onOpenScanner, onOpenAddGoat, showToast }) {
   }, []);
 
   const handleEnableNotifications = async () => {
+    if (isIPhone && !isAppStandalone) {
+      if (showToast) showToast('📱 iPhone Notice: Tap Share (⬆️) -> "Add to Home Screen" first!');
+      setShowNotifModal(true);
+      return;
+    }
+
     setIsSubscribing(true);
     try {
       const perm = await requestNotificationPermission();
       setNotifPermission(perm);
       if (perm === 'granted') {
         const subResult = await subscribeToPushNotifications();
-        if (showToast) showToast('Web Push & Background Notifications active');
-        await sendTestNotification();
+        if (subResult && subResult.success) {
+          if (showToast) showToast('✅ Web Push active & registered to Supabase!');
+          await sendTestNotification();
+        } else if (subResult && subResult.reason) {
+          if (showToast) showToast(`⚠️ Notification notice: ${subResult.reason}`);
+        }
       } else if (perm === 'denied') {
         if (showToast) showToast('Notification permission blocked in browser settings');
       }

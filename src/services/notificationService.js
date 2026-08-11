@@ -122,7 +122,10 @@ export async function subscribeToPushNotifications() {
         updated_at: new Date().toISOString()
       }, { onConflict: 'endpoint' });
 
-      if (dbErr) console.warn('Supabase push_subscriptions upsert notice:', dbErr.message);
+      if (dbErr) {
+        console.warn('Supabase push_subscriptions upsert notice:', dbErr.message);
+        return { success: false, reason: dbErr.message };
+      }
     }
 
     // 2. Notify backend push server if a custom remote server URL is explicitly configured
@@ -140,6 +143,8 @@ export async function subscribeToPushNotifications() {
         console.warn('Remote push server notice:', serverErr);
       }
     }
+
+    return { success: true, subscription: subJson };
 
     console.log('✅ Web Push subscription active & saved to Supabase for mobile background notifications.');
     return { success: true, subscription: subJson };
