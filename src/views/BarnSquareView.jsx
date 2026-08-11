@@ -493,6 +493,8 @@ export default function BarnSquareView({
       {showFeedingFormModal && editingPenFeeding && (
         <PenFeedingFormModal
           pen={editingPenFeeding}
+          barnAreas={pens}
+          goats={goats}
           onClose={() => {
             setShowFeedingFormModal(false);
             setEditingPenFeeding(null);

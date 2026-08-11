@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
-import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles } from 'lucide-react';
+import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles, Share2, Check } from 'lucide-react';
 import { parsePenFeeding } from './PenFeedingHistoryModal';
 import { getBeirutDateTimeString } from '../services/goatService';
 
-export default function PenFeedingFormModal({ pen, onClose, onSave, goats = [] }) {
+export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], onClose, onSave }) {
   const parsed = parsePenFeeding(pen?.feeding_info || pen?.note);
   const currentRation = parsed.current;
 
-  // Goat count for this pen
-  const penGoatCount = goats.filter(g => g.area_id === pen?.id).length;
+  // Primary Pen Goat Count
+  const primaryPenGoatCount = goats.filter(g => g.area_id === pen?.id).length;
 
-  // 3 feed components: TOTAL kg for the whole pen
+  // Shared Trough State
+  const [isSharedTrough, setIsSharedTrough] = useState(false);
+  const [selectedSharedPenIds, setSelectedSharedPenIds] = useState([pen?.id]);
+  const [targetRates, setTargetRates] = useState({ [pen?.id]: '2.5' });
+
+  // 3 Feed components: TOTAL kg for the whole trough / pen
   const [alphaKg, setAlphaKg] = useState(currentRation.alpha_kg > 0 ? String(currentRation.alpha_kg) : '');
   const [alphaPricePerKg, setAlphaPricePerKg] = useState(currentRation.alpha_price_per_kg > 0 ? String(currentRation.alpha_price_per_kg) : '');
   const [mixedGrainsKg, setMixedGrainsKg] = useState(currentRation.mixed_grains_kg > 0 ? String(currentRation.mixed_grains_kg) : '');
@@ -30,7 +35,31 @@ export default function PenFeedingFormModal({ pen, onClose, onSave, goats = [] }
     setTimeout(() => { onClose(); }, 220);
   };
 
-  // Pen totals
+  // Toggle pen in shared trough selection
+  const handleToggleSharedPen = (penId) => {
+    if (penId === pen?.id) return; // Primary pen is always included
+    if (selectedSharedPenIds.includes(penId)) {
+      setSelectedSharedPenIds(prev => prev.filter(id => id !== penId));
+    } else {
+      setSelectedSharedPenIds(prev => [...prev, penId]);
+      if (!targetRates[penId]) {
+        setTargetRates(prev => ({ ...prev, [penId]: '2.0' }));
+      }
+    }
+  };
+
+  // Update target consumption rate for a pen
+  const handleTargetRateChange = (penId, val) => {
+    setTargetRates(prev => ({ ...prev, [penId]: val }));
+  };
+
+  // Active pens in shared trough calculation
+  const allBarnPens = barnAreas.length > 0 ? barnAreas : [pen];
+  const activePens = allBarnPens.filter(p =>
+    isSharedTrough ? (selectedSharedPenIds.includes(p.id) || p.id === pen?.id) : p.id === pen?.id
+  );
+
+  // Totals input by farmer into the trough
   const totalAlpha = Number(alphaKg) || 0;
   const totalMixed = Number(mixedGrainsKg) || 0;
   const totalStraw = Number(strawKg) || 0;
@@ -39,8 +68,46 @@ export default function PenFeedingFormModal({ pen, onClose, onSave, goats = [] }
     + totalMixed * (Number(mixedGrainsPricePerKg) || 0)
     + totalStraw * (Number(strawPricePerKg) || 0);
 
-  const perHeadKg = penGoatCount > 0 ? totalKgPen / penGoatCount : null;
-  const perHeadCost = penGoatCount > 0 ? totalCostPen / penGoatCount : null;
+  // Calculate target need & proportional share per pen
+  const groupPenMetrics = activePens.map(p => {
+    const count = goats.filter(g => g.area_id === p.id).length;
+    const targetRate = parseFloat(targetRates[p.id] !== undefined ? targetRates[p.id] : '2.5') || 0;
+    const targetNeed = count * targetRate;
+    return { pen: p, count, targetRate, targetNeed };
+  });
+
+  const totalGroupGoats = groupPenMetrics.reduce((sum, item) => sum + item.count, 0);
+  const combinedTargetNeed = groupPenMetrics.reduce((sum, item) => sum + item.targetNeed, 0);
+
+  const allocatedPenData = groupPenMetrics.map(item => {
+    let ratio = 0;
+    if (combinedTargetNeed > 0) {
+      ratio = item.targetNeed / combinedTargetNeed;
+    } else if (totalGroupGoats > 0) {
+      ratio = item.count / totalGroupGoats;
+    } else if (groupPenMetrics.length > 0) {
+      ratio = 1 / groupPenMetrics.length;
+    }
+
+    const alphaAllocated = parseFloat((totalAlpha * ratio).toFixed(3));
+    const mixedAllocated = parseFloat((totalMixed * ratio).toFixed(3));
+    const strawAllocated = parseFloat((totalStraw * ratio).toFixed(3));
+    const totalAllocatedKg = parseFloat((totalKgPen * ratio).toFixed(3));
+    const perHeadKg = item.count > 0 ? (totalAllocatedKg / item.count) : null;
+
+    return {
+      ...item,
+      ratio,
+      alphaAllocated,
+      mixedAllocated,
+      strawAllocated,
+      totalAllocatedKg,
+      perHeadKg
+    };
+  });
+
+  const perHeadKgPrimary = primaryPenGoatCount > 0 ? totalKgPen / primaryPenGoatCount : null;
+  const perHeadCostPrimary = primaryPenGoatCount > 0 ? totalCostPen / primaryPenGoatCount : null;
 
   const handleSaveRation = async (e) => {
     e.preventDefault();
@@ -50,21 +117,44 @@ export default function PenFeedingFormModal({ pen, onClose, onSave, goats = [] }
     }
     setSubmitting(true);
 
-    const feedingData = {
-      alpha_kg: totalAlpha,
-      alpha_price_per_kg: Number(alphaPricePerKg) || 0,
-      mixed_grains_kg: totalMixed,
-      mixed_grains_price_per_kg: Number(mixedGrainsPricePerKg) || 0,
-      straw_kg: totalStraw,
-      straw_price_per_kg: Number(strawPricePerKg) || 0,
-      schedule: schedule.trim(),
-      notes: notes.trim(),
-      date: new Date(feedingDate).toISOString()
-    };
-
     try {
       if (onSave) {
-        await onSave(pen.id, feedingData);
+        if (!isSharedTrough || allocatedPenData.length <= 1) {
+          // Single Pen Entry
+          const feedingData = {
+            alpha_kg: totalAlpha,
+            alpha_price_per_kg: Number(alphaPricePerKg) || 0,
+            mixed_grains_kg: totalMixed,
+            mixed_grains_price_per_kg: Number(mixedGrainsPricePerKg) || 0,
+            straw_kg: totalStraw,
+            straw_price_per_kg: Number(strawPricePerKg) || 0,
+            schedule: schedule.trim(),
+            notes: notes.trim(),
+            date: new Date(feedingDate).toISOString()
+          };
+          await onSave(pen.id, feedingData);
+        } else {
+          // Shared Trough Multi-Pen Proportional Allocation
+          const sharedPenNames = activePens.map(p => `Pen ${p.letter}`).join(' & ');
+          for (const item of allocatedPenData) {
+            const ratioPct = (item.ratio * 100).toFixed(1);
+            const sharedNoteTag = `[Shared Trough with ${sharedPenNames} · ${ratioPct}% share]`;
+            const finalNote = notes.trim() ? `${sharedNoteTag} ${notes.trim()}` : sharedNoteTag;
+
+            const feedingData = {
+              alpha_kg: item.alphaAllocated,
+              alpha_price_per_kg: Number(alphaPricePerKg) || 0,
+              mixed_grains_kg: item.mixedAllocated,
+              mixed_grains_price_per_kg: Number(mixedGrainsPricePerKg) || 0,
+              straw_kg: item.strawAllocated,
+              straw_price_per_kg: Number(strawPricePerKg) || 0,
+              schedule: schedule.trim(),
+              notes: finalNote,
+              date: new Date(feedingDate).toISOString()
+            };
+            await onSave(item.pen.id, feedingData);
+          }
+        }
       }
       handleClose();
     } catch (err) {
@@ -107,12 +197,14 @@ export default function PenFeedingFormModal({ pen, onClose, onSave, goats = [] }
     }
   ];
 
+  const otherBarnPens = allBarnPens.filter(p => p.id !== pen?.id);
+
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} onClick={handleClose} style={{ zIndex: 110, fontFamily: "'Outfit', sans-serif" }}>
       <div
         className={`modal-content ${isClosing ? 'closing' : ''}`}
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '480px', width: '100%', padding: '18px', borderRadius: '16px', fontFamily: "'Outfit', sans-serif" }}
+        style={{ maxWidth: '500px', width: '100%', padding: '18px', borderRadius: '16px', fontFamily: "'Outfit', sans-serif" }}
       >
         {/* HEADER */}
         <div className="modal-header">
@@ -124,11 +216,10 @@ export default function PenFeedingFormModal({ pen, onClose, onSave, goats = [] }
               <h2 className="modal-title" style={{ fontSize: '17px', fontFamily: "'Outfit', sans-serif", margin: 0, fontWeight: '800' }}>
                 Log Pen Feeding — Pen {pen?.letter}
               </h2>
-              {penGoatCount > 0 && (
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Users size={11} /> {penGoatCount} goats in this pen
-                </span>
-              )}
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Users size={11} /> {primaryPenGoatCount} goats in Pen {pen?.letter}
+                {isSharedTrough && activePens.length > 1 && ` · (${totalGroupGoats} total in ${activePens.length} shared pens)`}
+              </span>
             </div>
           </div>
           <button className="close-btn" onClick={handleClose} disabled={submitting}>
@@ -154,11 +245,128 @@ export default function PenFeedingFormModal({ pen, onClose, onSave, goats = [] }
               />
             </div>
 
-            {/* FEED COMPONENTS CARDS - CLEAN WHITE */}
+            {/* SHARED TROUGH TOGGLE SECTION */}
+            {otherBarnPens.length > 0 && (
+              <div
+                style={{
+                  background: isSharedTrough ? '#f0fdf4' : '#f8fafc',
+                  border: isSharedTrough ? '1.5px solid var(--primary-border)' : '1px solid var(--border-color)',
+                  borderRadius: '12px',
+                  padding: '10px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Share2 size={15} color={isSharedTrough ? 'var(--primary-dark)' : 'var(--text-muted)'} />
+                    <strong style={{ fontSize: '13px', fontWeight: '800', color: isSharedTrough ? 'var(--primary-dark)' : 'var(--text-main)' }}>
+                      Shared Feed Trough
+                    </strong>
+                  </div>
+
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '6px', fontSize: '11px', fontWeight: '700', color: 'var(--primary-dark)' }}>
+                    <input
+                      type="checkbox"
+                      checked={isSharedTrough}
+                      onChange={(e) => setIsSharedTrough(e.target.checked)}
+                      disabled={submitting}
+                      style={{ width: '16px', height: '16px', accentColor: '#059669', cursor: 'pointer' }}
+                    />
+                    <span>{isSharedTrough ? 'Shared Active' : 'Enable Shared Trough'}</span>
+                  </label>
+                </div>
+
+                {isSharedTrough && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '4px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
+                      Select other pens sharing this feeder trough. Feed will be allocated proportionally based on target rates & headcounts.
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {allBarnPens.map(p => {
+                        const count = goats.filter(g => g.area_id === p.id).length;
+                        const isPrimary = p.id === pen?.id;
+                        const isSelected = selectedSharedPenIds.includes(p.id) || isPrimary;
+                        const allocatedInfo = allocatedPenData.find(d => d.pen.id === p.id);
+
+                        return (
+                          <div
+                            key={p.id}
+                            style={{
+                              background: isSelected ? '#ffffff' : 'rgba(255,255,255,0.6)',
+                              border: isSelected ? '1px solid #a7f3d0' : '1px solid var(--border-color)',
+                              borderRadius: '10px',
+                              padding: '8px 10px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isPrimary ? 'default' : 'pointer', flex: 1 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => handleToggleSharedPen(p.id)}
+                                  disabled={isPrimary || submitting}
+                                  style={{ accentColor: '#059669' }}
+                                />
+                                <div>
+                                  <strong style={{ fontSize: '12px', color: 'var(--text-main)' }}>
+                                    Pen {p.letter} {p.name && p.name !== `Pen ${p.letter}` ? `(${p.name})` : ''}
+                                  </strong>
+                                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                                    {count} goats
+                                  </span>
+                                </div>
+                              </label>
+
+                              {isSelected && allocatedInfo && (
+                                <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857', background: '#ecfdf5', padding: '2px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                                  {(allocatedInfo.ratio * 100).toFixed(1)}% Share
+                                </span>
+                              )}
+                            </div>
+
+                            {isSelected && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '22px' }}>
+                                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                                  Target Rate:
+                                </label>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  className="form-input"
+                                  placeholder="2.5"
+                                  value={targetRates[p.id] !== undefined ? targetRates[p.id] : '2.5'}
+                                  onChange={(e) => handleTargetRateChange(p.id, e.target.value)}
+                                  disabled={submitting}
+                                  style={{ fontSize: '11px', padding: '3px 6px', height: '26px', width: '70px' }}
+                                />
+                                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>kg/goat target</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* FEED COMPONENTS CARDS */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px', margin: 0 }}>
-                  <Scale size={14} color="var(--primary)" /> Feed Components (Total kg for Pen {pen?.letter})
+                  <Scale size={14} color="var(--primary)" />
+                  {isSharedTrough && activePens.length > 1
+                    ? `Feed Components (Total put into Shared Trough)`
+                    : `Feed Components (Total kg for Pen ${pen?.letter})`}
                 </label>
               </div>
 
@@ -191,7 +399,7 @@ export default function PenFeedingFormModal({ pen, onClose, onSave, goats = [] }
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
                       <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
-                        Total kg (Pen)
+                        {isSharedTrough && activePens.length > 1 ? 'Total Trough kg' : 'Total kg (Pen)'}
                       </label>
                       <input
                         type="number"
@@ -222,37 +430,46 @@ export default function PenFeedingFormModal({ pen, onClose, onSave, goats = [] }
                       />
                     </div>
                   </div>
-
-                  {comp.totalKg > 0 && penGoatCount > 0 && (
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '2px' }}>
-                      <span>Per goat share: <strong>{(comp.totalKg / penGoatCount).toFixed(2)} kg/head</strong></span>
-                      {Number(comp.price) > 0 && (
-                        <span style={{ color: 'var(--primary-dark)', fontWeight: '700' }}>
-                          ${((comp.totalKg * Number(comp.price)) / penGoatCount).toFixed(3)}/head
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </div>
               ))}
 
-              {/* PEN TOTAL SUMMARY CARD */}
+              {/* PEN TOTAL & ALLOCATION SUMMARY CARD */}
               {totalKgPen > 0 && (
-                <div style={{ background: '#f0fdf4', border: '1.5px solid var(--primary-border)', borderRadius: '12px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ background: '#f0fdf4', border: '1.5px solid var(--primary-border)', borderRadius: '12px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Sparkles size={14} color="var(--primary)" /> Pen Total Feed:
+                      <Sparkles size={14} color="var(--primary)" />
+                      {isSharedTrough && activePens.length > 1 ? 'Total Trough Dump:' : 'Pen Total Feed:'}
                     </span>
                     <strong style={{ fontSize: '16px', fontWeight: '900', color: 'var(--primary-dark)' }}>
                       {totalKgPen.toFixed(1)} kg {totalCostPen > 0 && `· $${totalCostPen.toFixed(2)}`}
                     </strong>
                   </div>
-                  {penGoatCount > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
-                      <span>Per goat ({penGoatCount} goats):</span>
-                      <strong style={{ color: 'var(--primary-dark)' }}>
-                        {perHeadKg.toFixed(2)} kg/head {perHeadCost > 0 && `· $${perHeadCost.toFixed(3)}/head`}
-                      </strong>
+
+                  {!isSharedTrough || activePens.length <= 1 ? (
+                    primaryPenGoatCount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
+                        <span>Per goat ({primaryPenGoatCount} goats):</span>
+                        <strong style={{ color: 'var(--primary-dark)' }}>
+                          {perHeadKgPrimary.toFixed(2)} kg/head {perHeadCostPrimary > 0 && `· $${perHeadCostPrimary.toFixed(3)}/head`}
+                        </strong>
+                      </div>
+                    )
+                  ) : (
+                    <div style={{ borderTop: '1px dashed #a7f3d0', paddingTop: '6px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '800', color: '#047857' }}>
+                        Proportional Feed Allocation Breakdown ({totalGroupGoats} total goats):
+                      </span>
+                      {allocatedPenData.map(item => (
+                        <div key={item.pen.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                          <span>
+                            <strong>Pen {item.pen.letter}</strong> ({item.count} goats @ {item.targetRate} kg target):
+                          </span>
+                          <strong style={{ color: '#047857' }}>
+                            {item.totalAllocatedKg.toFixed(2)} kg ({(item.ratio * 100).toFixed(1)}%) {item.perHeadKg ? `· ${item.perHeadKg.toFixed(2)} kg/goat` : ''}
+                          </strong>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -295,7 +512,7 @@ export default function PenFeedingFormModal({ pen, onClose, onSave, goats = [] }
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? <Loader2 size={16} className="spinner" /> : 'Save Feed Entry'}
+              {submitting ? <Loader2 size={16} className="spinner" /> : (isSharedTrough && activePens.length > 1 ? `Save Shared Feed (${activePens.length} Pens)` : 'Save Feed Entry')}
             </button>
           </div>
         </form>
