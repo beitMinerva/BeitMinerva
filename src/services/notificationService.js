@@ -79,13 +79,15 @@ export async function subscribeToPushNotifications() {
 
   const permission = await requestNotificationPermission();
   if (permission !== 'granted') {
-    return { success: false, reason: 'permission_denied' };
+    return { success: false, reason: `permission_${permission}` };
   }
 
   try {
-    let reg = await navigator.serviceWorker.getRegistration();
-    if (!reg) {
-      reg = await registerServiceWorker();
+    await registerServiceWorker();
+
+    let reg = null;
+    if ('serviceWorker' in navigator) {
+      reg = await navigator.serviceWorker.ready;
     }
 
     if (!reg || !reg.pushManager) {
@@ -93,22 +95,15 @@ export async function subscribeToPushNotifications() {
       return { success: false, reason: 'no_push_manager' };
     }
 
-    const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-    
-    // Always unsubscribe old key to ensure subscription matches current VAPID key
     let subscription = await reg.pushManager.getSubscription();
-    if (subscription) {
-      try {
-        await subscription.unsubscribe();
-      } catch (unsubErr) {
-        console.warn('Notice unsubscribing old push sub:', unsubErr);
-      }
-    }
 
-    subscription = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey
-    });
+    if (!subscription) {
+      const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey
+      });
+    }
 
     const subJson = subscription.toJSON();
 
@@ -145,13 +140,9 @@ export async function subscribeToPushNotifications() {
     }
 
     return { success: true, subscription: subJson };
-
-    console.log('✅ Web Push subscription active & saved to Supabase for mobile background notifications.');
-    return { success: true, subscription: subJson };
-
   } catch (err) {
-    console.error('Failed to subscribe to Web Push:', err);
-    return { success: false, error: err.message };
+    console.error('Error subscribing to push notifications:', err);
+    return { success: false, reason: err.message || String(err) };
   }
 }
 
