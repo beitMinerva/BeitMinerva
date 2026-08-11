@@ -601,13 +601,14 @@ export default function BarnSquareView({
                             />
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <label style={{ fontSize: '11px', fontWeight: '700', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '700', color: '#047857', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                               <input
                                 type="checkbox"
                                 checked={editIsNursery}
                                 onChange={(e) => setEditIsNursery(e.target.checked)}
+                                style={{ accentColor: '#059669', width: '15px', height: '15px', cursor: 'pointer' }}
                               />
-                              Nursery Pen (For Kids / Lambs — Milk Feed)
+                              Nursery Pen (Milk feed)
                             </label>
                             <div style={{ display: 'flex', gap: '6px' }}>
                               <button
@@ -637,7 +638,7 @@ export default function BarnSquareView({
 
                             <div style={{
                               width: '34px', height: '34px', borderRadius: '10px',
-                              background: isNurseryPenCheck(pen) ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : 'var(--primary-gradient)', display: 'grid', placeItems: 'center',
+                              background: 'var(--primary-gradient)', display: 'grid', placeItems: 'center',
                               fontSize: '16px', fontWeight: '900', color: 'white'
                             }}>
                               {pen.letter}
@@ -649,7 +650,7 @@ export default function BarnSquareView({
                                     {(pen.name || '').replace(/\s*\[NURSERY\]/gi, '').trim()}
                                   </strong>
                                 {isNurseryPenCheck(pen) && (
-                                  <span style={{ fontSize: '10px', fontWeight: '800', background: '#e0f2fe', color: '#0284c7', padding: '1px 6px', borderRadius: '4px' }}>
+                                  <span style={{ fontSize: '10px', fontWeight: '800', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '1px 6px', borderRadius: '4px' }}>
                                     Nursery
                                   </span>
                                 )}
@@ -717,13 +718,14 @@ export default function BarnSquareView({
                     </div>
                   </div>
 
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <label style={{ fontSize: '12px', fontWeight: '700', color: '#047857', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={newIsNursery}
                       onChange={(e) => setNewIsNursery(e.target.checked)}
+                      style={{ accentColor: '#059669', width: '15px', height: '15px', cursor: 'pointer' }}
                     />
-                    Nursery Pen (For Kids / Lambs — Milk Feed)
+                    Nursery Pen (Milk feed)
                   </label>
 
                   <div style={{ display: 'flex', gap: '8px' }}>
