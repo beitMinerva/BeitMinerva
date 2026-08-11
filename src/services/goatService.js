@@ -188,8 +188,11 @@ export async function addPenFeedingEntry(entryData) {
   const dailyWeight = goatCount > 0 ? parseFloat((totalWeight / goatCount).toFixed(4)) : null;
 
   // Auto-generate food_type from active components
+  const isNur = Boolean(entryData.is_nursery || (entryData.pen && isNurseryPenCheck(entryData.pen)));
+  const comp1Label = isNur ? 'Milk' : 'Alpha';
+
   const activeComponents = [];
-  if (alphaKg > 0) activeComponents.push('Alpha');
+  if (alphaKg > 0) activeComponents.push(comp1Label);
   if (mixedGrainsKg > 0) activeComponents.push('Mixed Grains');
   if (strawKg > 0) activeComponents.push('Straw');
   const foodType = activeComponents.length > 0 ? activeComponents.join(' + ') : (entryData.food_type || '');

@@ -271,8 +271,10 @@ export default function PenFeedingHistoryModal({
     if (values.length === 0) return null;
     const total = values.reduce((sum, value) => sum + value, 0);
     const goatCount = goats.filter((g) => g.area_id === pen?.id).length || 1;
-    const penAverage = total / goatCount;
-    return { total, penAverage, count: values.length, goatCount };
+    const uniqueDays = Math.max(1, new Set(filteredMilkingEntries.map(e => getBeirutDateString(e.date || e.created_at))).size);
+    const dailyAvg = total / uniqueDays;
+    const penAverage = dailyAvg / goatCount;
+    return { total, dailyAvg, penAverage, count: values.length, goatCount, uniqueDays };
   }, [filteredMilkingEntries, goats, pen?.id, isMilkingMode]);
 
   const handleClose = () => {
@@ -504,13 +506,16 @@ export default function PenFeedingHistoryModal({
                 <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: '12px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <TrendingUp size={14} color="var(--primary)" />
-                    <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary-dark)' }}>Pen Milk Summary</span>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary-dark)' }}>Pen Milk Yield Summary</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong style={{ fontSize: '16px', color: 'var(--text-main)' }}>{milkingSummary.total.toFixed(1)} L</strong>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{milkingSummary.goatCount} goats</span>
+                    <strong style={{ fontSize: '16px', color: 'var(--text-main)' }}>{milkingSummary.total.toFixed(1)} L Total</strong>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{milkingSummary.goatCount} goats · {milkingSummary.uniqueDays} {milkingSummary.uniqueDays === 1 ? 'day' : 'days'}</span>
                   </div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Avg. per goat: {milkingSummary.penAverage.toFixed(1)} L</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-main)', fontWeight: '700' }}>
+                    <span>Daily Yield (Summed): {milkingSummary.dailyAvg.toFixed(1)} L/day</span>
+                    <span style={{ color: 'var(--primary-dark)', fontWeight: '800' }}>{milkingSummary.penAverage.toFixed(2)} L/goat/day</span>
+                  </div>
                 </div>
               )}
 
@@ -684,7 +689,7 @@ export default function PenFeedingHistoryModal({
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                           <strong style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-main)' }}>
-                            {item.food_type}
+                            {(item.food_type || '').replace(/\bAlpha\b/g, isNurseryPenCheck(pen) ? 'Milk' : 'Alpha')}
                           </strong>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
@@ -790,7 +795,7 @@ export default function PenFeedingHistoryModal({
               <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid var(--border-color)' }}>
                 <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-main)' }}>Feed Components — Pen Totals (kg) & Price ($/kg)</span>
                 {[
-                  { label: 'Alpha', kg: feedingAlphaKg, setKg: setFeedingAlphaKg, price: feedingAlphaPrice, setPrice: setFeedingAlphaPrice },
+                  { label: isNurseryPenCheck(pen) ? 'Milk' : 'Alpha', kg: feedingAlphaKg, setKg: setFeedingAlphaKg, price: feedingAlphaPrice, setPrice: setFeedingAlphaPrice },
                   { label: 'Mixed Grains', kg: feedingMixedKg, setKg: setFeedingMixedKg, price: feedingMixedPrice, setPrice: setFeedingMixedPrice },
                   { label: 'Straw', kg: feedingStrawKg, setKg: setFeedingStrawKg, price: feedingStrawPrice, setPrice: setFeedingStrawPrice },
                 ].map(c => (
