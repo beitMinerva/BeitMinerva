@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getBeirutDateTimeString, formatBeirutDisplay } from '../services/goatService';
-import { calculateDailyFeedCarryover, calculateMonthlySnapshots } from '../components/FarmAnalyticsModal';
+import { calculateDailyFeedCarryover, calculateDailyMilkCarryover, calculateMonthlySnapshots } from '../components/FarmAnalyticsModal';
 
 describe('Pen Milk & Feeding Entries - Beirut Timezone & Amount Calculations', () => {
   it('correctly parses amount_liters for pen milk entries', () => {
@@ -233,5 +233,28 @@ describe('Daily Feed Carryover & Shift Validation', () => {
 
     expect(totalMilk).toBe(26);
     expect(sellableMilk).toBe(22); // 12 Morning + 10 Evening = 22 L sellable
+  });
+
+  it('correctly carries over daily milk and feed totals when a day has no entries, accumulating profit', () => {
+    const barnAreas = [{ id: 'pen-A', letter: 'A', name: 'Pen A' }];
+    const milkEntries = [
+      { id: 'm1', barn_area_id: 'pen-A', date: '2026-08-11T08:00:00Z', amount_liters: 10, destination: 'commercial' }
+    ];
+
+    const result1 = calculateDailyMilkCarryover({
+      milkEntries,
+      barnAreas,
+      startDate: new Date('2026-08-11T00:00:00Z'),
+      endDate: new Date('2026-08-11T23:59:59Z')
+    });
+    expect(result1.totalMilkLiters).toBe(10);
+
+    const result2 = calculateDailyMilkCarryover({
+      milkEntries,
+      barnAreas,
+      startDate: new Date('2026-08-11T00:00:00Z'),
+      endDate: new Date('2026-08-12T23:59:59Z')
+    });
+    expect(result2.totalMilkLiters).toBe(20); // 10 L from Aug 11 + 10 L carried to Aug 12
   });
 });
