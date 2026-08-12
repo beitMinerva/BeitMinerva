@@ -108,7 +108,74 @@ export function calculateDailyFeedCarryover({
   return { totalFeedKg: grandTotalKg, totalFeedCost: grandTotalCost, penFeedPerformanceMap: penMap, totalRangeDays: Math.max(1, dayList.length) };
 }
 
-// Standalone helper for Monthly Snapshots with daily feed carryover (exported for testing)
+// Standalone helper for daily milk carryover calculation (summing morning/night shifts per day, carrying over previous day if no entry logged)
+export function calculateDailyMilkCarryover({
+  milkEntries = [],
+  barnAreas = [],
+  startDate,
+  endDate
+}) {
+  if (!milkEntries || milkEntries.length === 0) {
+    return { totalMilkLiters: 0, totalSellableLiters: 0, penMilkMap: {}, penSellableMap: {}, sessionsCount: 0 };
+  }
+
+  const sortedEntries = [...milkEntries].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const allPens = barnAreas;
+
+  // Generate list of days
+  const dayList = [];
+  let curr = new Date(startDate);
+  while (curr <= endDate) {
+    dayList.push(new Date(curr));
+    curr.setDate(curr.getDate() + 1);
+  }
+
+  let totalLiters = 0;
+  let totalSellable = 0;
+  let sessionsCount = 0;
+  const penMap = {};
+  const penSellableMap = {};
+  allPens.forEach(p => { 
+    penMap[p.id] = 0; 
+    penSellableMap[p.id] = 0;
+  });
+
+  dayList.forEach(day => {
+    const dayEnd = new Date(day);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    allPens.forEach(p => {
+      // Find all entries logged on or before this day for this pen
+      const penEntries = sortedEntries.filter(e => e.barn_area_id === p.id && new Date(e.date) <= dayEnd);
+      if (penEntries.length > 0) {
+        // Carry over the active daily milk from the last date milk was recorded
+        const lastEntry = penEntries[penEntries.length - 1];
+        const lastEntryDateStr = getBeirutDateString(new Date(lastEntry.date));
+
+        // Get all entries for that active day (Morning + Night shifts summed)
+        const activeDayEntries = penEntries.filter(e => getBeirutDateString(new Date(e.date)) === lastEntryDateStr);
+        
+        const dayTotal = activeDayEntries.reduce((sum, e) => sum + (parseFloat(e.amount_liters) || 0), 0);
+        const daySellable = activeDayEntries
+          .filter(e => e.destination !== 'home_use' && e.destination !== 'farm_use')
+          .reduce((sum, e) => sum + (parseFloat(e.amount_liters) || 0), 0);
+
+        totalLiters += dayTotal;
+        totalSellable += daySellable;
+        sessionsCount += activeDayEntries.length;
+
+        if (penMap[p.id] !== undefined) {
+          penMap[p.id] += dayTotal;
+          penSellableMap[p.id] += daySellable;
+        }
+      }
+    });
+  });
+
+  return { totalMilkLiters: totalLiters, totalSellableLiters: totalSellable, penMilkMap: penMap, penSellableMap: penSellableMap, sessionsCount };
+}
+
+// Standalone helper for Monthly Snapshots with daily feed and milk carryover (exported for testing)
 export function calculateMonthlySnapshots({
   milkEntries = [],
   feedingEntries = [],
@@ -140,35 +207,25 @@ export function calculateMonthlySnapshots({
     return monthsMap[key];
   };
 
+  // Register months from milk entries
   milkEntries.forEach(e => {
     const d = new Date(e.date);
-    const mObj = getMonthObj(d.getFullYear(), d.getMonth());
-    const liters = parseFloat(e.amount_liters) || 0;
-    mObj.milk += liters;
-    if (e.destination !== 'home_use' && e.destination !== 'farm_use') {
-      mObj.sellableMilk += liters;
-    }
-    mObj.sessions += 1;
+    getMonthObj(d.getFullYear(), d.getMonth());
   });
 
+  // Register months from individual milking/sale timeline events
   timelineEvents.forEach(e => {
-    if (e.type === 'Milking') {
+    if (e.type === 'Milking' || e.type === 'Sale') {
       const d = new Date(e.date);
       const mObj = getMonthObj(d.getFullYear(), d.getMonth());
-      const liters = parseFloat(e.custom_fields?.amount_liters) || 0;
-      mObj.milk += liters;
-      if (e.custom_fields?.destination !== 'home_use' && e.custom_fields?.destination !== 'farm_use') {
-        mObj.sellableMilk += liters;
+      if (e.type === 'Sale') {
+        const val = parseFloat(e.custom_fields?.sale_price || e.custom_fields?.price || 0);
+        mObj.salesRevenue += val;
       }
-      mObj.sessions += 1;
-    } else if (e.type === 'Sale') {
-      const d = new Date(e.date);
-      const mObj = getMonthObj(d.getFullYear(), d.getMonth());
-      const val = parseFloat(e.custom_fields?.sale_price || e.custom_fields?.price || 0);
-      mObj.salesRevenue += val;
     }
   });
 
+  // Register months from feeding entries
   feedingEntries.forEach(e => {
     const d = new Date(e.date);
     getMonthObj(d.getFullYear(), d.getMonth());
@@ -190,6 +247,38 @@ export function calculateMonthlySnapshots({
     const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
     const endStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(endDayNum).padStart(2, '0')}`;
 
+    // Apply daily carryover for pen milk
+    const milkResult = calculateDailyMilkCarryover({
+      milkEntries,
+      barnAreas,
+      startDate: new Date(startStr),
+      endDate: new Date(endStr)
+    });
+    mObj.milk = milkResult.totalMilkLiters;
+    mObj.sellableMilk = milkResult.totalSellableLiters;
+    mObj.sessions = milkResult.sessionsCount;
+
+    // Add any individual timeline milking events for this month
+    const monthStart = new Date(startStr);
+    const monthEnd = new Date(endStr);
+    monthEnd.setHours(23, 59, 59, 999);
+
+    const monthIndividualMilking = timelineEvents.filter(e => {
+      if (e.type !== 'Milking') return false;
+      const ed = new Date(e.date);
+      return ed >= monthStart && ed <= monthEnd;
+    });
+
+    monthIndividualMilking.forEach(e => {
+      const liters = parseFloat(e.custom_fields?.amount_liters) || 0;
+      mObj.milk += liters;
+      if (e.custom_fields?.destination !== 'home_use' && e.custom_fields?.destination !== 'farm_use') {
+        mObj.sellableMilk += liters;
+      }
+      mObj.sessions += 1;
+    });
+
+    // Apply daily carryover for feed
     const feedResult = calculateDailyFeedCarryover({
       feedingEntries,
       barnAreas,
@@ -309,38 +398,6 @@ export default function FarmAnalyticsModal({
     daysInRange = parseInt(timeRange) || 30;
   }
 
-  // 1. MILK PRODUCTION & YIELD METRICS
-  const penMilkVolume = filteredMilk.reduce((sum, e) => sum + (parseFloat(e.amount_liters) || 0), 0);
-  const goatMilkEvents = filteredEvents.filter(e => e.type === 'Milking');
-  const individualMilkVolume = goatMilkEvents.reduce((sum, e) => sum + (parseFloat(e.custom_fields?.amount_liters) || 0), 0);
-  const totalMilkVolume = penMilkVolume + individualMilkVolume;
-
-  // Commercial / Sellable milk (excludes Home Use & Kid Feeding entries)
-  const penSellableMilk = filteredMilk
-    .filter(e => e.destination !== 'home_use' && e.destination !== 'farm_use')
-    .reduce((sum, e) => sum + (parseFloat(e.amount_liters) || 0), 0);
-  const goatSellableMilk = goatMilkEvents
-    .filter(e => e.custom_fields?.destination !== 'home_use' && e.custom_fields?.destination !== 'farm_use')
-    .reduce((sum, e) => sum + (parseFloat(e.custom_fields?.amount_liters) || 0), 0);
-  const sellableMilkVolume = penSellableMilk + goatSellableMilk;
-
-  const activeMilkingDoes = goats.filter(g => {
-    const gen = (g.gender || '').toLowerCase();
-    const isFemale = gen.includes('female') || gen.includes('doe') || gen === 'f';
-    return isFemale && g.status !== 'Dry' && g.status !== 'Quarantine';
-  });
-  const milkingDoeCount = activeMilkingDoes.length || 1;
-
-  // Active days on which milking occurred
-  const milkDatesSet = new Set([
-    ...filteredMilk.map(m => getBeirutDateString(m.date)),
-    ...goatMilkEvents.map(e => getBeirutDateString(e.date))
-  ]);
-  const activeMilkingDays = Math.max(1, milkDatesSet.size);
-
-  const dailyAverageMilk = totalMilkVolume / activeMilkingDays;
-  const milkYieldPerActiveDoe = dailyAverageMilk / Math.max(1, milkingDoeCount);
-
   // 2. FEED CONSUMPTION & DYNAMIC CUMULATIVE CARRYOVER METRICS
   const { totalFeedKg, totalFeedCost, penFeedPerformanceMap, totalRangeDays } = React.useMemo(() => {
     return calculateDailyFeedCarryover({
@@ -355,6 +412,63 @@ export default function FarmAnalyticsModal({
     });
   }, [feedingEntries, barnAreas, timeRange, customStartDate, customEndDate, alphaPricePerKg, mixedGrainsPricePerKg, strawPricePerKg]);
 
+  // 1. MILK PRODUCTION & DYNAMIC CUMULATIVE CARRYOVER METRICS (carrying over pen milk daily if no entries added)
+  const { penMilkVolume, penSellableMilk, penMilkPerformanceMap } = React.useMemo(() => {
+    // Determine start and end date objects matching the selected range
+    const end = timeRange === 'custom' && customEndDate ? new Date(customEndDate) : new Date();
+    end.setHours(23, 59, 59, 999);
+
+    let start = new Date(end);
+    if (timeRange === 'custom' && customStartDate) {
+      start = new Date(customStartDate);
+    } else if (timeRange === 'all') {
+      const earliest = milkEntries.reduce((earliestDate, entry) => {
+        const d = new Date(entry.date);
+        return d < earliestDate ? d : earliestDate;
+      }, new Date());
+      start = earliest;
+    } else {
+      const days = parseInt(timeRange) || 30;
+      start.setDate(start.getDate() - (days - 1));
+    }
+    start.setHours(0, 0, 0, 0);
+
+    const result = calculateDailyMilkCarryover({
+      milkEntries,
+      barnAreas,
+      startDate: start,
+      endDate: end
+    });
+
+    return {
+      penMilkVolume: result.totalMilkLiters,
+      penSellableMilk: result.totalSellableLiters,
+      penMilkPerformanceMap: result.penMilkMap
+    };
+  }, [milkEntries, barnAreas, timeRange, customStartDate, customEndDate]);
+
+  const goatMilkEvents = filteredEvents.filter(e => e.type === 'Milking');
+  const individualMilkVolume = goatMilkEvents.reduce((sum, e) => sum + (parseFloat(e.custom_fields?.amount_liters) || 0), 0);
+  const totalMilkVolume = penMilkVolume + individualMilkVolume;
+
+  const goatSellableMilk = goatMilkEvents
+    .filter(e => e.custom_fields?.destination !== 'home_use' && e.custom_fields?.destination !== 'farm_use')
+    .reduce((sum, e) => sum + (parseFloat(e.custom_fields?.amount_liters) || 0), 0);
+  const sellableMilkVolume = penSellableMilk + goatSellableMilk;
+
+  const activeMilkingDoes = goats.filter(g => {
+    const gen = (g.gender || '').toLowerCase();
+    const isFemale = gen.includes('female') || gen.includes('doe') || gen === 'f';
+    return isFemale && g.status !== 'Dry' && g.status !== 'Quarantine';
+  });
+  const milkingDoeCount = activeMilkingDoes.length || 1;
+
+  // Active days on which milking occurred (including carryover active range)
+  const activeMilkingDays = Math.max(1, totalRangeDays);
+
+  const dailyAverageMilk = totalMilkVolume / activeMilkingDays;
+  const milkYieldPerActiveDoe = dailyAverageMilk / Math.max(1, milkingDoeCount);
+
   const feedCostPerLiter = totalMilkVolume > 0 ? (totalFeedCost / totalMilkVolume).toFixed(2) : '0.00';
 
   // 3. SCIENTIFIC FEED METRICS: FCE vs FCR
@@ -368,35 +482,26 @@ export default function FarmAnalyticsModal({
   const estimatedGrossRevenue = milkRevenue + totalGoatSalesRevenue;
   const feedMargin = estimatedGrossRevenue - totalFeedCost;
 
-  // 5. NORMALIZED PEN COMPARISON (Active Milking Days & Active Feeding Days)
+  // 5. NORMALIZED PEN COMPARISON (Both Milk & Feed normalized over totalRangeDays using daily carryover)
   const penPerformance = barnAreas.map(area => {
     const penGoats = goats.filter(g => g.area_id === area.id);
     const penGoatIds = new Set(penGoats.map(g => g.id));
     const goatCount = penGoats.length || 1;
 
-    // 1. Pen-level milk entries
-    const penMilkEntries = filteredMilk.filter(m => m.barn_area_id === area.id);
-    const penMilkDirect = penMilkEntries.reduce((sum, m) => sum + (parseFloat(m.amount_liters) || 0), 0);
+    // 1. Pen-level milk entries (with carryover)
+    const penMilkDirect = penMilkPerformanceMap[area.id] || 0;
 
-    // 2. Individual goat milking events for goats in this pen
-    const goatMilkEvents = filteredEvents.filter(e => e.type === 'Milking' && penGoatIds.has(e.goat_id));
-    const goatMilkDirect = goatMilkEvents.reduce((sum, e) => sum + (parseFloat(e.custom_fields?.amount_liters) || 0), 0);
+    // 2. Individual goat milking events for goats in this pen (no carryover for individual logs)
+    const goatMilkEventsForPen = goatMilkEvents.filter(e => penGoatIds.has(e.goat_id));
+    const goatMilkDirect = goatMilkEventsForPen.reduce((sum, e) => sum + (parseFloat(e.custom_fields?.amount_liters) || 0), 0);
 
     const penMilk = penMilkDirect + goatMilkDirect;
 
     const penFeedData = penFeedPerformanceMap[area.id] || { feedKg: 0, feedCost: 0, daysCount: totalRangeDays };
     const penFeed = penFeedData.feedKg;
 
-    // Active days on which milk was actually logged for this pen
-    const milkDatesSet = new Set([
-      ...penMilkEntries.map(m => getBeirutDateString(m.date)),
-      ...goatMilkEvents.map(e => getBeirutDateString(e.date))
-    ]);
-    const penMilkDays = Math.max(1, milkDatesSet.size);
-    const penFeedDays = Math.max(1, penFeedData.daysCount);
-
-    const milkPerGoatDay = (penMilk / penMilkDays) / goatCount;
-    const feedPerGoatDay = (penFeed / penFeedDays) / goatCount;
+    const milkPerGoatDay = (penMilk / totalRangeDays) / goatCount;
+    const feedPerGoatDay = (penFeed / totalRangeDays) / goatCount;
     const penFCE = penFeed > 0 ? (penMilk / penFeed).toFixed(2) : '0.00';
 
     return {

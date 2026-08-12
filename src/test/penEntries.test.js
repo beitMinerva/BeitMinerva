@@ -212,8 +212,8 @@ describe('Daily Feed Carryover & Shift Validation', () => {
     expect(monthlySnapshots.length).toBeGreaterThanOrEqual(2);
     const julySnapshot = monthlySnapshots.find(m => m.key === '2026-07');
     expect(julySnapshot).toBeDefined();
-    expect(julySnapshot.milk).toBe(100);
-    expect(julySnapshot.milkRevenue).toBeCloseTo(110.00, 2); // 100 L * $1.10 = $110.00
+    expect(julySnapshot.milk).toBe(1700); // 17 days (July 15-31) * 100 L/day
+    expect(julySnapshot.milkRevenue).toBeCloseTo(1870.00, 2); // 1700 L * $1.10 = $1870.00
     // July has 31 days @ 20 kg/day = 620 kg feed
     expect(julySnapshot.feed).toBe(620);
   });

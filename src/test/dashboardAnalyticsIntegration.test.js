@@ -24,9 +24,9 @@ describe('Farm Dashboard & Analytics End-to-End Integration Edge Cases', () => {
 
     const augSnapshot = snapshots.find(s => s.key === '2026-08');
     expect(augSnapshot).toBeDefined();
-    expect(augSnapshot.milk).toBe(105); // Pen milk (100) + Individual milk (5)
-    expect(augSnapshot.milkRevenue).toBeCloseTo(115.50, 2); // 105 * 1.10 = $115.50
-    expect(augSnapshot.grossIncome).toBeCloseTo(365.50, 2); // $115.50 milk + $250 goat sale = $365.50
+    expect(augSnapshot.milk).toBe(805); // 8 days (Aug 5-12) * 100 L/day + 5 L individual milk
+    expect(augSnapshot.milkRevenue).toBeCloseTo(885.50, 2); // 805 L * $1.10 = $885.50
+    expect(augSnapshot.grossIncome).toBeCloseTo(1135.50, 2); // $885.50 milk + $250 goat sale = $1135.50
   });
 
   it('accurately tallies herd status counts for dashboard summary cards', () => {
