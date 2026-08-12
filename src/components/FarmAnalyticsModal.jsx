@@ -152,11 +152,21 @@ export function calculateMonthlySnapshots({
   });
 
   timelineEvents.forEach(e => {
-    if (e.type !== 'Sale') return;
-    const d = new Date(e.date);
-    const mObj = getMonthObj(d.getFullYear(), d.getMonth());
-    const val = parseFloat(e.custom_fields?.sale_price || e.custom_fields?.price || 0);
-    mObj.salesRevenue += val;
+    if (e.type === 'Milking') {
+      const d = new Date(e.date);
+      const mObj = getMonthObj(d.getFullYear(), d.getMonth());
+      const liters = parseFloat(e.custom_fields?.amount_liters) || 0;
+      mObj.milk += liters;
+      if (e.custom_fields?.destination !== 'home_use' && e.custom_fields?.destination !== 'farm_use') {
+        mObj.sellableMilk += liters;
+      }
+      mObj.sessions += 1;
+    } else if (e.type === 'Sale') {
+      const d = new Date(e.date);
+      const mObj = getMonthObj(d.getFullYear(), d.getMonth());
+      const val = parseFloat(e.custom_fields?.sale_price || e.custom_fields?.price || 0);
+      mObj.salesRevenue += val;
+    }
   });
 
   feedingEntries.forEach(e => {
