@@ -14,6 +14,7 @@ export default function GoatCard({ goat, barnAreas = [], onClick }) {
   const ageStr = calculateGoatAge(goat.birth_date);
   const genderLabel = goat.gender === 'Doe' ? 'Female' : goat.gender === 'Buck' ? 'Male' : (goat.gender || 'Female');
   const isBaby = isBabyGoat(goat, barnAreas);
+  const photoSrc = goat.photo_url || '';
 
   const getStatusBadgeClass = (status) => {
     switch (status) {
@@ -27,6 +28,8 @@ export default function GoatCard({ goat, barnAreas = [], onClick }) {
     }
   };
 
+  const initials = (goat.name || goat.tag_id || 'G').split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase();
+
   return (
     <div
       className="card goat-card"
@@ -37,9 +40,18 @@ export default function GoatCard({ goat, barnAreas = [], onClick }) {
         justify: 'space-between',
         alignItems: 'center',
         padding: '12px 14px',
-        borderRadius: '12px'
+        borderRadius: '12px',
+        gap: '10px'
       }}
     >
+      <div style={{ width: '42px', height: '42px', borderRadius: '12px', overflow: 'hidden', background: '#e2e8f0', border: '1px solid var(--border-color)', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+        {photoSrc ? (
+          <img src={photoSrc} alt={goat.name || goat.tag_id} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <span style={{ fontSize: '13px', fontWeight: '800', color: '#475569' }}>{initials}</span>
+        )}
+      </div>
+
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
           <span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: '11px' }}>

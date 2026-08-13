@@ -394,6 +394,7 @@ export async function addGoat(goatData) {
     status: goatData.status || 'Healthy',
     area_id: goatData.area_id || null,
     notes: goatData.notes || '',
+    photo_url: goatData.photo_url || null,
     created_at: new Date().toISOString()
   };
 

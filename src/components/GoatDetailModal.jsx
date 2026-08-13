@@ -96,6 +96,8 @@ export default function GoatDetailModal({
   const genderLabel = goat.gender === 'Doe' ? 'Female' : goat.gender === 'Buck' ? 'Male' : (goat.gender || 'Female');
   const neuteredLabel = goat.neutered_status || 'Intact';
   const isBaby = Boolean(area && isNurseryPenCheck(area));
+  const photoSrc = goat.photo_url || '';
+  const initials = (goat.name || goat.tag_id || 'G').split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase();
 
   const reminderCategories = [
     { id: 'Vaccination', label: 'Vaccination Booster', icon: Syringe, color: '#059669', bg: '#ecfdf5' },
@@ -272,30 +274,40 @@ export default function GoatDetailModal({
         <div style={{ maxWidth: '600px', width: '100%', margin: '0 auto', padding: '16px 16px 40px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
           {/* GOAT TITLE & BARCODE TAG */}
-          <div className="card" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <span className="badge" style={{ background: '#f1f5f9', color: '#334155' }}>
-                  <Tag size={12} />
-                  {goat.tag_id}
-                </span>
-                <span className={`badge ${getStatusBadgeClass(goat.status)}`}>
-                  {goat.status}
-                </span>
-                {isBaby && (
-                  <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', fontSize: '11px', fontWeight: '800' }}>
-                    Baby
-                  </span>
+          <div className="card" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '18px', overflow: 'hidden', background: '#e2e8f0', border: '1px solid var(--border-color)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                {photoSrc ? (
+                  <img src={photoSrc} alt={goat.name || goat.tag_id} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontSize: '24px', fontWeight: '800', color: '#475569' }}>{initials}</span>
                 )}
               </div>
 
-              <h1 style={{ fontSize: '24px', fontWeight: '800', margin: '0 0 4px 0' }}>{goat.name}</h1>
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 6px 0' }}>
-                {goat.breed} • {genderLabel} ({neuteredLabel})
-              </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--primary)', fontWeight: '700' }}>
-                <MapPin size={14} />
-                <span>{areaName}</span>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                  <span className="badge" style={{ background: '#f1f5f9', color: '#334155' }}>
+                    <Tag size={12} />
+                    {goat.tag_id}
+                  </span>
+                  <span className={`badge ${getStatusBadgeClass(goat.status)}`}>
+                    {goat.status}
+                  </span>
+                  {isBaby && (
+                    <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', fontSize: '11px', fontWeight: '800' }}>
+                      Baby
+                    </span>
+                  )}
+                </div>
+
+                <h1 style={{ fontSize: '24px', fontWeight: '800', margin: '0 0 4px 0' }}>{goat.name}</h1>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 6px 0' }}>
+                  {goat.breed} • {genderLabel} ({neuteredLabel})
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--primary)', fontWeight: '700' }}>
+                  <MapPin size={14} />
+                  <span>{areaName}</span>
+                </div>
               </div>
             </div>
 
