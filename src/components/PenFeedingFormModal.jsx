@@ -69,11 +69,14 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
       .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0];
 
     const savedRate = Number(penEntry?.daily_weight ?? latestFeedingEntry?.daily_weight ?? 0);
-    return Number.isFinite(savedRate) && savedRate > 0 ? savedRate : 2.5;
+    return Number.isFinite(savedRate) && savedRate > 0 ? savedRate : null;
   };
 
   const initialTargetRates = Object.fromEntries(
-    allBarnPens.map(p => [p.id, String(getLatestDailyWeightForPen(p.id))])
+    allBarnPens.map(p => {
+      const savedRate = getLatestDailyWeightForPen(p.id);
+      return [p.id, savedRate !== null ? String(savedRate) : ''];
+    })
   );
 
   // Shared Trough State
@@ -111,8 +114,8 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
       setSelectedSharedPenIds(prev => prev.filter(id => id !== penId));
     } else {
       setSelectedSharedPenIds(prev => [...prev, penId]);
-      if (!targetRates[penId]) {
-        setTargetRates(prev => ({ ...prev, [penId]: '2.0' }));
+      if (targetRates[penId] === undefined || targetRates[penId] === '') {
+        setTargetRates(prev => ({ ...prev, [penId]: '' }));
       }
     }
   };
@@ -139,7 +142,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
   // Calculate target need & proportional share per pen
   const groupPenMetrics = activePens.map(p => {
     const count = goats.filter(g => g.area_id === p.id).length;
-    const targetRate = parseFloat(targetRates[p.id] !== undefined ? targetRates[p.id] : '2.5') || 0;
+    const targetRate = parseFloat(targetRates[p.id] ?? '0') || 0;
     const targetNeed = count * targetRate;
     return { pen: p, count, targetRate, targetNeed };
   });
@@ -495,8 +498,8 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                                   step="any"
                                   min="0"
                                   className="form-input"
-                                  placeholder="2.5"
-                                  value={targetRates[p.id] !== undefined ? targetRates[p.id] : '2.5'}
+                                  placeholder="0"
+                                  value={targetRates[p.id] ?? ''}
                                   onChange={(e) => handleTargetRateChange(p.id, e.target.value)}
                                   disabled={submitting}
                                   style={{ fontSize: '12px', fontWeight: '700', padding: '4px 8px', height: '28px', width: '75px', background: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
@@ -547,8 +550,8 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
                       step="any"
                       min="0"
                       className="form-input"
-                      placeholder="2.5"
-                      value={targetRates[pen?.id] !== undefined ? targetRates[pen?.id] : '2.5'}
+                      placeholder="0"
+                      value={targetRates[pen?.id] ?? ''}
                       onChange={(e) => handleTargetRateChange(pen?.id, e.target.value)}
                       disabled={submitting}
                       style={{ fontSize: '12px', fontWeight: '700', padding: '4px 8px', height: '28px', width: '75px', background: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
@@ -734,44 +737,16 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '700', color: '#334155' }}>
                 <FileText size={14} color="#059669" /> Special Notes & Instructions
-                {sharedTroughInit?.isShared && (
-                  <span style={{ fontSize: '10px', fontWeight: '600', background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: '4px', marginLeft: 'auto' }}>
-                    LOCKED (Shared Trough)
-                  </span>
-                )}
               </label>
-              {sharedTroughInit?.isShared ? (
-                <div
-                  className="form-textarea"
-                  rows={2}
-                  placeholder="e.g. Add free-choice mineral block & fresh water daily."
-                  style={{
-                    fontWeight: '600',
-                    padding: '10px 12px',
-                    background: '#f9fafb',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    color: '#6b7280',
-                    minHeight: '60px',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word'
-                  }}
-                >
-                  {notes}
-                </div>
-              ) : (
-                <textarea
-                  className="form-textarea"
-                  rows={2}
-                  placeholder="e.g. Add free-choice mineral block & fresh water daily."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  disabled={submitting}
-                  style={{ fontWeight: '600' }}
-                />
-              )}
+              <textarea
+                className="form-textarea"
+                rows={2}
+                placeholder="e.g. Add free-choice mineral block & fresh water daily."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                disabled={submitting}
+                style={{ fontWeight: '600' }}
+              />
             </div>
           </div>
 
