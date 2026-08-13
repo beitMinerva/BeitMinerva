@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeSharedTroughMetadata, resolvePenFeedingFormSource } from '../services/goatService';
+import { normalizeSharedTroughMetadata, resolvePenFeedingFormSource, buildSharedTroughEditState } from '../services/goatService';
 
 describe('Shared trough metadata normalization', () => {
   it('reads structured database metadata and keeps plain notes clean', () => {
@@ -43,5 +43,55 @@ describe('Shared trough metadata normalization', () => {
     expect(source.id).toBe('older');
     expect(source.alpha_kg).toBe(8);
     expect(source.notes).toBe('selected');
+  });
+
+  it('rebuilds shared-trough edit state from the selected historical row', () => {
+    const barnAreas = [{ id: 'area-1', name: 'Pen A' }, { id: 'area-2', name: 'Pen B' }];
+    const selected = {
+      id: 'older',
+      alpha_kg: 8,
+      alpha_price_per_kg: 2.5,
+      mixed_grains_kg: 10,
+      mixed_grains_price_per_kg: 1.5,
+      straw_kg: 4,
+      straw_price_per_kg: 0.5,
+      notes: 'Saved note',
+      shared_trough_metadata: {
+        enabled: true,
+        pen_ids: ['area-1', 'area-2'],
+        percent: 50
+      }
+    };
+
+    const latest = {
+      id: 'newest',
+      alpha_kg: 20,
+      alpha_price_per_kg: 2.5,
+      mixed_grains_kg: 12,
+      mixed_grains_price_per_kg: 1.5,
+      straw_kg: 6,
+      straw_price_per_kg: 0.5,
+      notes: 'Latest stale note',
+      shared_trough_metadata: {
+        enabled: true,
+        pen_ids: ['area-1'],
+        percent: 100
+      }
+    };
+
+    const result = buildSharedTroughEditState({
+      selectedEntry: selected,
+      latestFeedingEntry: latest,
+      barnAreas,
+      primaryPenId: 'area-1'
+    });
+
+    expect(result).toMatchObject({
+      isShared: true,
+      selectedPenIds: ['area-1', 'area-2'],
+      alphaKg: '16.00',
+      mixedGrainsKg: '20.00',
+      strawKg: '8.00'
+    });
   });
 });

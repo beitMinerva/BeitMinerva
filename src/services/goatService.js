@@ -79,6 +79,49 @@ export function resolvePenFeedingFormSource({ latestFeedingEntry = null, selecte
   return {};
 }
 
+export function buildSharedTroughEditState({ selectedEntry = null, latestFeedingEntry = null, barnAreas = [], primaryPenId = null } = {}) {
+  const sourceEntry = resolvePenFeedingFormSource({ latestFeedingEntry, selectedEntry });
+  const normalized = normalizeSharedTroughMetadata(sourceEntry);
+  const sharedPenIds = (normalized.penIds || []).filter((id) => barnAreas.some((pen) => pen.id === id));
+  const fallbackPrimary = primaryPenId ? [primaryPenId] : [];
+  const finalSelectedPenIds = sharedPenIds.length > 0 ? sharedPenIds : fallbackPrimary;
+  const thisShare = Number(normalized.percent || 0);
+
+  if (!sourceEntry || !normalized.enabled || finalSelectedPenIds.length === 0 || thisShare <= 0) {
+    return null;
+  }
+
+  const allocatedAlpha = Number(sourceEntry.alpha_kg || 0);
+  const allocatedMixed = Number(sourceEntry.mixed_grains_kg || 0);
+  const allocatedStraw = Number(sourceEntry.straw_kg || 0);
+  const allocatedTotal = allocatedAlpha + allocatedMixed + allocatedStraw;
+  const ratio = thisShare / 100;
+
+  if (!Number.isFinite(ratio) || ratio <= 0 || allocatedTotal <= 0) {
+    return {
+      isShared: true,
+      alphaKg: sourceEntry.alpha_kg > 0 ? String(Number(sourceEntry.alpha_kg).toFixed(2)) : '',
+      alphaPricePerKg: sourceEntry.alpha_price_per_kg > 0 ? String(sourceEntry.alpha_price_per_kg) : '',
+      mixedGrainsKg: sourceEntry.mixed_grains_kg > 0 ? String(Number(sourceEntry.mixed_grains_kg).toFixed(2)) : '',
+      mixedGrainsPricePerKg: sourceEntry.mixed_grains_price_per_kg > 0 ? String(sourceEntry.mixed_grains_price_per_kg) : '',
+      strawKg: sourceEntry.straw_kg > 0 ? String(Number(sourceEntry.straw_kg).toFixed(2)) : '',
+      strawPricePerKg: sourceEntry.straw_price_per_kg > 0 ? String(sourceEntry.straw_price_per_kg) : '',
+      selectedPenIds: finalSelectedPenIds
+    };
+  }
+
+  return {
+    isShared: true,
+    alphaKg: allocatedAlpha > 0 ? String((allocatedAlpha / ratio).toFixed(2)) : '',
+    alphaPricePerKg: sourceEntry.alpha_price_per_kg > 0 ? String(sourceEntry.alpha_price_per_kg) : '',
+    mixedGrainsKg: allocatedMixed > 0 ? String((allocatedMixed / ratio).toFixed(2)) : '',
+    mixedGrainsPricePerKg: sourceEntry.mixed_grains_price_per_kg > 0 ? String(sourceEntry.mixed_grains_price_per_kg) : '',
+    strawKg: allocatedStraw > 0 ? String((allocatedStraw / ratio).toFixed(2)) : '',
+    strawPricePerKg: sourceEntry.straw_price_per_kg > 0 ? String(sourceEntry.straw_price_per_kg) : '',
+    selectedPenIds: finalSelectedPenIds
+  };
+}
+
 export async function addBarnArea(areaData) {
   const currentAreas = await getBarnAreas();
   const nextLetter = String.fromCharCode(65 + currentAreas.length);

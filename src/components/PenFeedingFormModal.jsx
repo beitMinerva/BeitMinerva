@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles, Share2, Layers, Check, Info, Plus, Milk } from 'lucide-react';
 import { parsePenFeeding } from './PenFeedingHistoryModal';
-import { getBeirutDateTimeString, isNurseryPenCheck, normalizeSharedTroughMetadata, resolvePenFeedingFormSource } from '../services/goatService';
+import { getBeirutDateTimeString, isNurseryPenCheck, normalizeSharedTroughMetadata, resolvePenFeedingFormSource, buildSharedTroughEditState } from '../services/goatService';
 
 export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], onClose, onSave, latestFeedingEntry = null, selectedEntry = null, feedingEntries = [] }) {
   const parsed = parsePenFeeding(pen?.feeding_info || pen?.note);
@@ -24,15 +24,26 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
   // Handles both new format: [Shared Trough: area-1,area-2 · 50% share]
   // AND old format: [Shared Trough with Pen MLK · 50% share]
   const initializeSharedTroughState = () => {
+    const prioritizedState = buildSharedTroughEditState({
+      selectedEntry,
+      latestFeedingEntry,
+      barnAreas,
+      primaryPenId: pen?.id
+    });
+
+    if (prioritizedState) {
+      return prioritizedState;
+    }
+
     const sourceEntry = editSourceEntry || latestFeedingEntry || { notes: currentRation.notes || '' };
     const normalized = normalizeSharedTroughMetadata(sourceEntry);
     const sharedPenIds = (normalized.penIds || []).filter(id => barnAreas.some(p => p.id === id));
     const thisShare = Number(normalized.percent || 0);
 
-    if (latestFeedingEntry && sharedPenIds.length > 0 && thisShare > 0) {
-      const allocatedAlpha = latestFeedingEntry.alpha_kg || 0;
-      const allocatedMixed = latestFeedingEntry.mixed_grains_kg || 0;
-      const allocatedStraw = latestFeedingEntry.straw_kg || 0;
+    if (sharedPenIds.length > 0 && thisShare > 0) {
+      const allocatedAlpha = Number(sourceEntry.alpha_kg || 0);
+      const allocatedMixed = Number(sourceEntry.mixed_grains_kg || 0);
+      const allocatedStraw = Number(sourceEntry.straw_kg || 0);
       const allocatedTotal = allocatedAlpha + allocatedMixed + allocatedStraw;
       const originalTotal = allocatedTotal / (thisShare / 100);
       const ratio = thisShare / 100;
@@ -45,11 +56,11 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
         return {
           isShared: true,
           alphaKg: reconstructedAlpha > 0 ? String(reconstructedAlpha.toFixed(2)) : '',
-          alphaPricePerKg: latestFeedingEntry.alpha_price_per_kg > 0 ? String(latestFeedingEntry.alpha_price_per_kg) : '',
+          alphaPricePerKg: sourceEntry.alpha_price_per_kg > 0 ? String(sourceEntry.alpha_price_per_kg) : '',
           mixedGrainsKg: reconstructedMixed > 0 ? String(reconstructedMixed.toFixed(2)) : '',
-          mixedGrainsPricePerKg: latestFeedingEntry.mixed_grains_price_per_kg > 0 ? String(latestFeedingEntry.mixed_grains_price_per_kg) : '',
+          mixedGrainsPricePerKg: sourceEntry.mixed_grains_price_per_kg > 0 ? String(sourceEntry.mixed_grains_price_per_kg) : '',
           strawKg: reconstructedStraw > 0 ? String(reconstructedStraw.toFixed(2)) : '',
-          strawPricePerKg: latestFeedingEntry.straw_price_per_kg > 0 ? String(latestFeedingEntry.straw_price_per_kg) : '',
+          strawPricePerKg: sourceEntry.straw_price_per_kg > 0 ? String(sourceEntry.straw_price_per_kg) : '',
           selectedPenIds: sharedPenIds
         };
       }
@@ -96,7 +107,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
 
   const [schedule, setSchedule] = useState(currentRation.schedule || '');
   const [notes, setNotes] = useState(() => {
-    const normalized = normalizeSharedTroughMetadata(latestFeedingEntry || currentRation);
+    const normalized = normalizeSharedTroughMetadata(editSourceEntry || latestFeedingEntry || currentRation);
     return normalized.cleanNotes || (currentRation.notes || '');
   });
   const [feedingDate, setFeedingDate] = useState(() => getBeirutDateTimeString());
