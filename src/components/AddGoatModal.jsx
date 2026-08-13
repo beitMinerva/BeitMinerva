@@ -35,12 +35,30 @@ export default function AddGoatModal({ goatToEdit = null, barnAreas = [], initia
     try {
       const parsed = new URL(url);
       const pathParts = parsed.pathname.split('/').filter(Boolean);
+
+      if (pathParts.length >= 6 && pathParts[0] === 'storage' && pathParts[1] === 'v1' && pathParts[2] === 'object') {
+        return decodeURIComponent(pathParts.slice(5).join('/'));
+      }
+
       if (pathParts.length >= 2 && pathParts[0] === 'storage' && pathParts[1] === 'v1') {
         return decodeURIComponent(pathParts.slice(3).join('/'));
       }
+
       return decodeURIComponent(pathParts.slice(1).join('/'));
     } catch (err) {
       return null;
+    }
+  };
+
+  const removePhotoFromStorage = async (url) => {
+    if (!url) return;
+
+    const storagePath = getStoragePathFromUrl(url);
+    if (!storagePath) return;
+
+    const { error } = await supabase.storage.from('goat-photos').remove([storagePath]);
+    if (error) {
+      console.warn('Could not remove goat photo from storage:', error.message);
     }
   };
 
@@ -112,10 +130,15 @@ export default function AddGoatModal({ goatToEdit = null, barnAreas = [], initia
     setPhotoUrl(previewUrl);
   };
 
-  const handleRemovePhoto = () => {
+  const handleRemovePhoto = async () => {
+    setShowRemovePhotoModal(false);
+
+    if (goatToEdit?.photo_url) {
+      await removePhotoFromStorage(goatToEdit.photo_url);
+    }
+
     setSelectedPhotoFile(null);
     setPhotoUrl('');
-    setShowRemovePhotoModal(false);
   };
 
   const handleAnimatedClose = () => {
@@ -133,13 +156,13 @@ export default function AddGoatModal({ goatToEdit = null, barnAreas = [], initia
 
       if (selectedPhotoFile) {
         if (goatToEdit?.photo_url) {
-          const oldPhotoPath = getStoragePathFromUrl(goatToEdit.photo_url);
-          if (oldPhotoPath) {
-            await supabase.storage.from('goat-photos').remove([oldPhotoPath]).catch(() => {});
-          }
+          await removePhotoFromStorage(goatToEdit.photo_url);
         }
 
         finalPhotoUrl = await uploadPhotoToStorage(selectedPhotoFile);
+      } else if (goatToEdit?.photo_url && !photoUrl) {
+        await removePhotoFromStorage(goatToEdit.photo_url);
+        finalPhotoUrl = null;
       }
 
       await onSave({

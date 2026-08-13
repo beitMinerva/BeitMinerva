@@ -381,6 +381,17 @@ const makeId = (prefix = 'gt') => {
   return `${prefix}-${timestamp}-${random}`;
 };
 
+export function shouldAddWeightTimelineEvent(previousWeight, nextWeight) {
+  const prev = Number(previousWeight);
+  const next = Number(nextWeight);
+
+  if (!Number.isFinite(prev) || !Number.isFinite(next)) {
+    return Number.isFinite(next) && next > 0;
+  }
+
+  return Math.abs(prev - next) > 0.0001;
+}
+
 export async function addGoat(goatData) {
   const newGoat = {
     id: makeId(),
@@ -417,17 +428,20 @@ export async function addGoat(goatData) {
 }
 
 export async function updateGoat(id, updates) {
+  const previousGoat = await supabase.from('goats').select('weight').eq('id', id).single();
+  const previousWeight = previousGoat?.data?.weight ?? null;
+
   const { data, error } = await supabase.from('goats').update(updates).eq('id', id).select().single();
   if (error) {
     console.error('Supabase updateGoat error:', error);
     throw new Error(error.message || 'Failed to update goat.');
   }
 
-  if (updates.weight && data) {
+  if (updates.weight !== undefined && shouldAddWeightTimelineEvent(previousWeight, updates.weight) && data) {
     await addTimelineEvent({
       goat_id: id,
       type: 'Weight Check',
-      title: `Weight Updated: ${updates.weight} kg`,
+      title: `Weight Updated: ${Number(updates.weight)} kg`,
       date: new Date().toISOString(),
       notes: 'Weight progression record'
     });
@@ -450,6 +464,27 @@ export async function updateGoatArea(goatId, newAreaId, oldAreaName = '', newAre
 }
 
 export async function deleteGoat(id) {
+  const { data: goatData, error: fetchError } = await supabase.from('goats').select('photo_url').eq('id', id).single();
+
+  if (!fetchError && goatData?.photo_url) {
+    try {
+      const url = new URL(goatData.photo_url);
+      const pathParts = url.pathname.split('/').filter(Boolean);
+
+      const storagePath = pathParts.length >= 6 && pathParts[0] === 'storage' && pathParts[1] === 'v1' && pathParts[2] === 'object'
+        ? decodeURIComponent(pathParts.slice(5).join('/'))
+        : pathParts.length >= 2 && pathParts[0] === 'storage' && pathParts[1] === 'v1'
+          ? decodeURIComponent(pathParts.slice(3).join('/'))
+          : decodeURIComponent(pathParts.slice(1).join('/'));
+
+      if (storagePath) {
+        await supabase.storage.from('goat-photos').remove([storagePath]).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('Could not parse goat photo URL for deletion:', err.message);
+    }
+  }
+
   const { error } = await supabase.from('goats').delete().eq('id', id);
   if (error) {
     console.error('Supabase deleteGoat error:', error);

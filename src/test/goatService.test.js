@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateNextDueDate, formatBeirutDateTime } from '../services/goatService';
+import { calculateNextDueDate, formatBeirutDateTime, shouldAddWeightTimelineEvent } from '../services/goatService';
 import { getRepeatLabel } from '../components/GoatDetailModal';
 
 describe('goatService & Helper Functions Unit Tests', () => {
@@ -56,6 +56,18 @@ describe('goatService & Helper Functions Unit Tests', () => {
     it('returns One-time Task for none frequency', () => {
       const event = { custom_fields: { repeat_frequency: 'none' } };
       expect(getRepeatLabel(event)).toBe('One-time Task');
+    });
+  });
+
+  describe('shouldAddWeightTimelineEvent', () => {
+    it('does not add a new weight entry when the value is unchanged', () => {
+      expect(shouldAddWeightTimelineEvent(45, 45)).toBe(false);
+      expect(shouldAddWeightTimelineEvent('45', '45.0')).toBe(false);
+    });
+
+    it('adds a new weight entry when the value changes', () => {
+      expect(shouldAddWeightTimelineEvent(45, 47.5)).toBe(true);
+      expect(shouldAddWeightTimelineEvent('45.0', 46)).toBe(true);
     });
   });
 });
