@@ -1,28 +1,30 @@
 import React, { useState } from 'react';
 import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles, Share2, Layers, Check, Info, Plus, Milk } from 'lucide-react';
 import { parsePenFeeding } from './PenFeedingHistoryModal';
-import { getBeirutDateTimeString, isNurseryPenCheck, normalizeSharedTroughMetadata } from '../services/goatService';
+import { getBeirutDateTimeString, isNurseryPenCheck, normalizeSharedTroughMetadata, resolvePenFeedingFormSource } from '../services/goatService';
 
-export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], onClose, onSave, latestFeedingEntry = null, feedingEntries = [] }) {
+export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], onClose, onSave, latestFeedingEntry = null, selectedEntry = null, feedingEntries = [] }) {
   const parsed = parsePenFeeding(pen?.feeding_info || pen?.note);
-  
-  // Use latest entry from DB if available, otherwise use parsed current ration
-  const currentRation = latestFeedingEntry ? {
-    alpha_kg: latestFeedingEntry.alpha_kg || 0,
-    alpha_price_per_kg: latestFeedingEntry.alpha_price_per_kg || 0,
-    mixed_grains_kg: latestFeedingEntry.mixed_grains_kg || 0,
-    mixed_grains_price_per_kg: latestFeedingEntry.mixed_grains_price_per_kg || 0,
-    straw_kg: latestFeedingEntry.straw_kg || 0,
-    straw_price_per_kg: latestFeedingEntry.straw_price_per_kg || 0,
-    schedule: latestFeedingEntry.schedule || '',
-    notes: latestFeedingEntry.notes || ''
+  const editSourceEntry = resolvePenFeedingFormSource({ latestFeedingEntry, selectedEntry, fallbackParsed: parsed });
+  const entryIdForEdit = selectedEntry?.id || null;
+
+  // Use the selected historical row when editing; otherwise fall back to the newest row or parsed current ration.
+  const currentRation = editSourceEntry ? {
+    alpha_kg: editSourceEntry.alpha_kg || 0,
+    alpha_price_per_kg: editSourceEntry.alpha_price_per_kg || 0,
+    mixed_grains_kg: editSourceEntry.mixed_grains_kg || 0,
+    mixed_grains_price_per_kg: editSourceEntry.mixed_grains_price_per_kg || 0,
+    straw_kg: editSourceEntry.straw_kg || 0,
+    straw_price_per_kg: editSourceEntry.straw_price_per_kg || 0,
+    schedule: editSourceEntry.schedule || '',
+    notes: editSourceEntry.notes || ''
   } : parsed.current;
 
   // Helper: Parse shared trough info from notes and reconstruct if needed
   // Handles both new format: [Shared Trough: area-1,area-2 · 50% share]
   // AND old format: [Shared Trough with Pen MLK · 50% share]
   const initializeSharedTroughState = () => {
-    const sourceEntry = latestFeedingEntry || { notes: currentRation.notes || '' };
+    const sourceEntry = editSourceEntry || latestFeedingEntry || { notes: currentRation.notes || '' };
     const normalized = normalizeSharedTroughMetadata(sourceEntry);
     const sharedPenIds = (normalized.penIds || []).filter(id => barnAreas.some(p => p.id === id));
     const thisShare = Number(normalized.percent || 0);
@@ -225,7 +227,8 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
             shared_trough_metadata: metadata,
             date: new Date(feedingDate).toISOString()
           };
-          await onSave(item.pen.id, feedingData);
+          const isEditingThisPen = Boolean(entryIdForEdit) && item.pen.id === selectedEntry?.barn_area_id;
+          await onSave(item.pen.id, feedingData, isEditingThisPen ? entryIdForEdit : null);
         }
       }
       handleClose();

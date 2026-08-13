@@ -69,6 +69,16 @@ export function normalizeSharedTroughMetadata(entry = {}) {
   };
 }
 
+export function resolvePenFeedingFormSource({ latestFeedingEntry = null, selectedEntry = null, fallbackParsed = null } = {}) {
+  if (selectedEntry && typeof selectedEntry === 'object') return selectedEntry;
+  if (latestFeedingEntry && typeof latestFeedingEntry === 'object') return latestFeedingEntry;
+  if (fallbackParsed && typeof fallbackParsed === 'object') {
+    const current = fallbackParsed.current || fallbackParsed;
+    return current || {};
+  }
+  return {};
+}
+
 export async function addBarnArea(areaData) {
   const currentAreas = await getBarnAreas();
   const nextLetter = String.fromCharCode(65 + currentAreas.length);

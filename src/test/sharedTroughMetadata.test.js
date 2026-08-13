@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeSharedTroughMetadata } from '../services/goatService';
+import { normalizeSharedTroughMetadata, resolvePenFeedingFormSource } from '../services/goatService';
 
 describe('Shared trough metadata normalization', () => {
   it('reads structured database metadata and keeps plain notes clean', () => {
@@ -31,5 +31,17 @@ describe('Shared trough metadata normalization', () => {
       percent: 0,
       cleanNotes: 'Supplement grain'
     });
+  });
+
+  it('prefers the clicked historical entry as the edit source instead of the newest feed row', () => {
+    const source = resolvePenFeedingFormSource({
+      latestFeedingEntry: { id: 'newest', alpha_kg: 12, notes: 'latest', daily_weight: 3 },
+      selectedEntry: { id: 'older', alpha_kg: 8, notes: 'selected', daily_weight: 2 },
+      fallbackParsed: { alpha_kg: 6, notes: 'fallback', daily_weight: 1 }
+    });
+
+    expect(source.id).toBe('older');
+    expect(source.alpha_kg).toBe(8);
+    expect(source.notes).toBe('selected');
   });
 });

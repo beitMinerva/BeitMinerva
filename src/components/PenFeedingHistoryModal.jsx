@@ -52,49 +52,105 @@ export function parsePenFeeding(infoStr) {
   };
 }
 
-function PenMilkChart({ entries = [] }) {
+function PenMilkChart({ entries = [], groupBy = 'day' }) {
   if (!entries || entries.length === 0) return null;
 
-  const values = entries
-    .map((entry) => Number(entry.amount_liters ?? entry.milk_liters ?? entry.amount ?? 0))
-    .filter((value) => Number.isFinite(value));
+  const getBucketKey = (dateInput, mode) => {
+    const d = new Date(dateInput);
+    if (Number.isNaN(d.getTime())) return null;
+    const beirutDate = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Beirut' }));
+    const yyyy = beirutDate.getFullYear();
+    const mm = String(beirutDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(beirutDate.getDate()).padStart(2, '0');
 
-  if (values.length === 0) return null;
+    if (mode === 'entry') return `${yyyy}-${mm}-${dd}T${String(beirutDate.getHours()).padStart(2, '0')}:${String(beirutDate.getMinutes()).padStart(2, '0')}`;
+    if (mode === 'day') return `${yyyy}-${mm}-${dd}`;
+    if (mode === 'month') return `${yyyy}-${mm}`;
+    if (mode === 'year') return `${yyyy}`;
+    return `${yyyy}-${mm}-${dd}`;
+  };
 
-  const svgWidth = 300;
-  const svgHeight = 120;
-  const padding = 24;
+  const formatBucketLabel = (bucketKey, mode) => {
+    if (!bucketKey) return 'Unknown';
+
+    if (mode === 'entry') {
+      const datePart = bucketKey.slice(0, 10);
+      return datePart.slice(5);
+    }
+    if (mode === 'day') {
+      return bucketKey.slice(5);
+    }
+    if (mode === 'month') {
+      const [year, month] = bucketKey.split('-');
+      const d = new Date(Number(year), Number(month) - 1, 1);
+      return d.toLocaleString('en-US', { timeZone: 'Asia/Beirut', month: 'short', year: '2-digit' });
+    }
+    if (mode === 'year') {
+      return bucketKey;
+    }
+    return bucketKey.slice(5);
+  };
+
+  const grouped = (() => {
+    const map = new Map();
+
+    entries.forEach((entry) => {
+      const amount = Number(entry.amount_liters ?? entry.milk_liters ?? entry.amount ?? 0);
+      if (!Number.isFinite(amount)) return;
+
+      const bucketKey = getBucketKey(entry.date || entry.created_at || new Date(), groupBy);
+      if (!bucketKey) return;
+
+      const current = map.get(bucketKey) || {
+        key: bucketKey,
+        value: 0,
+        label: formatBucketLabel(bucketKey, groupBy)
+      };
+
+      current.value += amount;
+      map.set(bucketKey, current);
+    });
+
+    return [...map.values()].sort((a, b) => a.key.localeCompare(b.key));
+  })();
+
+  if (grouped.length === 0) return null;
+
+  const values = grouped.map((item) => item.value);
   const minVal = Math.min(...values) * 0.9;
   const maxVal = Math.max(...values) * 1.1 || 10;
 
   const getX = (index) => {
-    if (values.length === 1) return svgWidth / 2;
-    return padding + (index / (values.length - 1)) * (svgWidth - padding * 2);
+    if (values.length === 1) return 150;
+    return 24 + (index / (values.length - 1)) * (300 - 48);
   };
 
   const getY = (value) => {
-    if (maxVal === minVal) return svgHeight / 2;
-    return svgHeight - padding - ((value - minVal) / (maxVal - minVal)) * (svgHeight - padding * 2);
+    if (maxVal === minVal) return 60;
+    return 120 - 24 - ((value - minVal) / (maxVal - minVal)) * (120 - 24 * 2);
   };
 
-  const points = values.map((value, index) => `${getX(index)},${getY(value)}`).join(' ');
+  const points = grouped.map((item, index) => `${getX(index)},${getY(item.value)}`).join(' ');
 
   return (
     <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: '12px', padding: '8px' }}>
       <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-dark)', marginBottom: '6px' }}>Pen Milk Trend</div>
-      <svg width="100%" height="120" viewBox={`0 0 ${svgWidth} ${svgHeight}`}>
-        <line x1={padding} y1={padding} x2={svgWidth - padding} y2={padding} stroke="var(--border-color)" strokeDasharray="3 3" />
-        <line x1={padding} y1={svgHeight / 2} x2={svgWidth - padding} y2={svgHeight / 2} stroke="var(--border-color)" strokeDasharray="3 3" />
-        <line x1={padding} y1={svgHeight - padding} x2={svgWidth - padding} y2={svgHeight - padding} stroke="var(--border-color)" />
-        {values.length > 1 && <polyline points={points} fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
-        {values.map((value, index) => {
+      <svg width="100%" height="120" viewBox="0 0 300 120">
+        <line x1={24} y1={24} x2={276} y2={24} stroke="var(--border-color)" strokeDasharray="3 3" />
+        <line x1={24} y1={60} x2={276} y2={60} stroke="var(--border-color)" strokeDasharray="3 3" />
+        <line x1={24} y1={96} x2={276} y2={96} stroke="var(--border-color)" />
+        {grouped.length > 1 && <polyline points={points} fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+        {grouped.map((item, index) => {
           const x = getX(index);
-          const y = getY(value);
+          const y = getY(item.value);
           return (
-            <g key={`${value}-${index}`}>
+            <g key={item.key || `${item.label}-${index}`}>
               <circle cx={x} cy={y} r="3" fill="var(--primary-dark)" />
               <text x={x + 6} y={y - 8} fontSize="9" fontWeight="700" fill="var(--primary-dark)">
-                {value.toFixed(1)} L
+                {item.value.toFixed(1)} L
+              </text>
+              <text x={x - 10} y={116} fontSize="7" fontWeight="700" fill="var(--text-muted)">
+                {item.label}
               </text>
             </g>
           );
@@ -156,86 +212,13 @@ export default function PenFeedingHistoryModal({
   const [submittingMilk, setSubmittingMilk] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [entryToDelete, setEntryToDelete] = useState(null);
-
-  const [editingFeedingEntry, setEditingFeedingEntry] = useState(null);
-  const [feedingEntryMode, setFeedingEntryMode] = useState('edit'); // 'edit' | 'duplicate'
-  const [feedingFoodType, setFeedingFoodType] = useState('');
-  const [feedingWeight, setFeedingWeight] = useState('');
-  const [feedingComposition, setFeedingComposition] = useState('');
-  const [feedingSchedule, setFeedingSchedule] = useState('');
-  const [feedingNotes, setFeedingNotes] = useState('');
-  const [feedingAlphaKg, setFeedingAlphaKg] = useState('');
-  const [feedingAlphaPrice, setFeedingAlphaPrice] = useState('');
-  const [feedingMixedKg, setFeedingMixedKg] = useState('');
-  const [feedingMixedPrice, setFeedingMixedPrice] = useState('');
-  const [feedingStrawKg, setFeedingStrawKg] = useState('');
-  const [feedingStrawPrice, setFeedingStrawPrice] = useState('');
   const [feedingEntryToDelete, setFeedingEntryToDelete] = useState(null);
-  const [submittingFeeding, setSubmittingFeeding] = useState(false);
+  const [milkChartGroup, setMilkChartGroup] = useState('day');
 
   const handleStartEditFeedingEntry = (item) => {
-    setEditingFeedingEntry(item);
-    setFeedingEntryMode('edit');
-    setFeedingFoodType(item.food_type || '');
-    setFeedingWeight(item.daily_weight || '');
-    setFeedingComposition(item.composition || '');
-    setFeedingSchedule(item.schedule || '');
-    setFeedingNotes(item.notes || '');
-    setFeedingAlphaKg(item.alpha_kg || '');
-    setFeedingAlphaPrice(item.alpha_price_per_kg || '');
-    setFeedingMixedKg(item.mixed_grains_kg || '');
-    setFeedingMixedPrice(item.mixed_grains_price_per_kg || '');
-    setFeedingStrawKg(item.straw_kg || '');
-    setFeedingStrawPrice(item.straw_price_per_kg || '');
-  };
-
-  const handleDuplicateFeedingEntry = (item) => {
-    setEditingFeedingEntry(item);
-    setFeedingEntryMode('duplicate');
-    setFeedingFoodType(item.food_type || '');
-    setFeedingWeight(item.daily_weight || '');
-    setFeedingComposition(item.composition || '');
-    setFeedingSchedule(item.schedule || '');
-    setFeedingNotes(item.notes || '');
-    setFeedingAlphaKg(item.alpha_kg || '');
-    setFeedingAlphaPrice(item.alpha_price_per_kg || '');
-    setFeedingMixedKg(item.mixed_grains_kg || '');
-    setFeedingMixedPrice(item.mixed_grains_price_per_kg || '');
-    setFeedingStrawKg(item.straw_kg || '');
-    setFeedingStrawPrice(item.straw_price_per_kg || '');
-  };
-
-  const handleCancelEditFeedingEntry = () => {
-    setEditingFeedingEntry(null);
-    setFeedingEntryMode('edit');
-  };
-
-  const handleSaveEditedFeedingEntry = async (e) => {
-    e.preventDefault();
-    if (!editingFeedingEntry || !onSaveFeedingEntry) return;
-    setSubmittingFeeding(true);
-    try {
-      const entryId = feedingEntryMode === 'edit' ? editingFeedingEntry.id : null;
-      await onSaveFeedingEntry(pen.id, {
-        food_type: feedingFoodType.trim(),
-        daily_weight: feedingWeight,
-        composition: feedingComposition.trim(),
-        schedule: feedingSchedule.trim(),
-        notes: feedingNotes.trim(),
-        date: editingFeedingEntry.date || new Date().toISOString(),
-        alpha_kg: Number(feedingAlphaKg) || 0,
-        alpha_price_per_kg: Number(feedingAlphaPrice) || 0,
-        mixed_grains_kg: Number(feedingMixedKg) || 0,
-        mixed_grains_price_per_kg: Number(feedingMixedPrice) || 0,
-        straw_kg: Number(feedingStrawKg) || 0,
-        straw_price_per_kg: Number(feedingStrawPrice) || 0,
-      }, entryId);
-      setEditingFeedingEntry(null);
-      setFeedingEntryMode('edit');
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSubmittingFeeding(false);
+    if (onOpenEditForm) {
+      onOpenEditForm(pen, item);
+      return;
     }
   };
 
@@ -540,7 +523,35 @@ export default function PenFeedingHistoryModal({
                 </div>
               )}
 
-              <PenMilkChart entries={filteredMilkingEntries} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700' }}>Chart group:</span>
+                {[
+                  { id: 'entry', label: 'By Entry' },
+                  { id: 'day', label: 'By Day' },
+                  { id: 'month', label: 'By Month' },
+                  { id: 'year', label: 'By Year' }
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setMilkChartGroup(option.id)}
+                    style={{
+                      background: milkChartGroup === option.id ? 'var(--primary-light)' : '#ffffff',
+                      color: milkChartGroup === option.id ? 'var(--primary-dark)' : 'var(--text-muted)',
+                      border: milkChartGroup === option.id ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '3px 8px',
+                      fontSize: '10px',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              <PenMilkChart entries={filteredMilkingEntries} groupBy={milkChartGroup} />
 
               {filteredMilkingEntries.length === 0 ? (
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0, textAlign: 'center', padding: '10px 0' }}>
@@ -775,78 +786,6 @@ export default function PenFeedingHistoryModal({
           </button>
         </div>
       </div>
-
-      {/* EDIT FEEDING ENTRY MODAL */}
-      {editingFeedingEntry && (
-        <div className="modal-overlay" onClick={handleCancelEditFeedingEntry} style={{ zIndex: 130, fontFamily: "'Outfit', sans-serif" }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', padding: '18px', fontFamily: "'Outfit', sans-serif" }}>
-            <div className="modal-header">
-              <div>
-                <h3 className="modal-title" style={{ fontFamily: "'Outfit', sans-serif", margin: 0 }}>{feedingEntryMode === 'duplicate' ? 'Copy Feed Log' : 'Edit Feed Log'}</h3>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{feedingEntryMode === 'duplicate' ? `Create a new feed log from the previous entry for Pen ${pen?.letter}` : `Update feeding record for Pen ${pen?.letter}`}</span>
-              </div>
-              <button className="close-btn" onClick={handleCancelEditFeedingEntry} disabled={submittingFeeding}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEditedFeedingEntry} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
-              <div>
-                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Food Name / Feed Type *</label>
-                <input type="text" className="form-input" value={feedingFoodType} onChange={(e) => setFeedingFoodType(e.target.value)} placeholder="Alfalfa Hay, Grain Mix..." disabled={submittingFeeding} required />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div>
-                  <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Daily Weight (kg)</label>
-                  <input type="number" step="any" className="form-input" value={feedingWeight} onChange={(e) => setFeedingWeight(e.target.value)} placeholder="e.g. 15.0" disabled={submittingFeeding} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Schedule / Timing</label>
-                  <input type="text" className="form-input" value={feedingSchedule} onChange={(e) => setFeedingSchedule(e.target.value)} placeholder="Twice daily..." disabled={submittingFeeding} />
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Composition / Formula</label>
-                <input type="text" className="form-input" value={feedingComposition} onChange={(e) => setFeedingComposition(e.target.value)} placeholder="70% Alfalfa, 30% Grain" disabled={submittingFeeding} />
-              </div>
-              <div>
-                <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Notes</label>
-                <input type="text" className="form-input" value={feedingNotes} onChange={(e) => setFeedingNotes(e.target.value)} placeholder="Ration notes..." disabled={submittingFeeding} />
-              </div>
-              <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid var(--border-color)' }}>
-                <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-main)' }}>Feed Components — Pen Totals (kg) & Price ($/kg)</span>
-                {[
-                  { label: isNurseryPenCheck(pen) ? 'Milk' : 'Alpha', kg: feedingAlphaKg, setKg: setFeedingAlphaKg, price: feedingAlphaPrice, setPrice: setFeedingAlphaPrice },
-                  { label: 'Mixed Grains', kg: feedingMixedKg, setKg: setFeedingMixedKg, price: feedingMixedPrice, setPrice: setFeedingMixedPrice },
-                  { label: 'Straw', kg: feedingStrawKg, setKg: setFeedingStrawKg, price: feedingStrawPrice, setPrice: setFeedingStrawPrice },
-                ].map(c => (
-                  <div key={c.label} style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 10px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>{c.label}</span>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                      <div>
-                        <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '2px' }}>Total kg (Pen)</label>
-                        <input type="number" step="any" min="0" className="form-input" value={c.kg} onChange={(e) => c.setKg(e.target.value)} disabled={submittingFeeding} placeholder="0.0" />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', display: 'block', marginBottom: '2px' }}>$/kg</label>
-                        <input type="number" step="any" min="0" className="form-input" value={c.price} onChange={(e) => c.setPrice(e.target.value)} disabled={submittingFeeding} placeholder="0.00" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={handleCancelEditFeedingEntry} disabled={submittingFeeding}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary btn-sm" disabled={submittingFeeding}>
-                  {submittingFeeding ? <><Loader2 size={14} className="spinner" /> Saving...</> : (feedingEntryMode === 'duplicate' ? 'Save Copy' : 'Save Feed Log')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* DELETE FEEDING CONFIRM MODAL */}
       {feedingEntryToDelete && (

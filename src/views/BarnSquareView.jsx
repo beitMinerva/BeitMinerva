@@ -71,6 +71,7 @@ export default function BarnSquareView({
   const [showFeedingHistoryModal, setShowFeedingHistoryModal] = useState(false);
   const [showMilkingHistoryModal, setShowMilkingHistoryModal] = useState(false);
   const [editingPenFeeding, setEditingPenFeeding] = useState(null);
+  const [editingPenFeedingEntry, setEditingPenFeedingEntry] = useState(null);
   const [viewingPenMilking, setViewingPenMilking] = useState(null);
 
   // Inline Edit State inside manage modal
@@ -493,6 +494,7 @@ export default function BarnSquareView({
           barnAreas={pens}
           goats={goats}
           feedingEntries={penFeedingEntries}
+          selectedEntry={editingPenFeedingEntry}
           latestFeedingEntry={(() => {
             const latestForPen = penFeedingEntries
               .filter(e => e.barn_area_id === editingPenFeeding?.id)
@@ -502,6 +504,7 @@ export default function BarnSquareView({
           onClose={() => {
             setShowFeedingFormModal(false);
             setEditingPenFeeding(null);
+            setEditingPenFeedingEntry(null);
           }}
           onSave={handleSaveFeedingInfo}
         />
@@ -518,9 +521,10 @@ export default function BarnSquareView({
             setShowFeedingHistoryModal(false);
             setEditingPenFeeding(null);
           }}
-          onOpenEditForm={(pen) => {
+          onOpenEditForm={(pen, entry = null) => {
             setShowFeedingHistoryModal(false);
             setEditingPenFeeding(pen);
+            setEditingPenFeedingEntry(entry);
             const action = () => setShowFeedingFormModal(true);
             if (onRequireAdmin) onRequireAdmin(action);
             else action();
