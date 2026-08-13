@@ -48,6 +48,27 @@ export function isNurseryPenCheck(pen) {
   return false;
 }
 
+export function normalizeSharedTroughMetadata(entry = {}) {
+  const metadata = (() => {
+    if (!entry.shared_trough_metadata) return null;
+    if (typeof entry.shared_trough_metadata === 'string') {
+      try { return JSON.parse(entry.shared_trough_metadata); } catch (e) { return null; }
+    }
+    return entry.shared_trough_metadata;
+  })();
+
+  const explicit = metadata || {};
+  const penIds = Array.isArray(explicit.pen_ids) ? explicit.pen_ids : [];
+  const percent = Number(explicit.percent ?? 0);
+
+  return {
+    enabled: Boolean(explicit.enabled),
+    penIds,
+    percent: Number.isFinite(percent) ? percent : 0,
+    cleanNotes: typeof entry.notes === 'string' ? entry.notes.trim() : ''
+  };
+}
+
 export async function addBarnArea(areaData) {
   const currentAreas = await getBarnAreas();
   const nextLetter = String.fromCharCode(65 + currentAreas.length);
@@ -197,6 +218,14 @@ export async function addPenFeedingEntry(entryData) {
   if (strawKg > 0) activeComponents.push('Straw');
   const foodType = activeComponents.length > 0 ? activeComponents.join(' + ') : (entryData.food_type || '');
 
+  const normalized = normalizeSharedTroughMetadata(entryData);
+  const cleanNotes = typeof entryData.notes === 'string' ? entryData.notes.trim() : '';
+  const metadata = entryData.shared_trough_metadata || (normalized.enabled ? {
+    enabled: normalized.enabled,
+    pen_ids: normalized.penIds,
+    percent: normalized.percent
+  } : null);
+
   const newEntry = {
     id: `pfe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     barn_area_id: entryData.barn_area_id,
@@ -207,7 +236,8 @@ export async function addPenFeedingEntry(entryData) {
     total_weight: totalWeight,   // total kg for the whole pen
     composition: entryData.composition || '',
     schedule: entryData.schedule || '',
-    notes: entryData.notes || '',
+    notes: cleanNotes,
+    shared_trough_metadata: metadata,
     alpha_kg: alphaKg,
     alpha_price_per_kg: alphaPricePerKg,
     mixed_grains_kg: mixedGrainsKg,
@@ -225,9 +255,22 @@ export async function addPenFeedingEntry(entryData) {
 }
 
 export async function updatePenFeedingEntry(id, updates) {
+  const normalized = normalizeSharedTroughMetadata(updates);
+  const payload = {
+    ...updates,
+    notes: normalized.cleanNotes || updates.notes || '',
+    shared_trough_metadata: updates.shared_trough_metadata ?? (
+      normalized.enabled ? {
+        enabled: normalized.enabled,
+        pen_ids: normalized.penIds,
+        percent: normalized.percent
+      } : null
+    ),
+  };
+
   const { data, error } = await supabase
     .from('pen_feeding_entries')
-    .update(updates)
+    .update(payload)
     .eq('id', id)
     .select()
     .single();

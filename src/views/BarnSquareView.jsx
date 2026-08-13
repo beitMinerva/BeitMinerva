@@ -492,6 +492,13 @@ export default function BarnSquareView({
           pen={editingPenFeeding}
           barnAreas={pens}
           goats={goats}
+          feedingEntries={penFeedingEntries}
+          latestFeedingEntry={(() => {
+            const latestForPen = penFeedingEntries
+              .filter(e => e.barn_area_id === editingPenFeeding?.id)
+              .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0];
+            return latestForPen || null;
+          })()}
           onClose={() => {
             setShowFeedingFormModal(false);
             setEditingPenFeeding(null);

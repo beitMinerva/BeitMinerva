@@ -1,30 +1,99 @@
 import React, { useState } from 'react';
 import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles, Share2, Layers, Check, Info, Plus, Milk } from 'lucide-react';
 import { parsePenFeeding } from './PenFeedingHistoryModal';
-import { getBeirutDateTimeString, isNurseryPenCheck } from '../services/goatService';
+import { getBeirutDateTimeString, isNurseryPenCheck, normalizeSharedTroughMetadata } from '../services/goatService';
 
-export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], onClose, onSave }) {
+export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], onClose, onSave, latestFeedingEntry = null, feedingEntries = [] }) {
   const parsed = parsePenFeeding(pen?.feeding_info || pen?.note);
-  const currentRation = parsed.current;
+  
+  // Use latest entry from DB if available, otherwise use parsed current ration
+  const currentRation = latestFeedingEntry ? {
+    alpha_kg: latestFeedingEntry.alpha_kg || 0,
+    alpha_price_per_kg: latestFeedingEntry.alpha_price_per_kg || 0,
+    mixed_grains_kg: latestFeedingEntry.mixed_grains_kg || 0,
+    mixed_grains_price_per_kg: latestFeedingEntry.mixed_grains_price_per_kg || 0,
+    straw_kg: latestFeedingEntry.straw_kg || 0,
+    straw_price_per_kg: latestFeedingEntry.straw_price_per_kg || 0,
+    schedule: latestFeedingEntry.schedule || '',
+    notes: latestFeedingEntry.notes || ''
+  } : parsed.current;
+
+  // Helper: Parse shared trough info from notes and reconstruct if needed
+  // Handles both new format: [Shared Trough: area-1,area-2 · 50% share]
+  // AND old format: [Shared Trough with Pen MLK · 50% share]
+  const initializeSharedTroughState = () => {
+    const sourceEntry = latestFeedingEntry || { notes: currentRation.notes || '' };
+    const normalized = normalizeSharedTroughMetadata(sourceEntry);
+    const sharedPenIds = (normalized.penIds || []).filter(id => barnAreas.some(p => p.id === id));
+    const thisShare = Number(normalized.percent || 0);
+
+    if (latestFeedingEntry && sharedPenIds.length > 0 && thisShare > 0) {
+      const allocatedAlpha = latestFeedingEntry.alpha_kg || 0;
+      const allocatedMixed = latestFeedingEntry.mixed_grains_kg || 0;
+      const allocatedStraw = latestFeedingEntry.straw_kg || 0;
+      const allocatedTotal = allocatedAlpha + allocatedMixed + allocatedStraw;
+      const originalTotal = allocatedTotal / (thisShare / 100);
+      const ratio = thisShare / 100;
+
+      if (ratio > 0 && originalTotal > 0) {
+        const reconstructedAlpha = allocatedAlpha / ratio;
+        const reconstructedMixed = allocatedMixed / ratio;
+        const reconstructedStraw = allocatedStraw / ratio;
+
+        return {
+          isShared: true,
+          alphaKg: reconstructedAlpha > 0 ? String(reconstructedAlpha.toFixed(2)) : '',
+          alphaPricePerKg: latestFeedingEntry.alpha_price_per_kg > 0 ? String(latestFeedingEntry.alpha_price_per_kg) : '',
+          mixedGrainsKg: reconstructedMixed > 0 ? String(reconstructedMixed.toFixed(2)) : '',
+          mixedGrainsPricePerKg: latestFeedingEntry.mixed_grains_price_per_kg > 0 ? String(latestFeedingEntry.mixed_grains_price_per_kg) : '',
+          strawKg: reconstructedStraw > 0 ? String(reconstructedStraw.toFixed(2)) : '',
+          strawPricePerKg: latestFeedingEntry.straw_price_per_kg > 0 ? String(latestFeedingEntry.straw_price_per_kg) : '',
+          selectedPenIds: sharedPenIds
+        };
+      }
+    }
+
+    return null;
+  };
+  
+  const sharedTroughInit = initializeSharedTroughState();
 
   // Primary Pen Goat Count
   const primaryPenGoatCount = goats.filter(g => g.area_id === pen?.id).length;
 
+  // Use actual persisted per-head daily_weight values when reopening the form,
+  // rather than defaulting every pen to a magic 2.5 kg/goat.
+  const allBarnPens = barnAreas.length > 0 ? barnAreas : [pen];
+  const getLatestDailyWeightForPen = (penId) => {
+    const penEntry = (feedingEntries || []).filter(entry => (entry.barn_area_id || entry.area_id) === penId)
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0];
+
+    const savedRate = Number(penEntry?.daily_weight ?? latestFeedingEntry?.daily_weight ?? 0);
+    return Number.isFinite(savedRate) && savedRate > 0 ? savedRate : 2.5;
+  };
+
+  const initialTargetRates = Object.fromEntries(
+    allBarnPens.map(p => [p.id, String(getLatestDailyWeightForPen(p.id))])
+  );
+
   // Shared Trough State
-  const [isSharedTrough, setIsSharedTrough] = useState(false);
-  const [selectedSharedPenIds, setSelectedSharedPenIds] = useState([pen?.id]);
-  const [targetRates, setTargetRates] = useState({ [pen?.id]: '2.5' });
+  const [isSharedTrough, setIsSharedTrough] = useState(sharedTroughInit?.isShared || false);
+  const [selectedSharedPenIds, setSelectedSharedPenIds] = useState(sharedTroughInit?.selectedPenIds || [pen?.id]);
+  const [targetRates, setTargetRates] = useState(initialTargetRates);
 
   // 3 Feed components: TOTAL kg for the whole trough / pen
-  const [alphaKg, setAlphaKg] = useState(currentRation.alpha_kg > 0 ? String(currentRation.alpha_kg) : '');
-  const [alphaPricePerKg, setAlphaPricePerKg] = useState(currentRation.alpha_price_per_kg > 0 ? String(currentRation.alpha_price_per_kg) : '');
-  const [mixedGrainsKg, setMixedGrainsKg] = useState(currentRation.mixed_grains_kg > 0 ? String(currentRation.mixed_grains_kg) : '');
-  const [mixedGrainsPricePerKg, setMixedGrainsPricePerKg] = useState(currentRation.mixed_grains_price_per_kg > 0 ? String(currentRation.mixed_grains_price_per_kg) : '');
-  const [strawKg, setStrawKg] = useState(currentRation.straw_kg > 0 ? String(currentRation.straw_kg) : '');
-  const [strawPricePerKg, setStrawPricePerKg] = useState(currentRation.straw_price_per_kg > 0 ? String(currentRation.straw_price_per_kg) : '');
+  const [alphaKg, setAlphaKg] = useState(sharedTroughInit?.alphaKg || (currentRation.alpha_kg > 0 ? String(currentRation.alpha_kg) : ''));
+  const [alphaPricePerKg, setAlphaPricePerKg] = useState(sharedTroughInit?.alphaPricePerKg || (currentRation.alpha_price_per_kg > 0 ? String(currentRation.alpha_price_per_kg) : ''));
+  const [mixedGrainsKg, setMixedGrainsKg] = useState(sharedTroughInit?.mixedGrainsKg || (currentRation.mixed_grains_kg > 0 ? String(currentRation.mixed_grains_kg) : ''));
+  const [mixedGrainsPricePerKg, setMixedGrainsPricePerKg] = useState(sharedTroughInit?.mixedGrainsPricePerKg || (currentRation.mixed_grains_price_per_kg > 0 ? String(currentRation.mixed_grains_price_per_kg) : ''));
+  const [strawKg, setStrawKg] = useState(sharedTroughInit?.strawKg || (currentRation.straw_kg > 0 ? String(currentRation.straw_kg) : ''));
+  const [strawPricePerKg, setStrawPricePerKg] = useState(sharedTroughInit?.strawPricePerKg || (currentRation.straw_price_per_kg > 0 ? String(currentRation.straw_price_per_kg) : ''));
 
   const [schedule, setSchedule] = useState(currentRation.schedule || '');
-  const [notes, setNotes] = useState(currentRation.notes || '');
+  const [notes, setNotes] = useState(() => {
+    const normalized = normalizeSharedTroughMetadata(latestFeedingEntry || currentRation);
+    return normalized.cleanNotes || (currentRation.notes || '');
+  });
   const [feedingDate, setFeedingDate] = useState(() => getBeirutDateTimeString());
 
   const [isClosing, setIsClosing] = useState(false);
@@ -54,7 +123,6 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
   };
 
   // Active pens in shared trough calculation
-  const allBarnPens = barnAreas.length > 0 ? barnAreas : [pen];
   const activePens = allBarnPens.filter(p =>
     isSharedTrough ? (selectedSharedPenIds.includes(p.id) || p.id === pen?.id) : p.id === pen?.id
   );
@@ -125,16 +193,21 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
     try {
       if (onSave) {
         const isMultiPenShared = isSharedTrough && activePens.length > 1;
-        const sharedPenNames = isMultiPenShared
-          ? activePens.map(p => `Pen ${p.letter}`).join(' & ')
+        const sharedPenIds = isMultiPenShared
+          ? activePens.map(p => p.id).join(',')
           : '';
 
         for (const item of allocatedPenData) {
           let finalNote = notes.trim();
+          const metadata = isMultiPenShared ? {
+            enabled: true,
+            pen_ids: activePens.map(p => p.id),
+            pen_names: activePens.map(p => p.name || p.letter || p.id),
+            percent: Number((item.ratio * 100).toFixed(1))
+          } : null;
+
           if (isMultiPenShared) {
-            const ratioPct = (item.ratio * 100).toFixed(1);
-            const sharedNoteTag = `[Shared Trough with ${sharedPenNames} · ${ratioPct}% share]`;
-            finalNote = finalNote ? `${sharedNoteTag} ${finalNote}` : sharedNoteTag;
+            finalNote = finalNote;
           }
 
           const feedingData = {
@@ -146,6 +219,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
             straw_price_per_kg: Number(strawPricePerKg) || 0,
             schedule: schedule.trim(),
             notes: finalNote,
+            shared_trough_metadata: metadata,
             date: new Date(feedingDate).toISOString()
           };
           await onSave(item.pen.id, feedingData);
@@ -660,16 +734,44 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '700', color: '#334155' }}>
                 <FileText size={14} color="#059669" /> Special Notes & Instructions
+                {sharedTroughInit?.isShared && (
+                  <span style={{ fontSize: '10px', fontWeight: '600', background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: '4px', marginLeft: 'auto' }}>
+                    LOCKED (Shared Trough)
+                  </span>
+                )}
               </label>
-              <textarea
-                className="form-textarea"
-                rows={2}
-                placeholder="e.g. Add free-choice mineral block & fresh water daily."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                disabled={submitting}
-                style={{ fontWeight: '600' }}
-              />
+              {sharedTroughInit?.isShared ? (
+                <div
+                  className="form-textarea"
+                  rows={2}
+                  placeholder="e.g. Add free-choice mineral block & fresh water daily."
+                  style={{
+                    fontWeight: '600',
+                    padding: '10px 12px',
+                    background: '#f9fafb',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    color: '#6b7280',
+                    minHeight: '60px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word'
+                  }}
+                >
+                  {notes}
+                </div>
+              ) : (
+                <textarea
+                  className="form-textarea"
+                  rows={2}
+                  placeholder="e.g. Add free-choice mineral block & fresh water daily."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  disabled={submitting}
+                  style={{ fontWeight: '600' }}
+                />
+              )}
             </div>
           </div>
 

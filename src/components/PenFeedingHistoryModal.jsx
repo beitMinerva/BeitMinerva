@@ -158,6 +158,7 @@ export default function PenFeedingHistoryModal({
   const [entryToDelete, setEntryToDelete] = useState(null);
 
   const [editingFeedingEntry, setEditingFeedingEntry] = useState(null);
+  const [feedingEntryMode, setFeedingEntryMode] = useState('edit'); // 'edit' | 'duplicate'
   const [feedingFoodType, setFeedingFoodType] = useState('');
   const [feedingWeight, setFeedingWeight] = useState('');
   const [feedingComposition, setFeedingComposition] = useState('');
@@ -174,6 +175,23 @@ export default function PenFeedingHistoryModal({
 
   const handleStartEditFeedingEntry = (item) => {
     setEditingFeedingEntry(item);
+    setFeedingEntryMode('edit');
+    setFeedingFoodType(item.food_type || '');
+    setFeedingWeight(item.daily_weight || '');
+    setFeedingComposition(item.composition || '');
+    setFeedingSchedule(item.schedule || '');
+    setFeedingNotes(item.notes || '');
+    setFeedingAlphaKg(item.alpha_kg || '');
+    setFeedingAlphaPrice(item.alpha_price_per_kg || '');
+    setFeedingMixedKg(item.mixed_grains_kg || '');
+    setFeedingMixedPrice(item.mixed_grains_price_per_kg || '');
+    setFeedingStrawKg(item.straw_kg || '');
+    setFeedingStrawPrice(item.straw_price_per_kg || '');
+  };
+
+  const handleDuplicateFeedingEntry = (item) => {
+    setEditingFeedingEntry(item);
+    setFeedingEntryMode('duplicate');
     setFeedingFoodType(item.food_type || '');
     setFeedingWeight(item.daily_weight || '');
     setFeedingComposition(item.composition || '');
@@ -189,6 +207,7 @@ export default function PenFeedingHistoryModal({
 
   const handleCancelEditFeedingEntry = () => {
     setEditingFeedingEntry(null);
+    setFeedingEntryMode('edit');
   };
 
   const handleSaveEditedFeedingEntry = async (e) => {
@@ -196,6 +215,7 @@ export default function PenFeedingHistoryModal({
     if (!editingFeedingEntry || !onSaveFeedingEntry) return;
     setSubmittingFeeding(true);
     try {
+      const entryId = feedingEntryMode === 'edit' ? editingFeedingEntry.id : null;
       await onSaveFeedingEntry(pen.id, {
         food_type: feedingFoodType.trim(),
         daily_weight: feedingWeight,
@@ -209,8 +229,9 @@ export default function PenFeedingHistoryModal({
         mixed_grains_price_per_kg: Number(feedingMixedPrice) || 0,
         straw_kg: Number(feedingStrawKg) || 0,
         straw_price_per_kg: Number(feedingStrawPrice) || 0,
-      }, editingFeedingEntry.id);
+      }, entryId);
       setEditingFeedingEntry(null);
+      setFeedingEntryMode('edit');
     } catch (err) {
       console.error(err);
     } finally {
@@ -761,8 +782,8 @@ export default function PenFeedingHistoryModal({
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', padding: '18px', fontFamily: "'Outfit', sans-serif" }}>
             <div className="modal-header">
               <div>
-                <h3 className="modal-title" style={{ fontFamily: "'Outfit', sans-serif", margin: 0 }}>Edit Feed Log</h3>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Update feeding record for Pen {pen?.letter}</span>
+                <h3 className="modal-title" style={{ fontFamily: "'Outfit', sans-serif", margin: 0 }}>{feedingEntryMode === 'duplicate' ? 'Copy Feed Log' : 'Edit Feed Log'}</h3>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{feedingEntryMode === 'duplicate' ? `Create a new feed log from the previous entry for Pen ${pen?.letter}` : `Update feeding record for Pen ${pen?.letter}`}</span>
               </div>
               <button className="close-btn" onClick={handleCancelEditFeedingEntry} disabled={submittingFeeding}>
                 <X size={18} />
@@ -819,7 +840,7 @@ export default function PenFeedingHistoryModal({
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary btn-sm" disabled={submittingFeeding}>
-                  {submittingFeeding ? <><Loader2 size={14} className="spinner" /> Saving...</> : 'Save Feed Log'}
+                  {submittingFeeding ? <><Loader2 size={14} className="spinner" /> Saving...</> : (feedingEntryMode === 'duplicate' ? 'Save Copy' : 'Save Feed Log')}
                 </button>
               </div>
             </form>
