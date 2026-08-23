@@ -126,9 +126,11 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
   const [generalTitle, setGeneralTitle] = useState(taskToComplete?.title ? taskToComplete.title.replace(/^Scheduled:\s*/i, '') : '');
   const [date, setDate] = useState(getInitialDateStr());
   const [notes, setNotes] = useState(taskToComplete?.notes ? taskToComplete.notes : '');
+  const [urgency, setUrgency] = useState(getInitialCustomField('urgency', 'normal'));
   const [submitting, setSubmitting] = useState(false);
   const [repeatFrequency, setRepeatFrequency] = useState('none');
   const [customRepeatDays, setCustomRepeatDays] = useState('60');
+
 
   const handleAnimatedClose = () => {
     setIsClosing(true);
@@ -267,7 +269,8 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
         buyer_notes: buyerNotes.trim(),
         mark_as_sold: markAsSold,
         repeat_frequency: repeatFrequency,
-        custom_repeat_days: customRepeatDays
+        custom_repeat_days: customRepeatDays,
+        urgency: urgency
       }
     };
 
@@ -293,7 +296,8 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
               target_goat_ids: snapshotGoatIds,
               medicines_list: medicines,
               repeat_frequency: repeatFrequency,
-              custom_repeat_days: customRepeatDays
+              custom_repeat_days: customRepeatDays,
+              urgency: urgency
             }
           };
           await onSave(futurePayloadEvent);
@@ -852,6 +856,47 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
                 onChangeRepeat={(freq, days) => { setRepeatFrequency(freq); setCustomRepeatDays(days); }}
                 disabled={submitting}
               />
+            </div>
+
+            {/* TASK URGENCY / PRIORITY */}
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Task Priority & Urgency</span>
+                <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'capitalize', color: urgency === 'urgent' ? '#dc2626' : urgency === 'high' ? '#d97706' : 'var(--text-muted)' }}>
+                  {urgency} Priority
+                </span>
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                {[
+                  { id: 'normal', label: 'Normal', activeStyle: { background: '#f1f5f9', color: '#334155', border: '1.5px solid #cbd5e1' } },
+                  { id: 'high', label: 'High', activeStyle: { background: '#fffbeb', color: '#b45309', border: '1.5px solid #fde68a' } },
+                  { id: 'urgent', label: 'Urgent', activeStyle: { background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5' } }
+                ].map((lvl) => {
+                  const isSelected = urgency === lvl.id;
+                  return (
+                    <button
+                      key={lvl.id}
+                      type="button"
+                      onClick={() => setUrgency(lvl.id)}
+                      disabled={submitting}
+                      style={{
+                        padding: '7px 10px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.15s ease',
+                        border: isSelected ? lvl.activeStyle.border : '1px solid var(--border-color)',
+                        background: isSelected ? lvl.activeStyle.background : '#ffffff',
+                        color: isSelected ? lvl.activeStyle.color : 'var(--text-muted)'
+                      }}
+                    >
+                      {lvl.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* NOTES */}

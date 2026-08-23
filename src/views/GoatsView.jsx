@@ -95,7 +95,7 @@ export default function GoatsView({ goats = [], barnAreas = [], onSelectGoat, on
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  Pen {area.letter} ({count}) {isNur ? '🌱' : ''}
+                  Pen {area.letter} ({count}) {isNur ? '(Nursery)' : ''}
                 </button>
               );
             })}

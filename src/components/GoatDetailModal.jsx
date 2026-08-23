@@ -85,6 +85,7 @@ export default function GoatDetailModal({
   const [savingReminder, setSavingReminder] = useState(false);
   const [reminderRepeatFrequency, setReminderRepeatFrequency] = useState('none');
   const [reminderCustomRepeatDays, setReminderCustomRepeatDays] = useState('60');
+  const [reminderUrgency, setReminderUrgency] = useState('normal');
 
   const [pullY, setPullY] = useState(0);
   const touchStartY = useRef(0);
@@ -121,6 +122,7 @@ export default function GoatDetailModal({
     setTimeout(() => {
       setShowReminderModal(false);
       setIsReminderModalClosing(false);
+      setReminderUrgency('normal');
     }, 220);
   };
 
@@ -137,13 +139,15 @@ export default function GoatDetailModal({
           notes: `Target: ${goat.name} (${goat.tag_id})${reminderNotes ? ` • ${reminderNotes}` : ''}`,
           custom_fields: {
             repeat_frequency: reminderRepeatFrequency,
-            custom_repeat_days: reminderCustomRepeatDays
+            custom_repeat_days: reminderCustomRepeatDays,
+            urgency: reminderUrgency
           }
         });
       }
       handleReminderModalClose();
       setReminderTitle('');
       setReminderNotes('');
+      setReminderUrgency('normal');
     } catch (err) {
       console.error(err);
     } finally {
@@ -689,6 +693,47 @@ export default function GoatDetailModal({
                     onChangeRepeat={(freq, days) => { setReminderRepeatFrequency(freq); setReminderCustomRepeatDays(days); }}
                     disabled={savingReminder}
                   />
+                </div>
+
+                {/* TASK URGENCY / PRIORITY */}
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Task Priority & Urgency</span>
+                    <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'capitalize', color: reminderUrgency === 'urgent' ? '#dc2626' : reminderUrgency === 'high' ? '#d97706' : 'var(--text-muted)' }}>
+                      {reminderUrgency} Priority
+                    </span>
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                    {[
+                      { id: 'normal', label: 'Normal', activeStyle: { background: '#f1f5f9', color: '#334155', border: '1.5px solid #cbd5e1' } },
+                      { id: 'high', label: 'High', activeStyle: { background: '#fffbeb', color: '#b45309', border: '1.5px solid #fde68a' } },
+                      { id: 'urgent', label: 'Urgent', activeStyle: { background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5' } }
+                    ].map((lvl) => {
+                      const isSelected = reminderUrgency === lvl.id;
+                      return (
+                        <button
+                          key={lvl.id}
+                          type="button"
+                          onClick={() => setReminderUrgency(lvl.id)}
+                          disabled={savingReminder}
+                          style={{
+                            padding: '7px 10px',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                            transition: 'all 0.15s ease',
+                            border: isSelected ? lvl.activeStyle.border : '1px solid var(--border-color)',
+                            background: isSelected ? lvl.activeStyle.background : '#ffffff',
+                            color: isSelected ? lvl.activeStyle.color : 'var(--text-muted)'
+                          }}
+                        >
+                          {lvl.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="form-group">

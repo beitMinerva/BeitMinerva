@@ -71,6 +71,7 @@ export default function EditReminderModal({ reminder, goats = [], barnAreas = []
   const [reminderTitle, setReminderTitle] = useState(getInitialReminderTitle(initialCat.id));
   const [reminderDate, setReminderDate] = useState(formatLocalDatetime(reminder?.date));
   const [reminderNotes, setReminderNotes] = useState(reminder?.notes || '');
+  const [urgency, setUrgency] = useState(parsedFields.urgency || 'normal');
   const [submitting, setSubmitting] = useState(false);
 
   // Vaccination / Medication medicine list
@@ -120,6 +121,14 @@ export default function EditReminderModal({ reminder, goats = [], barnAreas = []
     setTimeout(() => { onClose(); }, 220);
   };
 
+  const getFinalTargetGoatIds = () => {
+    if (targetMode === 'HERD') return goats.map((g) => g.id);
+    if (targetMode === 'PEN') return goats.filter((g) => g.area_id === selectedPenId).map((g) => g.id);
+    if (targetMode === 'CUSTOM') return selectedGoatIds;
+    if (targetMode === 'SINGLE') return selectedGoatIds.slice(0, 1);
+    return [];
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -152,7 +161,8 @@ export default function EditReminderModal({ reminder, goats = [], barnAreas = []
       ...parsedFields,
       target_mode: resolvedTargetMode,
       target_pen_id: resolvedTargetMode === 'PEN' ? selectedPenId : null,
-      target_goat_ids: snapshotIds
+      target_goat_ids: snapshotIds,
+      urgency: urgency
     };
 
     if (selectedCategory.id === 'Vaccination' || selectedCategory.id === 'Medication') {
@@ -574,6 +584,47 @@ export default function EditReminderModal({ reminder, goats = [], barnAreas = []
                 />
               </div>
             )}
+
+            {/* TASK URGENCY / PRIORITY */}
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Task Priority & Urgency</span>
+                <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'capitalize', color: urgency === 'urgent' ? '#dc2626' : urgency === 'high' ? '#d97706' : 'var(--text-muted)' }}>
+                  {urgency} Priority
+                </span>
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                {[
+                  { id: 'normal', label: 'Normal', activeStyle: { background: '#f1f5f9', color: '#334155', border: '1.5px solid #cbd5e1' } },
+                  { id: 'high', label: 'High', activeStyle: { background: '#fffbeb', color: '#b45309', border: '1.5px solid #fde68a' } },
+                  { id: 'urgent', label: 'Urgent', activeStyle: { background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5' } }
+                ].map((lvl) => {
+                  const isSelected = urgency === lvl.id;
+                  return (
+                    <button
+                      key={lvl.id}
+                      type="button"
+                      onClick={() => setUrgency(lvl.id)}
+                      disabled={submitting}
+                      style={{
+                        padding: '7px 10px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.15s ease',
+                        border: isSelected ? lvl.activeStyle.border : '1px solid var(--border-color)',
+                        background: isSelected ? lvl.activeStyle.background : '#ffffff',
+                        color: isSelected ? lvl.activeStyle.color : 'var(--text-muted)'
+                      }}
+                    >
+                      {lvl.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             <div className="form-group">
               <label className="form-label">Notes & Instructions</label>

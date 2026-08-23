@@ -533,6 +533,26 @@ export default function CalendarView({
                             {rem.title}
                           </strong>
 
+                          {/* URGENCY / PRIORITY BADGE */}
+                          {(() => {
+                            const raw = typeof rem.custom_fields === 'string' ? (() => { try { return JSON.parse(rem.custom_fields); } catch { return {}; } })() : (rem.custom_fields || {});
+                            if (raw.urgency === 'urgent') {
+                              return (
+                                <span style={{ fontSize: '10px', fontWeight: '800', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', padding: '1px 6px', borderRadius: '9999px' }}>
+                                  Urgent
+                                </span>
+                              );
+                            }
+                            if (raw.urgency === 'high') {
+                              return (
+                                <span style={{ fontSize: '10px', fontWeight: '800', background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '1px 6px', borderRadius: '9999px' }}>
+                                  High Priority
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+
                           {/* REPEAT BADGE */}
                           {repeatLabel && (
                             <span style={{ fontSize: '10px', fontWeight: '800', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '1px 6px', borderRadius: '9999px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>

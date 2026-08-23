@@ -6,6 +6,7 @@ import AddGoatModal from './components/AddGoatModal';
 import AddEventModal from './components/AddEventModal';
 import AdminLoginModal from './components/AdminLoginModal';
 import FarmAnalyticsModal from './components/FarmAnalyticsModal';
+import NotificationCenterModal from './components/NotificationCenterModal';
 import { supabase } from './config/supabase';
 
 import BarnSquareView from './views/BarnSquareView';
@@ -13,7 +14,8 @@ import ScannerView from './views/ScannerView';
 import CalendarView from './views/CalendarView';
 import GoatsView from './views/GoatsView';
 import SettingsView from './views/SettingsView';
-import { checkUpcomingTasksAndNotify } from './services/notificationService';
+import { checkUpcomingTasksAndNotify, generateDynamicFarmAlerts } from './services/notificationService';
+
 
 import {
   getGoats,
@@ -92,7 +94,46 @@ export default function App() {
   const [initialAddEventMode, setInitialAddEventMode] = useState('LOG');
   const [initialAddEventDate, setInitialAddEventDate] = useState(null);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [dismissedAlertIds, setDismissedAlertIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('dismissed_farm_alert_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [toastMessage, setToastMessage] = useState('');
+
+  // Compute dynamic farm alerts in real-time
+  const farmAlerts = React.useMemo(() => {
+    return generateDynamicFarmAlerts({
+      events: recentEvents,
+      goats,
+      barnAreas,
+      feedingEntries: penFeedingEntries,
+      milkingEntries: penMilkEntries,
+      dismissedAlertIds
+    });
+  }, [recentEvents, goats, barnAreas, penFeedingEntries, penMilkEntries, dismissedAlertIds]);
+
+  const handleDismissAlert = (alertId) => {
+    setDismissedAlertIds((prev) => {
+      const updated = [...new Set([...prev, alertId])];
+      localStorage.setItem('dismissed_farm_alert_ids', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleDismissAllAlerts = () => {
+    const allIds = farmAlerts.map((a) => a.id);
+    setDismissedAlertIds((prev) => {
+      const updated = [...new Set([...prev, ...allIds])];
+      localStorage.setItem('dismissed_farm_alert_ids', JSON.stringify(updated));
+      return updated;
+    });
+    showToast('All notifications cleared for today.');
+  };
 
   const loadData = async () => {
     try {
@@ -110,13 +151,14 @@ export default function App() {
       setPenFeedingEntries(feedingEntriesData);
 
       // Check for due tasks & send Web Push Notifications
-      checkUpcomingTasksAndNotify(eventsData, goatsData);
+      checkUpcomingTasksAndNotify(eventsData, goatsData, areasData, feedingEntriesData, milkEntriesData);
     } catch (err) {
       console.error('Error loading data:', err);
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     loadData();
@@ -182,7 +224,7 @@ export default function App() {
       const created = await addBarnArea(areaData);
       showToast(`Created Pen ${created.letter}.`);
       await loadData();
-    } catch (err) { showToast(`❌ Error: ${err.message}`); }
+    } catch (err) { showToast(`Error: ${err.message}`); }
   };
 
   const handleUpdateBarnArea = async (id, updates) => {
@@ -190,7 +232,7 @@ export default function App() {
       await updateBarnArea(id, updates);
       showToast('Pen updated.');
       await loadData();
-    } catch (err) { showToast(`❌ Error: ${err.message}`); }
+    } catch (err) { showToast(`Error: ${err.message}`); }
   };
 
   const handleDeleteBarnArea = async (id) => {
@@ -198,7 +240,7 @@ export default function App() {
       await deleteBarnArea(id);
       showToast('Pen deleted.');
       await loadData();
-    } catch (err) { showToast(`❌ Error: ${err.message}`); }
+    } catch (err) { showToast(`Error: ${err.message}`); }
   };
 
   const handleSavePenMilkEntry = async (param1, param2, param3 = null) => {
@@ -387,13 +429,13 @@ export default function App() {
             is_scheduled: true
           });
           const nextDateStr = new Date(nextDueDate).toLocaleDateString();
-          showToast(`✅ Event logged to history! Next reminder scheduled for ${nextDateStr}.`);
+          showToast(`Event logged to history! Next reminder scheduled for ${nextDateStr}.`);
         } else {
           await updateTimelineEvent(taskToComplete.id, {
             status: 'completed',
             is_scheduled: false
           });
-          showToast(`✅ Event logged to history & task completed.`);
+          showToast(`Event logged to history and task completed.`);
         }
         setTaskToComplete(null);
       }
@@ -403,7 +445,7 @@ export default function App() {
         const updatedEvents = await getTimelineEvents(selectedGoat.id);
         setSelectedGoatEvents(updatedEvents);
       }
-    } catch (err) { showToast(`❌ Error: ${err.message}`); }
+    } catch (err) { showToast(`Error: ${err.message}`); }
   };
 
   const handleUpdateEvent = async (eventId, updates) => {
@@ -415,7 +457,7 @@ export default function App() {
         const updatedEvents = await getTimelineEvents(selectedGoat.id);
         setSelectedGoatEvents(updatedEvents);
       }
-    } catch (err) { showToast(`❌ Error: ${err.message}`); }
+    } catch (err) { showToast(`Error: ${err.message}`); }
   };
 
   const handleDeleteEvent = async (eventId) => {
@@ -460,8 +502,11 @@ export default function App() {
           setGoatToEdit(null);
           setShowAddGoatModal(true);
         })}
+        onOpenNotifications={() => setShowNotificationModal(true)}
+        alerts={farmAlerts}
         showToast={showToast}
       />
+
 
       {/* Toast Notification */}
       {toastMessage && (
@@ -646,7 +691,7 @@ export default function App() {
           onClose={() => setShowLoginModal(false)}
           onLoginSuccess={(s) => {
             setSession(s);
-            showToast('✅ Signed in as Admin. Full edit access granted.');
+            showToast('Signed in as Admin. Full edit access granted.');
           }}
         />
       )}
@@ -662,6 +707,26 @@ export default function App() {
           onClose={() => setShowAnalyticsModal(false)}
         />
       )}
+
+      {/* Dynamic Farm Notification & Alert Center Modal */}
+      {showNotificationModal && (
+        <NotificationCenterModal
+          alerts={farmAlerts}
+          onClose={() => setShowNotificationModal(false)}
+          onCompleteTask={(task) => requireAdmin(() => handleCompleteTask(task))}
+          onSelectGoat={(goatId) => {
+            const found = goats.find((g) => g.id === goatId);
+            if (found) setSelectedGoat(found);
+          }}
+          onSelectPen={(penId) => {
+            setActiveTab('barn');
+          }}
+          onDismissAlert={handleDismissAlert}
+          onDismissAllAlerts={handleDismissAllAlerts}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 }
+

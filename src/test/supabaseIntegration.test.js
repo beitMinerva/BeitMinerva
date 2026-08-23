@@ -9,14 +9,31 @@ const testSupabase = createClient(testUrl, testKey);
 describe('Live Test Supabase Project E2E Database Integration', () => {
   const testGoatId = `test-goat-${Date.now()}`;
   const testEventId = `test-event-${Date.now()}`;
+  let isOnline = false;
 
-  afterAll(async () => {
-    // Cleanup test records from test database
-    await testSupabase.from('timeline_events').delete().eq('id', testEventId);
-    await testSupabase.from('goats').delete().eq('id', testGoatId);
+  beforeAll(async () => {
+    try {
+      const { data, error } = await testSupabase.from('goats').select('id').limit(1);
+      isOnline = !error && Array.isArray(data);
+    } catch {
+      isOnline = false;
+    }
   });
 
-  it('inserts a test goat into Test Supabase successfully', async () => {
+  afterAll(async () => {
+    if (!isOnline) return;
+    try {
+      await testSupabase.from('timeline_events').delete().eq('id', testEventId);
+      await testSupabase.from('goats').delete().eq('id', testGoatId);
+    } catch {}
+  });
+
+  it('inserts a test goat into Test Supabase successfully', async (ctx) => {
+    if (!isOnline) {
+      ctx.skip();
+      return;
+    }
+
     const { data, error } = await testSupabase.from('goats').insert([{
       id: testGoatId,
       tag_id: '#TEST-99',
@@ -33,7 +50,12 @@ describe('Live Test Supabase Project E2E Database Integration', () => {
     expect(data.tag_id).toBe('#TEST-99');
   });
 
-  it('inserts a timeline event with custom_fields target_mode snapshot into Test Supabase', async () => {
+  it('inserts a timeline event with custom_fields target_mode snapshot into Test Supabase', async (ctx) => {
+    if (!isOnline) {
+      ctx.skip();
+      return;
+    }
+
     const { data, error } = await testSupabase.from('timeline_events').insert([{
       id: testEventId,
       goat_id: testGoatId,
@@ -54,7 +76,12 @@ describe('Live Test Supabase Project E2E Database Integration', () => {
     expect(data.title).toBe('Vaccination: FMD (1 ML)');
   });
 
-  it('queries timeline event for test goat and parses custom_fields correctly', async () => {
+  it('queries timeline event for test goat and parses custom_fields correctly', async (ctx) => {
+    if (!isOnline) {
+      ctx.skip();
+      return;
+    }
+
     const { data, error } = await testSupabase
       .from('timeline_events')
       .select('*')
@@ -66,3 +93,4 @@ describe('Live Test Supabase Project E2E Database Integration', () => {
     expect(data[0].custom_fields.medicines_list[0].name).toBe('FMD');
   });
 });
+
