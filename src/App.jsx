@@ -75,13 +75,23 @@ export default function App() {
     showToast('Signed out. You are now in Guest (read-only) mode.');
   };
 
+  const isDemoOrAdminDisabled =
+    import.meta.env.MODE === 'test' ||
+    import.meta.env.MODE === 'demo' ||
+    import.meta.env.VITE_DISABLE_ADMIN === 'true' ||
+    import.meta.env.VITE_DEMO_MODE === 'true';
+
   const requireAdmin = (actionFn) => {
+    if (isDemoOrAdminDisabled) {
+      if (typeof actionFn === 'function') actionFn();
+      return true;
+    }
     if (!session) {
       showToast('Please sign in as Admin to perform this action.');
       setShowLoginModal(true);
       return false;
     }
-    actionFn();
+    if (typeof actionFn === 'function') actionFn();
     return true;
   };
 
@@ -610,6 +620,7 @@ export default function App() {
                 goats={goats}
                 barnAreas={barnAreas}
                 session={session}
+                isDemoMode={isDemoOrAdminDisabled}
                 onOpenLogin={() => setShowLoginModal(true)}
                 onSignOut={handleSignOut}
                 onOpenAnalytics={() => setShowAnalyticsModal(true)}

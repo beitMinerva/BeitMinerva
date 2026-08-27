@@ -4,6 +4,7 @@ export default function SettingsView({
   goats = [],
   barnAreas = [],
   session = null,
+  isDemoMode = false,
   onOpenLogin,
   onSignOut,
   onOpenAnalytics
@@ -49,7 +50,27 @@ export default function SettingsView({
           Account & Access Level
         </h3>
 
-        {session ? (
+        {isDemoMode ? (
+          <div style={{
+            background: '#f0fdf4',
+            border: '1px solid var(--primary-border)',
+            borderRadius: '12px',
+            padding: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <ShieldCheck size={22} color="var(--primary-dark)" />
+            <div>
+              <strong style={{ fontSize: '14px', color: 'var(--primary-dark)', display: 'block', marginBottom: '2px' }}>
+                Demo Mode (Full Access)
+              </strong>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Admin security is disabled for this demo. All features and write permissions are unlocked without login.
+              </span>
+            </div>
+          </div>
+        ) : session ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{
               background: '#f0fdf4',
