@@ -7,6 +7,7 @@ import AddEventModal from './components/AddEventModal';
 import AdminLoginModal from './components/AdminLoginModal';
 import FarmAnalyticsModal from './components/FarmAnalyticsModal';
 import NotificationCenterModal from './components/NotificationCenterModal';
+import BudgetTrackerModal from './components/BudgetTrackerModal';
 import { supabase } from './config/supabase';
 
 import BarnSquareView from './views/BarnSquareView';
@@ -104,6 +105,7 @@ export default function App() {
   const [initialAddEventMode, setInitialAddEventMode] = useState('LOG');
   const [initialAddEventDate, setInitialAddEventDate] = useState(null);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [dismissedAlertIds, setDismissedAlertIds] = useState(() => {
     try {
@@ -624,6 +626,7 @@ export default function App() {
                 onOpenLogin={() => setShowLoginModal(true)}
                 onSignOut={handleSignOut}
                 onOpenAnalytics={() => setShowAnalyticsModal(true)}
+                onOpenBudgetTracker={() => setShowBudgetModal(true)}
               />
             )}
           </>
@@ -735,6 +738,17 @@ export default function App() {
           onDismissAlert={handleDismissAlert}
           onDismissAllAlerts={handleDismissAllAlerts}
           showToast={showToast}
+        />
+      )}
+
+      {/* Farm Budget & Expense Ledger Modal */}
+      {showBudgetModal && (
+        <BudgetTrackerModal
+          session={session}
+          isDemoMode={isDemoOrAdminDisabled}
+          requireAdmin={requireAdmin}
+          showToast={showToast}
+          onClose={() => setShowBudgetModal(false)}
         />
       )}
     </div>

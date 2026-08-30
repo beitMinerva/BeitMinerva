@@ -1,4 +1,4 @@
-import { User, LogIn, LogOut, ShieldCheck, Info, BarChart2, ChevronRight } from 'lucide-react';
+import { User, LogIn, LogOut, ShieldCheck, Info, BarChart2, ChevronRight, Wallet } from 'lucide-react';
 
 export default function SettingsView({
   goats = [],
@@ -7,15 +7,45 @@ export default function SettingsView({
   isDemoMode = false,
   onOpenLogin,
   onSignOut,
-  onOpenAnalytics
+  onOpenAnalytics,
+  onOpenBudgetTracker
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div>
         <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Settings & Farm Intelligence</h2>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          Manage admin access and farm business intelligence.
+          Manage admin access, farm budget ledger, and business intelligence.
         </p>
+      </div>
+
+      {/* FARM BUDGET & EXPENSE TRACKER BUTTON */}
+      <div
+        className="card"
+        onClick={onOpenBudgetTracker}
+        style={{
+          padding: '14px 16px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          border: '1px solid var(--border-color)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ background: 'var(--primary-light)', padding: '9px', borderRadius: '10px' }}>
+            <Wallet size={20} color="var(--primary-dark)" />
+          </div>
+          <div>
+            <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)', display: 'block' }}>
+              Farm Budget & Expense Tracker
+            </span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              Track farm expenses and product income in USD & LBP
+            </span>
+          </div>
+        </div>
+        <ChevronRight size={16} color="var(--text-muted)" />
       </div>
 
       {/* ANALYTICS BUTTON - MINIMAL ROW */}
