@@ -212,6 +212,60 @@ export default function BudgetTrackerModal({
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
+  // DYNAMIC CATEGORIES: Extract all custom and predefined categories from entries
+  const dynamicExpenseCategories = useMemo(() => {
+    const list = [...DEFAULT_EXPENSE_CATEGORIES];
+    const existingNames = new Set(list.map((c) => c.nameAr));
+    
+    entries.forEach((e) => {
+      if (e.entry_type === 'expense' && e.category && !existingNames.has(e.category) && e.category !== 'غيرها') {
+        existingNames.add(e.category);
+        list.push({
+          id: `custom_exp_${e.category}`,
+          nameAr: e.category,
+          nameEn: e.category,
+          icon: 'ShoppingBag',
+          isCustom: true
+        });
+      }
+    });
+    return list;
+  }, [entries]);
+
+  const dynamicIncomeCategories = useMemo(() => {
+    const list = [...DEFAULT_INCOME_CATEGORIES];
+    const existingNames = new Set(list.map((c) => c.nameAr));
+    
+    entries.forEach((e) => {
+      if (e.entry_type === 'income' && e.category && !existingNames.has(e.category) && e.category !== 'غيرها') {
+        existingNames.add(e.category);
+        list.push({
+          id: `custom_inc_${e.category}`,
+          nameAr: e.category,
+          nameEn: e.category,
+          icon: 'TrendingUp',
+          isCustom: true
+        });
+      }
+    });
+    return list;
+  }, [entries]);
+
+  const activeCategoryList = useMemo(() => {
+    if (activeTab === 'expense') return dynamicExpenseCategories;
+    if (activeTab === 'income') return dynamicIncomeCategories;
+    
+    const combined = [...dynamicExpenseCategories];
+    const seen = new Set(combined.map((c) => c.nameAr));
+    dynamicIncomeCategories.forEach((c) => {
+      if (!seen.has(c.nameAr)) {
+        seen.add(c.nameAr);
+        combined.push(c);
+      }
+    });
+    return combined;
+  }, [activeTab, dynamicExpenseCategories, dynamicIncomeCategories]);
+
   // Filtered entries
   const filteredEntries = useMemo(() => {
     return entries.filter((e) => {
@@ -235,6 +289,35 @@ export default function BudgetTrackerModal({
       return true;
     });
   }, [entries, selectedMonth, activeTab, selectedCategory, searchTerm]);
+
+  // Selected category specific total
+  const selectedCategorySummary = useMemo(() => {
+    if (selectedCategory === 'ALL') return null;
+
+    const matchedEntries = entries.filter((e) => {
+      if (selectedMonth !== 'ALL' && (!e.date || !e.date.startsWith(selectedMonth))) return false;
+      if (activeTab !== 'all' && e.entry_type !== activeTab) return false;
+      return e.category === selectedCategory;
+    });
+
+    let totalUSD = 0;
+    let totalLBP = 0;
+    let isIncome = activeTab === 'income';
+
+    matchedEntries.forEach((e) => {
+      totalUSD += parseFloat(e.usd_amount) || 0;
+      totalLBP += parseFloat(e.lbp_amount) || 0;
+      if (e.entry_type === 'income') isIncome = true;
+    });
+
+    return {
+      categoryName: selectedCategory,
+      count: matchedEntries.length,
+      totalUSD,
+      totalLBP,
+      isIncome
+    };
+  }, [entries, selectedMonth, activeTab, selectedCategory]);
 
   // Totals calculation (Both Separate raw USD/LBP and Converted USD)
   const totals = useMemo(() => {
@@ -283,18 +366,28 @@ export default function BudgetTrackerModal({
     };
   }, [entries, selectedMonth, exchangeRate]);
 
-  // Tab counts that remain stable when toggling tabs
+  // Tab counts that reflect selectedMonth, selectedCategory, and searchTerm
   const tabCounts = useMemo(() => {
-    const baseList = selectedMonth === 'ALL'
-      ? entries
-      : entries.filter((e) => e.date && e.date.startsWith(selectedMonth));
+    const baseList = entries.filter((e) => {
+      if (selectedMonth !== 'ALL' && (!e.date || !e.date.startsWith(selectedMonth))) return false;
+      if (selectedCategory !== 'ALL' && e.category !== selectedCategory) return false;
+      if (searchTerm.trim()) {
+        const query = searchTerm.toLowerCase().trim();
+        const cat = (e.category || '').toLowerCase();
+        const comments = (e.comments || '').toLowerCase();
+        const date = (e.date || '').toLowerCase();
+        const engName = getCategoryEnglishName(e.category, e.entry_type === 'income').toLowerCase();
+        return cat.includes(query) || comments.includes(query) || date.includes(query) || engName.includes(query);
+      }
+      return true;
+    });
 
     return {
       all: baseList.length,
       expense: baseList.filter((e) => e.entry_type === 'expense').length,
       income: baseList.filter((e) => e.entry_type === 'income').length
     };
-  }, [entries, selectedMonth]);
+  }, [entries, selectedMonth, selectedCategory, searchTerm]);
 
   // Open Form for Create
   const handleOpenCreate = (defaultType = null, defaultCategory = null) => {
@@ -328,8 +421,8 @@ export default function BudgetTrackerModal({
   // Open Form for Edit
   const handleOpenEdit = (entry) => {
     setEditingEntry(entry);
-    const isPredefined = (entry.entry_type === 'income' ? DEFAULT_INCOME_CATEGORIES : DEFAULT_EXPENSE_CATEGORIES)
-      .some((c) => c.nameAr === entry.category);
+    const activeList = entry.entry_type === 'income' ? dynamicIncomeCategories : dynamicExpenseCategories;
+    const isPredefined = activeList.some((c) => c.nameAr === entry.category);
 
     setFormData({
       entry_type: entry.entry_type || 'expense',
@@ -428,12 +521,6 @@ export default function BudgetTrackerModal({
     }
   };
 
-  const activeCategoryList = useMemo(() => {
-    if (activeTab === 'expense') return DEFAULT_EXPENSE_CATEGORIES;
-    if (activeTab === 'income') return DEFAULT_INCOME_CATEGORIES;
-    return [...DEFAULT_EXPENSE_CATEGORIES, ...DEFAULT_INCOME_CATEGORIES];
-  }, [activeTab]);
-
   return (
     <>
       <style>{`
@@ -444,18 +531,14 @@ export default function BudgetTrackerModal({
         }
       `}</style>
 
+      {/* FULL PAGE CONTAINER - CLEAN VERTICAL SPLIT SO SCROLLING DOES NOT MOVE THE FLOATING BUTTON */}
       <div
-        ref={containerRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         className={`full-page-animate budget-tracker-page ${isClosing ? 'full-page-close-animate' : ''}`}
         style={{
           position: 'fixed',
           inset: 0,
           background: '#ffffff',
           zIndex: 100,
-          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
           transform: pullY > 0 ? `translateY(${pullY}px)` : undefined,
@@ -463,15 +546,13 @@ export default function BudgetTrackerModal({
         }}
       >
         {/* PULL DOWN HANDLE BAR */}
-        <div style={{ padding: '8px 0 2px 0', display: 'flex', justifyContent: 'center', background: '#ffffff', cursor: 'grab' }}>
+        <div style={{ padding: '8px 0 2px 0', display: 'flex', justifyContent: 'center', background: '#ffffff', cursor: 'grab', flexShrink: 0 }}>
           <div style={{ width: '42px', height: '5px', borderRadius: '9999px', background: '#cbd5e1' }} />
         </div>
 
         {/* FULL PAGE HEADER */}
         <div
           style={{
-            position: 'sticky',
-            top: 0,
             background: '#ffffff',
             borderBottom: '1px solid var(--border-color)',
             padding: '10px 16px',
@@ -479,6 +560,7 @@ export default function BudgetTrackerModal({
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '10px',
+            flexShrink: 0,
             zIndex: 10
           }}
         >
@@ -502,567 +584,641 @@ export default function BudgetTrackerModal({
           </div>
         </div>
 
-        {/* FULL PAGE CONTENT HUB */}
+        {/* SCROLLABLE CONTENT BODY */}
         <div
+          ref={containerRef}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           style={{
-            maxWidth: '600px',
-            width: '100%',
-            margin: '0 auto',
-            padding: '16px 16px 80px 16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '14px'
+            flex: 1,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            position: 'relative'
           }}
         >
-          {/* TITLE & PERIOD BAR */}
-          <div
-            className="card"
-            style={{
-              padding: '14px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              flexWrap: 'wrap'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div
-                style={{
-                  background: 'var(--primary-light)',
-                  border: '1px solid var(--primary-border)',
-                  padding: '9px',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <Wallet size={22} color="var(--primary)" />
-              </div>
-              <div>
-                <h2 style={{ fontSize: '17px', fontWeight: '800', margin: 0, lineHeight: 1.2 }}>
-                  Farm Budget & Ledger
-                </h2>
-                <span className="ar-text" style={{ fontSize: '12.5px', color: 'var(--text-muted)', fontWeight: '600' }}>
-                  سجل المصاريف والمدخول
-                </span>
-              </div>
-            </div>
-
-            {/* MONTH PICKER */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar size={15} color="var(--primary)" />
-              <select
-                className="form-input"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                style={{
-                  padding: '4px 10px',
-                  fontSize: '13px',
-                  fontWeight: '700',
-                  borderRadius: '8px',
-                  minWidth: '135px',
-                  height: '34px'
-                }}
-              >
-                <option value="ALL">All Time</option>
-                {availableMonths.map((m) => (
-                  <option key={m} value={m}>
-                    {formatMonthName(m)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* CURRENCY VIEW MODE TOGGLE (Separate USD/LBP vs All in USD) */}
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '8px',
-              padding: '4px 2px'
-            }}
-          >
-            <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '3px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-              <button
-                type="button"
-                onClick={() => setCurrencyMode('split')}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: '7px',
-                  border: 'none',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  background: currencyMode === 'split' ? '#ffffff' : 'transparent',
-                  color: currencyMode === 'split' ? 'var(--text-main)' : 'var(--text-muted)',
-                  boxShadow: currencyMode === 'split' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                Separate ($ & L.L.)
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrencyMode('all_usd')}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: '7px',
-                  border: 'none',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  background: currencyMode === 'all_usd' ? '#ffffff' : 'transparent',
-                  color: currencyMode === 'all_usd' ? 'var(--primary-dark)' : 'var(--text-muted)',
-                  boxShadow: currencyMode === 'all_usd' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                All in USD ($)
-              </button>
-            </div>
-
-            {/* EXCHANGE RATE PILL BUTTON */}
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => {
-                setCustomRateInput(String(exchangeRate));
-                setShowRateModal(true);
-              }}
-              style={{
-                fontSize: '11px',
-                fontWeight: '700',
-                padding: '4px 8px',
-                height: '28px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                background: '#ffffff'
-              }}
-              title="Set USD / LBP Exchange Rate"
-            >
-              <Settings2 size={12} color="var(--primary)" />
-              <span>1$ = {exchangeRate >= 1000 ? `${(exchangeRate / 1000).toFixed(0)}k` : exchangeRate}</span>
-            </button>
-          </div>
-
-          {/* FINANCIAL SUMMARY METRIC CARDS */}
-          {currencyMode === 'split' ? (
-            /* SEPARATE USD AND LBP LIKE BEFORE */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* ROW 1: INCOME & EXPENSES */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                {/* 1. INCOME CARD */}
-                <div
-                  className="card"
-                  style={{
-                    padding: '12px 14px',
-                    background: '#ffffff',
-                    border: '1px solid #bbf7d0',
-                    boxShadow: 'var(--shadow-sm)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#15803d' }}>
-                      INCOME <span className="ar-text" style={{ fontSize: '11.5px' }}>(المدخول)</span>
-                    </span>
-                    <div style={{ background: '#dcfce7', padding: '4px', borderRadius: '7px' }}>
-                      <ArrowDownLeft size={13} color="#16a34a" />
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '17px', fontWeight: '900', color: '#16a34a' }}>
-                    {formatCurrencyUSD(totals.incomeUSD)}
-                  </div>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {formatCurrencyLBP(totals.incomeLBP)}
-                  </div>
-                </div>
-
-                {/* 2. EXPENSES CARD */}
-                <div
-                  className="card"
-                  style={{
-                    padding: '12px 14px',
-                    background: '#ffffff',
-                    border: '1px solid #fecaca',
-                    boxShadow: 'var(--shadow-sm)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#b91c1c' }}>
-                      EXPENSES <span className="ar-text" style={{ fontSize: '11.5px' }}>(المصاريف)</span>
-                    </span>
-                    <div style={{ background: '#fee2e2', padding: '4px', borderRadius: '7px' }}>
-                      <ArrowUpRight size={13} color="#dc2626" />
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '17px', fontWeight: '900', color: '#dc2626' }}>
-                    {formatCurrencyUSD(totals.expenseUSD)}
-                  </div>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {formatCurrencyLBP(totals.expenseLBP)}
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. SEPARATE NET BALANCE / PROFIT CARD */}
-              <div
-                className="card"
-                style={{
-                  padding: '14px 16px',
-                  background: (totals.netUSD >= 0 && totals.netLBP >= 0) ? '#f0fdf4' : (totals.netUSD < 0 && totals.netLBP < 0) ? '#fef2f2' : '#ffffff',
-                  border: `1px solid ${(totals.netUSD >= 0 && totals.netLBP >= 0) ? 'var(--primary-border)' : (totals.netUSD < 0 && totals.netLBP < 0) ? '#fca5a5' : 'var(--border-color)'}`,
-                  boxShadow: 'var(--shadow-sm)'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: totals.netUSD >= 0 ? 'var(--primary-dark)' : '#dc2626' }}>
-                    NET BALANCE <span className="ar-text">(صافي الميزانية)</span>
-                  </span>
-                  <div style={{ background: totals.netUSD >= 0 ? '#dcfce7' : '#fee2e2', padding: '4px', borderRadius: '7px' }}>
-                    {totals.netUSD >= 0 ? (
-                      <TrendingUp size={14} color="var(--primary)" />
-                    ) : (
-                      <TrendingDown size={14} color="#dc2626" />
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', alignItems: 'baseline' }}>
-                  <div>
-                    <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', display: 'block' }}>USD Balance</span>
-                    <div style={{ fontSize: '18px', fontWeight: '900', color: totals.netUSD >= 0 ? 'var(--primary-dark)' : '#dc2626' }}>
-                      {totals.netUSD < 0 ? '-' : '+'}{formatCurrencyUSD(Math.abs(totals.netUSD))}
-                    </div>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', display: 'block' }}>LBP Balance</span>
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: totals.netLBP >= 0 ? '#15803d' : '#dc2626' }}>
-                      {totals.netLBP < 0 ? '-' : '+'}{formatCurrencyLBP(Math.abs(totals.netLBP))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* ALL CONVERTED IN USD ($) */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div
-                  className="card"
-                  style={{
-                    padding: '12px 14px',
-                    background: '#ffffff',
-                    border: '1px solid #bbf7d0',
-                    boxShadow: 'var(--shadow-sm)'
-                  }}
-                >
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#15803d', display: 'block', marginBottom: '4px' }}>
-                    TOTAL INCOME ($)
-                  </span>
-                  <div style={{ fontSize: '18px', fontWeight: '900', color: '#16a34a' }}>
-                    {formatCurrencyUSD(totals.convertedIncomeAllUSD)}
-                  </div>
-                  <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    Combined @ {exchangeRate.toLocaleString()} L.L.
-                  </div>
-                </div>
-
-                <div
-                  className="card"
-                  style={{
-                    padding: '12px 14px',
-                    background: '#ffffff',
-                    border: '1px solid #fecaca',
-                    boxShadow: 'var(--shadow-sm)'
-                  }}
-                >
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#b91c1c', display: 'block', marginBottom: '4px' }}>
-                    TOTAL EXPENSES ($)
-                  </span>
-                  <div style={{ fontSize: '18px', fontWeight: '900', color: '#dc2626' }}>
-                    {formatCurrencyUSD(totals.convertedExpenseAllUSD)}
-                  </div>
-                  <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    Combined @ {exchangeRate.toLocaleString()} L.L.
-                  </div>
-                </div>
-              </div>
-
-              <div
-                className="card"
-                style={{
-                  padding: '14px 16px',
-                  background: totals.convertedNetAllUSD >= 0 ? '#f0fdf4' : '#fef2f2',
-                  border: `1.5px solid ${totals.convertedNetAllUSD >= 0 ? 'var(--primary-border)' : '#fca5a5'}`,
-                  boxShadow: 'var(--shadow-sm)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: totals.convertedNetAllUSD >= 0 ? 'var(--primary-dark)' : '#dc2626' }}>
-                    {totals.convertedNetAllUSD >= 0 ? 'TOTAL NET PROFIT ($)' : 'TOTAL NET LOSS ($)'}
-                  </span>
-                  <div style={{ fontSize: '22px', fontWeight: '900', color: totals.convertedNetAllUSD >= 0 ? 'var(--primary-dark)' : '#dc2626' }}>
-                    {totals.convertedNetAllUSD < 0 ? '-' : '+'}{formatCurrencyUSD(Math.abs(totals.convertedNetAllUSD))}
-                  </div>
-                </div>
-                <div style={{ background: totals.convertedNetAllUSD >= 0 ? '#dcfce7' : '#fee2e2', padding: '10px', borderRadius: '12px' }}>
-                  {totals.convertedNetAllUSD >= 0 ? <TrendingUp size={22} color="var(--primary)" /> : <TrendingDown size={22} color="#dc2626" />}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* FILTER CONTROLS & TABS */}
-          <div
-            className="card"
-            style={{
-              padding: '12px',
+              maxWidth: '600px',
+              width: '100%',
+              margin: '0 auto',
+              padding: '16px 16px 90px 16px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px'
+              gap: '14px'
             }}
           >
-            {/* TYPE TABS */}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                className={`btn btn-sm ${activeTab === 'all' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => { setActiveTab('all'); }}
-                style={{ flex: 1, padding: '7px', height: '34px' }}
-              >
-                All ({tabCounts.all})
-              </button>
-              <button
-                className={`btn btn-sm ${activeTab === 'expense' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => { setActiveTab('expense'); }}
-                style={{
-                  flex: 1,
-                  padding: '7px',
-                  height: '34px',
-                  background: activeTab === 'expense' ? '#dc2626' : undefined,
-                  borderColor: activeTab === 'expense' ? '#dc2626' : undefined
-                }}
-              >
-                Expenses ({tabCounts.expense})
-              </button>
-              <button
-                className={`btn btn-sm ${activeTab === 'income' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => { setActiveTab('income'); }}
-                style={{
-                  flex: 1,
-                  padding: '7px',
-                  height: '34px',
-                  background: activeTab === 'income' ? '#16a34a' : undefined,
-                  borderColor: activeTab === 'income' ? '#16a34a' : undefined
-                }}
-              >
-                Income ({tabCounts.income})
-              </button>
-            </div>
-
-            {/* SEARCH & CATEGORY FILTER */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: '160px', position: 'relative' }}>
-                <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Search comments, category..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ paddingLeft: '32px', height: '36px', fontSize: '12px' }}
-                />
-              </div>
-
-              <select
-                className="form-input"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                style={{ minWidth: '150px', height: '36px', fontSize: '12px', fontWeight: '600' }}
-              >
-                <option value="ALL">All Categories</option>
-                {activeCategoryList.map((c, i) => (
-                  <option key={c.id || i} value={c.nameAr}>
-                    {c.nameEn} • {c.nameAr}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* TRANSACTIONS LIST */}
-          {loading ? (
-            <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              Loading budget ledger...
-            </div>
-          ) : filteredEntries.length === 0 ? (
+            {/* TITLE & PERIOD BAR */}
             <div
               className="card"
               style={{
-                padding: '40px 20px',
-                textAlign: 'center',
-                border: '1px dashed var(--border-color)',
+                padding: '14px 16px',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                gap: '10px'
+                justifyContent: 'space-between',
+                gap: '12px',
+                flexWrap: 'wrap'
               }}
             >
-              <FileText size={32} color="var(--text-light)" />
-              <strong style={{ fontSize: '14px', color: 'var(--text-main)' }}>No Transactions Found</strong>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', maxWidth: '280px' }}>
-                {selectedCategory !== 'ALL' 
-                  ? `No records found under "${getCategoryEnglishName(selectedCategory)}".` 
-                  : selectedMonth !== 'ALL' 
-                  ? `No records logged for ${formatMonthName(selectedMonth)}.` 
-                  : 'No transactions recorded yet.'}
-              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    background: 'var(--primary-light)',
+                    border: '1px solid var(--primary-border)',
+                    padding: '9px',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Wallet size={22} color="var(--primary)" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '17px', fontWeight: '800', margin: 0, lineHeight: 1.2 }}>
+                    Farm Budget & Ledger
+                  </h2>
+                  <span className="ar-text" style={{ fontSize: '12.5px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                    سجل المصاريف والمدخول
+                  </span>
+                </div>
+              </div>
+
+              {/* MONTH PICKER */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Calendar size={15} color="var(--primary)" />
+                <select
+                  className="form-input"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    borderRadius: '8px',
+                    minWidth: '135px',
+                    height: '34px'
+                  }}
+                >
+                  <option value="ALL">All Time</option>
+                  {availableMonths.map((m) => (
+                    <option key={m} value={m}>
+                      {formatMonthName(m)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* CURRENCY VIEW MODE TOGGLE (Separate USD/LBP vs All in USD) */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                padding: '4px 2px'
+              }}
+            >
+              <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '3px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrencyMode('split')}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '7px',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    background: currencyMode === 'split' ? '#ffffff' : 'transparent',
+                    color: currencyMode === 'split' ? 'var(--text-main)' : 'var(--text-muted)',
+                    boxShadow: currencyMode === 'split' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Separate ($ & L.L.)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrencyMode('all_usd')}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '7px',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    background: currencyMode === 'all_usd' ? '#ffffff' : 'transparent',
+                    color: currencyMode === 'all_usd' ? 'var(--primary-dark)' : 'var(--text-muted)',
+                    boxShadow: currencyMode === 'all_usd' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  All in USD ($)
+                </button>
+              </div>
+
+              {/* EXCHANGE RATE PILL BUTTON */}
               <button
-                className="btn btn-primary btn-sm"
-                onClick={() => handleOpenCreate(activeTab === 'income' ? 'income' : 'expense', selectedCategory !== 'ALL' ? selectedCategory : null)}
-                style={{ marginTop: '4px' }}
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setCustomRateInput(String(exchangeRate));
+                  setShowRateModal(true);
+                }}
+                style={{
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  padding: '4px 8px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: '#ffffff'
+                }}
+                title="Set USD / LBP Exchange Rate"
               >
-                <Plus size={14} /> Add First Entry
+                <Settings2 size={12} color="var(--primary)" />
+                <span>1$ = {exchangeRate >= 1000 ? `${(exchangeRate / 1000).toFixed(0)}k` : exchangeRate}</span>
               </button>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {filteredEntries.map((entry) => {
-                const isInc = entry.entry_type === 'income';
-                const usd = parseFloat(entry.usd_amount) || 0;
-                const lbp = parseFloat(entry.lbp_amount) || 0;
-                const engName = getCategoryEnglishName(entry.category, isInc);
 
-                return (
+            {/* FINANCIAL SUMMARY METRIC CARDS */}
+            {currencyMode === 'split' ? (
+              /* SEPARATE USD AND LBP LIKE BEFORE */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {/* ROW 1: INCOME & EXPENSES */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {/* 1. INCOME CARD */}
                   <div
-                    key={entry.id}
                     className="card"
                     style={{
                       padding: '12px 14px',
                       background: '#ffffff',
-                      borderLeft: `4px solid ${isInc ? '#16a34a' : '#dc2626'}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '10px',
+                      border: '1px solid #bbf7d0',
                       boxShadow: 'var(--shadow-sm)'
                     }}
                   >
-                    {/* LEFT: Category Icon & Details */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          width: '36px',
-                          height: '36px',
-                          background: isInc ? '#ecfdf5' : '#fef2f2',
-                          border: `1px solid ${isInc ? '#a7f3d0' : '#fecaca'}`,
-                          color: isInc ? '#059669' : '#dc2626',
-                          borderRadius: '10px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}
-                      >
-                        {getCategoryIcon(entry.category, isInc, 17)}
-                      </div>
-
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <strong style={{ fontSize: '13.5px', color: 'var(--text-main)', fontWeight: '700' }}>
-                            {engName}
-                          </strong>
-                          <span className="ar-text" style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>
-                            ({entry.category})
-                          </span>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                            • {entry.date}
-                          </span>
-                        </div>
-
-                        {entry.comments && (
-                          <p
-                            className="ar-text"
-                            style={{
-                              fontSize: '12px',
-                              color: 'var(--text-muted)',
-                              marginTop: '2px',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}
-                          >
-                            {entry.comments}
-                          </p>
-                        )}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '800', color: '#15803d' }}>
+                        INCOME <span className="ar-text" style={{ fontSize: '11.5px' }}>(المدخول)</span>
+                      </span>
+                      <div style={{ background: '#dcfce7', padding: '4px', borderRadius: '7px' }}>
+                        <ArrowDownLeft size={13} color="#16a34a" />
                       </div>
                     </div>
+                    <div style={{ fontSize: '17px', fontWeight: '900', color: '#16a34a' }}>
+                      {formatCurrencyUSD(totals.incomeUSD)}
+                    </div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {formatCurrencyLBP(totals.incomeLBP)}
+                    </div>
+                  </div>
 
-                    {/* RIGHT: Amounts & Actions */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ textAlign: 'right' }}>
-                        {usd > 0 && (
-                          <div style={{ fontSize: '14px', fontWeight: '800', color: isInc ? '#16a34a' : '#dc2626' }}>
-                            {isInc ? '+' : '-'}{formatCurrencyUSD(usd)}
-                          </div>
-                        )}
-                        {lbp > 0 && (
-                          <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>
-                            {isInc ? '+' : '-'}{formatCurrencyLBP(lbp)}
-                          </div>
-                        )}
+                  {/* 2. EXPENSES CARD */}
+                  <div
+                    className="card"
+                    style={{
+                      padding: '12px 14px',
+                      background: '#ffffff',
+                      border: '1px solid #fecaca',
+                      boxShadow: 'var(--shadow-sm)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '800', color: '#b91c1c' }}>
+                        EXPENSES <span className="ar-text" style={{ fontSize: '11.5px' }}>(المصاريف)</span>
+                      </span>
+                      <div style={{ background: '#fee2e2', padding: '4px', borderRadius: '7px' }}>
+                        <ArrowUpRight size={13} color="#dc2626" />
                       </div>
+                    </div>
+                    <div style={{ fontSize: '17px', fontWeight: '900', color: '#dc2626' }}>
+                      {formatCurrencyUSD(totals.expenseUSD)}
+                    </div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {formatCurrencyLBP(totals.expenseLBP)}
+                    </div>
+                  </div>
+                </div>
 
-                      {/* ACTIONS */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <button
-                          onClick={() => handleOpenEdit(entry)}
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '5px', height: '30px', width: '30px', borderRadius: '8px' }}
-                          title="Edit Transaction"
-                        >
-                          <Edit2 size={13} color="var(--text-muted)" />
-                        </button>
-                        <button
-                          onClick={() => setEntryToDelete(entry)}
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '5px', height: '30px', width: '30px', borderRadius: '8px', color: '#dc2626' }}
-                          title="Delete Transaction"
-                        >
-                          <Trash2 size={13} color="#dc2626" />
-                        </button>
+                {/* 3. SEPARATE NET BALANCE / PROFIT CARD */}
+                <div
+                  className="card"
+                  style={{
+                    padding: '14px 16px',
+                    background: (totals.netUSD >= 0 && totals.netLBP >= 0) ? '#f0fdf4' : (totals.netUSD < 0 && totals.netLBP < 0) ? '#fef2f2' : '#ffffff',
+                    border: `1px solid ${(totals.netUSD >= 0 && totals.netLBP >= 0) ? 'var(--primary-border)' : (totals.netUSD < 0 && totals.netLBP < 0) ? '#fca5a5' : 'var(--border-color)'}`,
+                    boxShadow: 'var(--shadow-sm)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: totals.netUSD >= 0 ? 'var(--primary-dark)' : '#dc2626' }}>
+                      NET BALANCE <span className="ar-text">(صافي الميزانية)</span>
+                    </span>
+                    <div style={{ background: totals.netUSD >= 0 ? '#dcfce7' : '#fee2e2', padding: '4px', borderRadius: '7px' }}>
+                      {totals.netUSD >= 0 ? (
+                        <TrendingUp size={14} color="var(--primary)" />
+                      ) : (
+                        <TrendingDown size={14} color="#dc2626" />
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', alignItems: 'baseline' }}>
+                    <div>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', display: 'block' }}>USD Balance</span>
+                      <div style={{ fontSize: '18px', fontWeight: '900', color: totals.netUSD >= 0 ? 'var(--primary-dark)' : '#dc2626' }}>
+                        {totals.netUSD < 0 ? '-' : '+'}{formatCurrencyUSD(Math.abs(totals.netUSD))}
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', display: 'block' }}>LBP Balance</span>
+                      <div style={{ fontSize: '14px', fontWeight: '800', color: totals.netLBP >= 0 ? '#15803d' : '#dc2626' }}>
+                        {totals.netLBP < 0 ? '-' : '+'}{formatCurrencyLBP(Math.abs(totals.netLBP))}
                       </div>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              </div>
+            ) : (
+              /* ALL CONVERTED IN USD ($) */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div
+                    className="card"
+                    style={{
+                      padding: '12px 14px',
+                      background: '#ffffff',
+                      border: '1px solid #bbf7d0',
+                      boxShadow: 'var(--shadow-sm)'
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#15803d', display: 'block', marginBottom: '4px' }}>
+                      TOTAL INCOME ($)
+                    </span>
+                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#16a34a' }}>
+                      {formatCurrencyUSD(totals.convertedIncomeAllUSD)}
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      Combined @ {exchangeRate.toLocaleString()} L.L.
+                    </div>
+                  </div>
+
+                  <div
+                    className="card"
+                    style={{
+                      padding: '12px 14px',
+                      background: '#ffffff',
+                      border: '1px solid #fecaca',
+                      boxShadow: 'var(--shadow-sm)'
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#b91c1c', display: 'block', marginBottom: '4px' }}>
+                      TOTAL EXPENSES ($)
+                    </span>
+                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#dc2626' }}>
+                      {formatCurrencyUSD(totals.convertedExpenseAllUSD)}
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      Combined @ {exchangeRate.toLocaleString()} L.L.
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="card"
+                  style={{
+                    padding: '14px 16px',
+                    background: totals.convertedNetAllUSD >= 0 ? '#f0fdf4' : '#fef2f2',
+                    border: `1.5px solid ${totals.convertedNetAllUSD >= 0 ? 'var(--primary-border)' : '#fca5a5'}`,
+                    boxShadow: 'var(--shadow-sm)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div>
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: totals.convertedNetAllUSD >= 0 ? 'var(--primary-dark)' : '#dc2626' }}>
+                      {totals.convertedNetAllUSD >= 0 ? 'TOTAL NET PROFIT ($)' : 'TOTAL NET LOSS ($)'}
+                    </span>
+                    <div style={{ fontSize: '22px', fontWeight: '900', color: totals.convertedNetAllUSD >= 0 ? 'var(--primary-dark)' : '#dc2626' }}>
+                      {totals.convertedNetAllUSD < 0 ? '-' : '+'}{formatCurrencyUSD(Math.abs(totals.convertedNetAllUSD))}
+                    </div>
+                  </div>
+                  <div style={{ background: totals.convertedNetAllUSD >= 0 ? '#dcfce7' : '#fee2e2', padding: '10px', borderRadius: '12px' }}>
+                    {totals.convertedNetAllUSD >= 0 ? <TrendingUp size={22} color="var(--primary)" /> : <TrendingDown size={22} color="#dc2626" />}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* FILTER CONTROLS & TABS */}
+            <div
+              className="card"
+              style={{
+                padding: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}
+            >
+              {/* TYPE TABS */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className={`btn btn-sm ${activeTab === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    setActiveTab('all');
+                    setSelectedCategory('ALL');
+                  }}
+                  style={{ flex: 1, padding: '7px', height: '34px' }}
+                >
+                  All ({tabCounts.all})
+                </button>
+                <button
+                  className={`btn btn-sm ${activeTab === 'expense' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    setActiveTab('expense');
+                    setSelectedCategory('ALL');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '7px',
+                    height: '34px',
+                    background: activeTab === 'expense' ? '#dc2626' : undefined,
+                    borderColor: activeTab === 'expense' ? '#dc2626' : undefined
+                  }}
+                >
+                  Expenses ({tabCounts.expense})
+                </button>
+                <button
+                  className={`btn btn-sm ${activeTab === 'income' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    setActiveTab('income');
+                    setSelectedCategory('ALL');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '7px',
+                    height: '34px',
+                    background: activeTab === 'income' ? '#16a34a' : undefined,
+                    borderColor: activeTab === 'income' ? '#16a34a' : undefined
+                  }}
+                >
+                  Income ({tabCounts.income})
+                </button>
+              </div>
+
+              {/* SEARCH & CATEGORY FILTER SELECT */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '160px', position: 'relative' }}>
+                  <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Search comments, category..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ paddingLeft: '32px', height: '36px', fontSize: '12px' }}
+                  />
+                </div>
+
+                <select
+                  className="form-input"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  style={{ minWidth: '150px', height: '36px', fontSize: '12px', fontWeight: '600' }}
+                >
+                  <option value="ALL">All Categories</option>
+                  {activeCategoryList.map((c, i) => (
+                    <option key={c.id || i} value={c.nameAr}>
+                      {c.nameEn} • {c.nameAr}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          )}
+
+            {/* DEDICATED CATEGORY SUMMARY CARD (WHEN A CATEGORY IS SELECTED IN FILTER) */}
+            {selectedCategorySummary && (
+              <div
+                className="card"
+                style={{
+                  padding: '12px 14px',
+                  background: selectedCategorySummary.isIncome ? '#f0fdf4' : '#fef2f2',
+                  border: `1.5px solid ${selectedCategorySummary.isIncome ? 'var(--primary-border)' : '#fca5a5'}`,
+                  boxShadow: 'var(--shadow-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                  <div
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '8px',
+                      background: selectedCategorySummary.isIncome ? '#dcfce7' : '#fee2e2',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: selectedCategorySummary.isIncome ? '#15803d' : '#b91c1c',
+                      flexShrink: 0
+                    }}
+                  >
+                    {getCategoryIcon(selectedCategorySummary.categoryName, selectedCategorySummary.isIncome, 16)}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                      {selectedCategorySummary.isIncome ? 'Total Gained' : 'Total Spent'} ({selectedCategorySummary.count} {selectedCategorySummary.count === 1 ? 'entry' : 'entries'})
+                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {getCategoryEnglishName(selectedCategorySummary.categoryName, selectedCategorySummary.isIncome)} • <span className="ar-text">{selectedCategorySummary.categoryName}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: '15px', fontWeight: '900', color: selectedCategorySummary.isIncome ? '#16a34a' : '#dc2626' }}>
+                    {formatCurrencyUSD(selectedCategorySummary.totalUSD)}
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                    {formatCurrencyLBP(selectedCategorySummary.totalLBP)}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TRANSACTIONS LIST */}
+            {loading ? (
+              <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Loading budget ledger...
+              </div>
+            ) : filteredEntries.length === 0 ? (
+              <div
+                className="card"
+                style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  border: '1px dashed var(--border-color)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}
+              >
+                <FileText size={32} color="var(--text-light)" />
+                <strong style={{ fontSize: '14px', color: 'var(--text-main)' }}>No Transactions Found</strong>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', maxWidth: '280px' }}>
+                  {selectedCategory !== 'ALL' 
+                    ? `No records found under "${getCategoryEnglishName(selectedCategory)}".` 
+                    : selectedMonth !== 'ALL' 
+                    ? `No records logged for ${formatMonthName(selectedMonth)}.` 
+                    : 'No transactions recorded yet.'}
+                </p>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => handleOpenCreate(activeTab === 'income' ? 'income' : 'expense', selectedCategory !== 'ALL' ? selectedCategory : null)}
+                  style={{ marginTop: '4px' }}
+                >
+                  <Plus size={14} /> Add First Entry
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {filteredEntries.map((entry) => {
+                  const isInc = entry.entry_type === 'income';
+                  const usd = parseFloat(entry.usd_amount) || 0;
+                  const lbp = parseFloat(entry.lbp_amount) || 0;
+                  const engName = getCategoryEnglishName(entry.category, isInc);
+
+                  return (
+                    <div
+                      key={entry.id}
+                      className="card"
+                      style={{
+                        padding: '12px 14px',
+                        background: '#ffffff',
+                        borderLeft: `4px solid ${isInc ? '#16a34a' : '#dc2626'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        boxShadow: 'var(--shadow-sm)'
+                      }}
+                    >
+                      {/* LEFT: Category Icon & Details */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: '36px',
+                            height: '36px',
+                            background: isInc ? '#ecfdf5' : '#fef2f2',
+                            border: `1px solid ${isInc ? '#a7f3d0' : '#fecaca'}`,
+                            color: isInc ? '#059669' : '#dc2626',
+                            borderRadius: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}
+                        >
+                          {getCategoryIcon(entry.category, isInc, 17)}
+                        </div>
+
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <strong style={{ fontSize: '13.5px', color: 'var(--text-main)', fontWeight: '700' }}>
+                              {engName}
+                            </strong>
+                            <span className="ar-text" style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                              ({entry.category})
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              • {entry.date}
+                            </span>
+                          </div>
+
+                          {entry.comments && (
+                            <p
+                              className="ar-text"
+                              style={{
+                                fontSize: '12px',
+                                color: 'var(--text-muted)',
+                                marginTop: '2px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}
+                            >
+                              {entry.comments}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* RIGHT: Amounts & Actions */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ textAlign: 'right' }}>
+                          {usd > 0 && (
+                            <div style={{ fontSize: '14px', fontWeight: '800', color: isInc ? '#16a34a' : '#dc2626' }}>
+                              {isInc ? '+' : '-'}{formatCurrencyUSD(usd)}
+                            </div>
+                          )}
+                          {lbp > 0 && (
+                            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                              {isInc ? '+' : '-'}{formatCurrencyLBP(lbp)}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ACTIONS */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button
+                            onClick={() => handleOpenEdit(entry)}
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '5px', height: '30px', width: '30px', borderRadius: '8px' }}
+                            title="Edit Transaction"
+                          >
+                            <Edit2 size={13} color="var(--text-muted)" />
+                          </button>
+                          <button
+                            onClick={() => setEntryToDelete(entry)}
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '5px', height: '30px', width: '30px', borderRadius: '8px', color: '#dc2626' }}
+                            title="Delete Transaction"
+                          >
+                            <Trash2 size={13} color="#dc2626" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* RECTANGULAR NATURAL FLOATING ACTION BUTTON */}
+        {/* FLOATING ACTION BUTTON - ANCHORED DIRECTLY TO VIEWPORT BOTTOM-RIGHT (NEVER SCROLLS WITH CONTENT) */}
         <button
           className="btn btn-primary"
           onClick={() => handleOpenCreate(null, selectedCategory !== 'ALL' ? selectedCategory : null)}
           style={{
             position: 'fixed',
-            bottom: '20px',
-            right: '20px',
+            bottom: '24px',
+            right: '24px',
             zIndex: 105,
             borderRadius: '12px',
-            height: '42px',
-            padding: '0 16px',
+            height: '44px',
+            padding: '0 18px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
             boxShadow: 'var(--primary-glow)',
-            fontSize: '13px',
+            fontSize: '13.5px',
             fontWeight: '700'
           }}
           title="Add Transaction"
@@ -1123,7 +1279,7 @@ export default function BudgetTrackerModal({
                         setFormData({
                           ...formData,
                           entry_type: 'expense',
-                          category: DEFAULT_EXPENSE_CATEGORIES[0].nameAr
+                          category: dynamicExpenseCategories[0].nameAr
                         });
                       }}
                       style={{
@@ -1142,7 +1298,7 @@ export default function BudgetTrackerModal({
                         setFormData({
                           ...formData,
                           entry_type: 'income',
-                          category: DEFAULT_INCOME_CATEGORIES[0].nameAr
+                          category: dynamicIncomeCategories[0].nameAr
                         });
                       }}
                       style={{
@@ -1169,7 +1325,7 @@ export default function BudgetTrackerModal({
                   />
                 </div>
 
-                {/* 3. VISUAL QUICK-TAP CATEGORY CHIPS (1-TAP SELECTION WITH ICONS) */}
+                {/* 3. VISUAL QUICK-TAP CATEGORY CHIPS (1-TAP SELECTION WITH ICONS INCLUDING ALL DYNAMIC CATEGORIES) */}
                 <div className="form-group">
                   <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>Category</span>
@@ -1186,7 +1342,7 @@ export default function BudgetTrackerModal({
                       padding: '2px'
                     }}
                   >
-                    {(formData.entry_type === 'income' ? DEFAULT_INCOME_CATEGORIES : DEFAULT_EXPENSE_CATEGORIES).map((c) => {
+                    {(formData.entry_type === 'income' ? dynamicIncomeCategories : dynamicExpenseCategories).map((c) => {
                       const isSelected = formData.category === c.nameAr;
                       const isIncome = formData.entry_type === 'income';
                       const activeColor = isIncome ? '#059669' : '#dc2626';

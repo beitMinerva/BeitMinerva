@@ -24,7 +24,7 @@ describe('Farm Dashboard & Analytics End-to-End Integration Edge Cases', () => {
 
     const augSnapshot = snapshots.find(s => s.key === '2026-08');
     expect(augSnapshot).toBeDefined();
-    const daysInAug = new Date().getDate() - 5 + 1;
+    const daysInAug = 31 - 5 + 1;
     const expectedMilk = daysInAug * 100 + 5;
     expect(augSnapshot.milk).toBe(expectedMilk);
     expect(augSnapshot.milkRevenue).toBeCloseTo(expectedMilk * 1.10, 2);
