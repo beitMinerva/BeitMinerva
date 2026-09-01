@@ -4,7 +4,8 @@ import {
   DEFAULT_INCOME_CATEGORIES,
   DEFAULT_UNITS,
   formatCurrencyLBP,
-  formatCurrencyUSD
+  formatCurrencyUSD,
+  updateBudgetCategory
 } from '../services/budgetService';
 
 describe('Budget Service & Categories', () => {
@@ -43,4 +44,13 @@ describe('Budget Service & Categories', () => {
     expect(formatCurrencyLBP(5000000)).toBe('5,000,000 L.L.');
     expect(formatCurrencyLBP(0)).toBe('0 L.L.');
   });
+
+  it('should handle category rename validation errors gracefully', async () => {
+    const res1 = await updateBudgetCategory('', 'NewName');
+    expect(res1.error).toBeTruthy();
+
+    const res2 = await updateBudgetCategory('OldName', '');
+    expect(res2.error).toBeTruthy();
+  });
 });
+

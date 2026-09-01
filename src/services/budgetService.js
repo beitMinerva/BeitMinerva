@@ -119,6 +119,35 @@ export async function deleteBudgetEntry(id) {
   }
 }
 
+export async function updateBudgetCategory(oldCategoryName, newCategoryName, entryType = null) {
+  try {
+    const trimmedOld = (oldCategoryName || '').trim();
+    const trimmedNew = (newCategoryName || '').trim();
+    if (!trimmedOld || !trimmedNew) {
+      throw new Error('Category name cannot be empty');
+    }
+
+    let query = supabase
+      .from('farm_budget_entries')
+      .update({
+        category: trimmedNew,
+        updated_at: new Date().toISOString()
+      })
+      .eq('category', trimmedOld);
+
+    if (entryType && entryType !== 'all') {
+      query = query.eq('entry_type', entryType);
+    }
+
+    const { data, error } = await query.select();
+    if (error) throw error;
+    return { data: data || [], error: null };
+  } catch (err) {
+    console.error('updateBudgetCategory error:', err);
+    return { data: null, error: err };
+  }
+}
+
 export function formatCurrencyLBP(amount) {
   const num = Number(amount) || 0;
   return new Intl.NumberFormat('en-US', {
@@ -133,3 +162,4 @@ export function formatCurrencyUSD(amount) {
     maximumFractionDigits: 2
   }).format(num);
 }
+

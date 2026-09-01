@@ -43,6 +43,7 @@ import {
   addBudgetEntry,
   updateBudgetEntry,
   deleteBudgetEntry,
+  updateBudgetCategory,
   DEFAULT_EXPENSE_CATEGORIES,
   DEFAULT_INCOME_CATEGORIES,
   DEFAULT_UNITS,
@@ -179,6 +180,12 @@ export default function BudgetTrackerModal({
   // Delete Confirm Modal
   const [entryToDelete, setEntryToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Edit / Rename Category Modal
+  const [editingCategory, setEditingCategory] = useState(null); // { name: string, type: string, count: number }
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categorySubmitting, setCategorySubmitting] = useState(false);
+  const [categoryError, setCategoryError] = useState('');
 
   // Load entries from Supabase
   const loadEntries = async () => {
@@ -518,6 +525,91 @@ export default function BudgetTrackerModal({
       localStorage.setItem('farm_budget_exchange_rate', String(rate));
       showToast(`Exchange rate updated: 1 USD = ${rate.toLocaleString()} L.L.`);
       setShowRateModal(false);
+    }
+  };
+
+  // Open Edit Category Modal
+  const handleOpenEditCategory = (categoryName, entryType = null) => {
+    requireAdmin(() => {
+      const type = entryType || (activeTab === 'all' ? null : activeTab);
+      const count = entries.filter(
+        (e) => e.category === categoryName && (!type || type === 'all' || e.entry_type === type)
+      ).length;
+
+      setEditingCategory({
+        name: categoryName,
+        type: type || 'all',
+        count: count
+      });
+      setNewCategoryName(categoryName);
+      setCategoryError('');
+    });
+  };
+
+  // Save Renamed Category & Update All Matching Entries
+  const handleSaveEditCategory = async (e) => {
+    if (e) e.preventDefault();
+    if (!editingCategory) return;
+
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) {
+      setCategoryError('Category name cannot be empty.');
+      return;
+    }
+    if (trimmed === editingCategory.name) {
+      setEditingCategory(null);
+      return;
+    }
+
+    setCategorySubmitting(true);
+    setCategoryError('');
+
+    try {
+      const typeFilter = (!editingCategory.type || editingCategory.type === 'all') ? null : editingCategory.type;
+      const { data, error } = await updateBudgetCategory(
+        editingCategory.name,
+        trimmed,
+        typeFilter
+      );
+
+      if (error) {
+        setCategoryError(error.message || 'Failed to update category.');
+        setCategorySubmitting(false);
+        return;
+      }
+
+      const updatedCount = (data && data.length) || editingCategory.count;
+
+      // Update all local state entries matching old category name
+      setEntries((prev) =>
+        prev.map((item) => {
+          if (
+            item.category === editingCategory.name &&
+            (!typeFilter || item.entry_type === typeFilter)
+          ) {
+            return { ...item, category: trimmed };
+          }
+          return item;
+        })
+      );
+
+      // Update selected category filter if active
+      if (selectedCategory === editingCategory.name) {
+        setSelectedCategory(trimmed);
+      }
+
+      // Update formData category if form modal is open
+      if (formData.category === editingCategory.name) {
+        setFormData((prev) => ({ ...prev, category: trimmed }));
+      }
+
+      showToast(`Renamed category to "${trimmed}". Updated ${updatedCount} transaction(s).`);
+      setEditingCategory(null);
+    } catch (err) {
+      console.error('Error updating category:', err);
+      setCategoryError('An unexpected error occurred while updating category.');
+    } finally {
+      setCategorySubmitting(false);
     }
   };
 
@@ -1034,8 +1126,30 @@ export default function BudgetTrackerModal({
                     <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>
                       {selectedCategorySummary.isIncome ? 'Total Gained' : 'Total Spent'} ({selectedCategorySummary.count} {selectedCategorySummary.count === 1 ? 'entry' : 'entries'})
                     </div>
-                    <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {getCategoryEnglishName(selectedCategorySummary.categoryName, selectedCategorySummary.isIncome)} • <span className="ar-text">{selectedCategorySummary.categoryName}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {getCategoryEnglishName(selectedCategorySummary.categoryName, selectedCategorySummary.isIncome)} • <span className="ar-text">{selectedCategorySummary.categoryName}</span>
+                      </div>
+                      <button
+                        type="button"
+                        title="Edit / Rename Category"
+                        onClick={() => handleOpenEditCategory(selectedCategorySummary.categoryName, selectedCategorySummary.isIncome ? 'income' : 'expense')}
+                        style={{
+                          background: 'rgba(0,0,0,0.06)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '3px 7px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          cursor: 'pointer',
+                          color: 'var(--text-main)'
+                        }}
+                      >
+                        <Edit2 size={11} /> Rename
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1379,6 +1493,36 @@ export default function BudgetTrackerModal({
                               {c.nameAr}
                             </div>
                           </div>
+                          {c.isCustom && (
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              title={`Rename category "${c.nameAr}"`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEditCategory(c.nameAr, formData.entry_type);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.stopPropagation();
+                                  handleOpenEditCategory(c.nameAr, formData.entry_type);
+                                }
+                              }}
+                              style={{
+                                padding: '4px',
+                                borderRadius: '6px',
+                                background: isSelected ? 'rgba(0,0,0,0.08)' : '#f3f4f6',
+                                color: isSelected ? activeColor : 'var(--text-muted)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                flexShrink: 0
+                              }}
+                            >
+                              <Edit2 size={12} />
+                            </div>
+                          )}
                         </button>
                       );
                     })}
@@ -1620,6 +1764,144 @@ export default function BudgetTrackerModal({
                 {deleteLoading ? 'Deleting...' : 'Delete'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT / RENAME CATEGORY MODAL */}
+      {editingCategory && (
+        <div
+          className="modal-overlay budget-tracker-page"
+          onClick={() => !categorySubmitting && setEditingCategory(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 220,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '400px',
+              width: '100%',
+              borderRadius: '16px',
+              padding: '20px',
+              background: '#ffffff',
+              boxShadow: 'var(--shadow-lg)'
+            }}
+          >
+            <div className="modal-header" style={{ padding: '0 0 12px 0', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div
+                  style={{
+                    background: editingCategory.type === 'income' ? '#dcfce7' : '#fee2e2',
+                    color: editingCategory.type === 'income' ? '#16a34a' : '#dc2626',
+                    padding: '6px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Edit2 size={16} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: '800', margin: 0 }}>Rename Category</h3>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {editingCategory.type === 'income' ? 'Income Category' : editingCategory.type === 'expense' ? 'Expense Category' : 'Category'}
+                  </span>
+                </div>
+              </div>
+              <button
+                className="close-btn"
+                onClick={() => !categorySubmitting && setEditingCategory(null)}
+                disabled={categorySubmitting}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditCategory} style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '14px' }}>
+              {categoryError && (
+                <div style={{
+                  padding: '10px 12px',
+                  background: '#fef2f2',
+                  border: '1px solid #fca5a5',
+                  borderRadius: '10px',
+                  color: '#dc2626',
+                  fontSize: '12.5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertCircle size={16} />
+                  <span>{categoryError}</span>
+                </div>
+              )}
+
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                fontSize: '12px',
+                color: 'var(--text-muted)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: '600' }}>Current Name:</span>
+                  <strong style={{ color: 'var(--text-main)' }}>{editingCategory.name}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: '600' }}>Affected Transactions:</span>
+                  <strong style={{ color: 'var(--primary-dark)' }}>
+                    {editingCategory.count} {editingCategory.count === 1 ? 'transaction' : 'transactions'}
+                  </strong>
+                </div>
+                <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px dashed #e2e8f0', paddingTop: '6px' }}>
+                  ⚡ Renaming will automatically update all {editingCategory.count} transaction(s) under this category.
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">New Category Name</label>
+                <input
+                  type="text"
+                  className="form-input ar-text"
+                  placeholder="Enter new category name..."
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  autoFocus
+                  required
+                  style={{ fontWeight: '600' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setEditingCategory(null)}
+                  disabled={categorySubmitting}
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={categorySubmitting || !newCategoryName.trim() || newCategoryName.trim() === editingCategory.name}
+                  style={{ flex: 1 }}
+                >
+                  {categorySubmitting ? 'Updating All...' : `Save & Update All (${editingCategory.count})`}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
