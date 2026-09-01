@@ -1864,7 +1864,7 @@ export default function BudgetTrackerModal({
                   </strong>
                 </div>
                 <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px dashed #e2e8f0', paddingTop: '6px' }}>
-                  ⚡ Renaming will automatically update all {editingCategory.count} transaction(s) under this category.
+                  Note: Renaming will automatically update all {editingCategory.count} transaction(s) under this category.
                 </div>
               </div>
 
