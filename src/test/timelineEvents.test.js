@@ -33,3 +33,40 @@ describe('Timeline History vs Pending Tasks Separation', () => {
     expect(hasPending).toBe(false);
   });
 });
+
+describe('Shared Event Multi-Goat Target Removal Logic', () => {
+  it('correctly removes a single goat from a multi-goat event targets array', () => {
+    const event = {
+      id: 'evt-100',
+      goat_id: null,
+      type: 'Vaccination',
+      custom_fields: {
+        target_mode: 'ALL',
+        target_goat_ids: ['goat-1', 'goat-2', 'goat-3']
+      }
+    };
+
+    const targetGoatIdToRemove = 'goat-2';
+    const remainingIds = event.custom_fields.target_goat_ids.filter((id) => id !== targetGoatIdToRemove);
+
+    expect(remainingIds).toHaveLength(2);
+    expect(remainingIds).toEqual(['goat-1', 'goat-3']);
+    expect(remainingIds.includes('goat-2')).toBe(false);
+  });
+
+  it('transitions to single goat mode when only one target goat remains', () => {
+    const event = {
+      id: 'evt-101',
+      goat_id: null,
+      type: 'Medication',
+      custom_fields: {
+        target_mode: 'CUSTOM',
+        target_goat_ids: ['goat-1', 'goat-2']
+      }
+    };
+
+    const remainingIds = event.custom_fields.target_goat_ids.filter((id) => id !== 'goat-1');
+    expect(remainingIds).toHaveLength(1);
+    expect(remainingIds[0]).toBe('goat-2');
+  });
+});

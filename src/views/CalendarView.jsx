@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Plus, Bell, Syringe, Pill, Milk, Weight, Hea
 import ReminderDetailModal from '../components/ReminderDetailModal';
 import EditReminderModal from '../components/EditReminderModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import DeleteEventModal from '../components/DeleteEventModal';
 import CustomRepeatPicker from '../components/CustomRepeatPicker';
 import { getBeirutDateString, getBeirutDateTimeString, formatBeirutDisplay } from '../services/goatService';
 
@@ -132,6 +133,7 @@ export default function CalendarView({
   onAddTimelineEvent,
   onUpdateTimelineEvent,
   onDeleteTimelineEvent,
+  onRemoveGoatFromTimelineEvent,
   onCompleteTimelineEvent,
   onOpenAddEvent
 }) {
@@ -784,15 +786,24 @@ export default function CalendarView({
 
       {/* DELETE CONFIRMATION MODAL */}
       {reminderToDelete && (
-        <DeleteConfirmModal
-          title="Delete Event / Task"
-          message={`Are you sure you want to delete "${reminderToDelete.title || reminderToDelete.type}"?`}
+        <DeleteEventModal
+          event={reminderToDelete}
+          currentGoat={null}
+          goats={goats}
+          barnAreas={barnAreas}
           onClose={() => setReminderToDelete(null)}
-          onConfirm={async () => {
-            const idToDelete = reminderToDelete?.id;
+          onDeleteAll={async (eventId) => {
+            const idToDelete = eventId || reminderToDelete?.id;
             setReminderToDelete(null);
             if (idToDelete && onDeleteTimelineEvent) {
               await onDeleteTimelineEvent(idToDelete);
+            }
+          }}
+          onRemoveFromGoat={async (eventId, goatId) => {
+            const idToDelete = eventId || reminderToDelete?.id;
+            setReminderToDelete(null);
+            if (idToDelete && onRemoveGoatFromTimelineEvent && goatId) {
+              await onRemoveGoatFromTimelineEvent(idToDelete, goatId);
             }
           }}
         />

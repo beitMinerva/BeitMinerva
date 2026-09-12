@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import BarcodeSVG from './BarcodeSVG';
 import GoatMetricsChart from './GoatMetricsChart';
 import DeleteConfirmModal from './DeleteConfirmModal';
+import DeleteEventModal from './DeleteEventModal';
 import EventDetailModal from './EventDetailModal';
 import EditReminderModal from './EditReminderModal';
 import CustomRepeatPicker from './CustomRepeatPicker';
@@ -56,6 +57,7 @@ export function formatBeirutDateTime(dateStr) {
 
 export default function GoatDetailModal({
   goat,
+  goats = [],
   barnAreas = [],
   events = [],
   allEvents = [],
@@ -66,6 +68,7 @@ export default function GoatDetailModal({
   onTransferArea,
   onUpdateEvent,
   onDeleteEvent,
+  onRemoveGoatFromEvent,
   onDeleteGoat,
   onCompleteTask
 }) {
@@ -785,9 +788,15 @@ export default function GoatDetailModal({
         <EventDetailModal
           event={selectedEventForDetail}
           goat={goat}
+          goats={goats}
+          barnAreas={barnAreas}
           onClose={() => setSelectedEventForDetail(null)}
           onEdit={onUpdateEvent ? (ev) => { setSelectedEventForDetail(null); setEventToEdit(ev); } : undefined}
-          onDelete={onDeleteEvent ? (id) => onDeleteEvent(id) : undefined}
+          onDelete={(ev) => {
+            const targetEv = (ev && typeof ev === 'object') ? ev : selectedEventForDetail;
+            setSelectedEventForDetail(null);
+            setEventToDelete(targetEv);
+          }}
           onCompleteTask={onCompleteTask ? (rem) => onCompleteTask(rem) : undefined}
         />
       )}
@@ -795,6 +804,7 @@ export default function GoatDetailModal({
       {eventToEdit && (
         <EditReminderModal
           reminder={eventToEdit}
+          goats={goats}
           onClose={() => setEventToEdit(null)}
           onSave={async (id, updates) => {
             if (onUpdateEvent) await onUpdateEvent(id, updates);
@@ -805,13 +815,24 @@ export default function GoatDetailModal({
 
       {/* DELETE EVENT CONFIRMATION POPUP MODAL */}
       {eventToDelete && (
-        <DeleteConfirmModal
-          title="Delete Timeline Record"
-          message={`Are you sure you want to delete "${eventToDelete.title || eventToDelete.type}" from ${goat.name}'s timeline?`}
-          onConfirm={async () => {
-            const idToDelete = eventToDelete?.id;
+        <DeleteEventModal
+          event={eventToDelete}
+          currentGoat={goat}
+          goats={goats}
+          barnAreas={barnAreas}
+          onClose={() => setEventToDelete(null)}
+          onDeleteAll={async (eventId) => {
+            const idToDelete = eventId || eventToDelete?.id;
             setEventToDelete(null);
             if (idToDelete && onDeleteEvent) await onDeleteEvent(idToDelete);
+          }}
+          onRemoveFromGoat={async (eventId, goatId) => {
+            const idToDelete = eventId || eventToDelete?.id;
+            const targetGoatId = goatId || goat?.id;
+            setEventToDelete(null);
+            if (idToDelete && onRemoveGoatFromEvent && targetGoatId) {
+              await onRemoveGoatFromEvent(idToDelete, targetGoatId);
+            }
           }}
         />
       )}

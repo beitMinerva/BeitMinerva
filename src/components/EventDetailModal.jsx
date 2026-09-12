@@ -242,7 +242,7 @@ export default function EventDetailModal({ event, goat, goats = [], barnAreas = 
               className="btn"
               style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2' }}
               onClick={() => {
-                handleAnimatedClose(() => onDelete(event.id));
+                handleAnimatedClose(() => onDelete(event));
               }}
             >
               <Trash2 size={14} /> Delete

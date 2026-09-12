@@ -42,6 +42,7 @@ import {
   addBatchTimelineEvents,
   updateTimelineEvent,
   deleteTimelineEvent,
+  removeGoatFromTimelineEvent,
   calculateNextDueDate,
   isNurseryPenCheck
 } from './services/goatService';
@@ -484,6 +485,22 @@ export default function App() {
     } catch (err) { showToast(`Error: ${err.message}`); }
   };
 
+  const handleRemoveGoatFromEvent = async (eventId, goatId) => {
+    try {
+      const res = await removeGoatFromTimelineEvent(eventId, goatId, goats);
+      if (res?.action === 'deleted') {
+        showToast('Deleted timeline entry.');
+      } else {
+        showToast('Removed goat from timeline entry.');
+      }
+      await loadData();
+      if (selectedGoat) {
+        const updatedEvents = await getTimelineEvents(selectedGoat.id);
+        setSelectedGoatEvents(updatedEvents);
+      }
+    } catch (err) { showToast(`Error: ${err.message}`); }
+  };
+
   const handleCompleteTask = (reminder) => {
     setTaskToComplete(reminder);
     if (reminder.goat_id && reminder.goat_id !== 'herd' && !reminder.goat_id.startsWith('pen-')) {
@@ -589,6 +606,7 @@ export default function App() {
                 onAddTimelineEvent={(eventData) => requireAdmin(() => handleSaveEvent(eventData))}
                 onUpdateTimelineEvent={(eventId, updates) => requireAdmin(() => handleUpdateEvent(eventId, updates))}
                 onDeleteTimelineEvent={(eventId) => requireAdmin(() => handleDeleteEvent(eventId))}
+                onRemoveGoatFromTimelineEvent={(eventId, goatId) => requireAdmin(() => handleRemoveGoatFromEvent(eventId, goatId))}
                 onCompleteTimelineEvent={(reminder) => requireAdmin(() => handleCompleteTask(reminder))}
                 onOpenAddEvent={(dateStr) => requireAdmin(() => {
                   setGoatForEvent(null);
@@ -640,6 +658,7 @@ export default function App() {
       {selectedGoat && (
         <GoatDetailModal
           goat={selectedGoat}
+          goats={goats}
           barnAreas={barnAreas}
           events={selectedGoatEvents}
           allEvents={recentEvents}
@@ -659,6 +678,7 @@ export default function App() {
           }}
           onUpdateEvent={(eventId, updates) => requireAdmin(() => handleUpdateEvent(eventId, updates))}
           onDeleteEvent={(eventId) => requireAdmin(() => handleDeleteEvent(eventId))}
+          onRemoveGoatFromEvent={(eventId, goatId) => requireAdmin(() => handleRemoveGoatFromEvent(eventId, goatId))}
           onDeleteGoat={(id) => requireAdmin(() => handleDeleteGoat(id))}
           onCompleteTask={(reminder) => requireAdmin(() => handleCompleteTask(reminder))}
         />

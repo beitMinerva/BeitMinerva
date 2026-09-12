@@ -569,6 +569,77 @@ export async function deleteTimelineEvent(eventId) {
   return true;
 }
 
+export async function removeGoatFromTimelineEvent(eventId, goatId, allGoats = []) {
+  // Fetch current event from Supabase to ensure fresh state
+  const { data: event, error: fetchErr } = await supabase
+    .from('timeline_events')
+    .select('*')
+    .eq('id', eventId)
+    .single();
+
+  if (fetchErr || !event) {
+    console.error('Supabase removeGoatFromTimelineEvent fetch error:', fetchErr);
+    throw new Error(fetchErr?.message || 'Event record not found.');
+  }
+
+  let customFields = {};
+  if (typeof event.custom_fields === 'object' && event.custom_fields) {
+    customFields = { ...event.custom_fields };
+  } else if (typeof event.custom_fields === 'string') {
+    try {
+      customFields = JSON.parse(event.custom_fields) || {};
+    } catch (e) {
+      customFields = {};
+    }
+  }
+
+  let currentTargetIds = [];
+  if (Array.isArray(customFields.target_goat_ids) && customFields.target_goat_ids.length > 0) {
+    currentTargetIds = [...customFields.target_goat_ids];
+  } else if (event.goat_id && event.goat_id !== 'herd' && !event.goat_id.startsWith('pen-')) {
+    currentTargetIds = [event.goat_id];
+  } else {
+    currentTargetIds = allGoats.map((g) => g.id);
+  }
+
+  const updatedTargetIds = currentTargetIds.filter((id) => id !== goatId);
+
+  // If no goats left in the event, delete the entire record
+  if (updatedTargetIds.length === 0) {
+    const { error: delErr } = await supabase.from('timeline_events').delete().eq('id', eventId);
+    if (delErr) throw new Error(delErr.message || 'Failed to delete event.');
+    return { action: 'deleted' };
+  }
+
+  // If exactly 1 goat remains, set goat_id to that goat and mode to SINGLE
+  if (updatedTargetIds.length === 1) {
+    const updates = {
+      goat_id: updatedTargetIds[0],
+      custom_fields: {
+        ...customFields,
+        target_mode: 'SINGLE',
+        target_goat_ids: updatedTargetIds
+      }
+    };
+    const { data, error } = await supabase.from('timeline_events').update(updates).eq('id', eventId).select().single();
+    if (error) throw new Error(error.message || 'Failed to update event.');
+    return { action: 'updated', data };
+  }
+
+  // Multiple goats remaining
+  const updates = {
+    goat_id: null,
+    custom_fields: {
+      ...customFields,
+      target_mode: 'CUSTOM',
+      target_goat_ids: updatedTargetIds
+    }
+  };
+  const { data, error } = await supabase.from('timeline_events').update(updates).eq('id', eventId).select().single();
+  if (error) throw new Error(error.message || 'Failed to update event.');
+  return { action: 'updated', data };
+}
+
 export function calculateNextDueDate(baseDateStr, frequency, customDays = 21) {
   const date = new Date(baseDateStr || Date.now());
   if (isNaN(date.getTime())) return null;
