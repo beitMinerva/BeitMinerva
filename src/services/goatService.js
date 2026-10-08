@@ -551,8 +551,41 @@ export async function addBatchTimelineEvents(eventDataList) {
   return data;
 }
 
+export function sanitizeTimelineEventUpdates(updates) {
+  if (!updates || typeof updates !== 'object') return {};
+  const sanitized = { ...updates };
+
+  // 'is_scheduled' is stored inside custom_fields, not as a top-level database column.
+  // If passed at top-level, migrate into custom_fields and delete from top-level to prevent schema cache errors.
+  if (sanitized.is_scheduled !== undefined) {
+    let custom = sanitized.custom_fields;
+    if (typeof custom === 'string') {
+      try { custom = JSON.parse(custom); } catch (e) { custom = {}; }
+    } else if (typeof custom === 'object' && custom) {
+      custom = { ...custom };
+    } else {
+      custom = {};
+    }
+    custom.is_scheduled = Boolean(sanitized.is_scheduled);
+    sanitized.custom_fields = custom;
+    delete sanitized.is_scheduled;
+  }
+
+  // Ensure only valid top-level schema columns are sent to Supabase
+  const validColumns = ['goat_id', 'type', 'title', 'date', 'notes', 'custom_fields', 'status'];
+  const finalUpdates = {};
+  for (const key of Object.keys(sanitized)) {
+    if (validColumns.includes(key)) {
+      finalUpdates[key] = sanitized[key];
+    }
+  }
+
+  return finalUpdates;
+}
+
 export async function updateTimelineEvent(eventId, updates) {
-  const { data, error } = await supabase.from('timeline_events').update(updates).eq('id', eventId).select().single();
+  const sanitizedUpdates = sanitizeTimelineEventUpdates(updates);
+  const { data, error } = await supabase.from('timeline_events').update(sanitizedUpdates).eq('id', eventId).select().single();
   if (error) {
     console.error('Supabase updateTimelineEvent error:', error);
     throw new Error(error.message || 'Failed to update event.');

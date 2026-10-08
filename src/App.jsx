@@ -416,22 +416,19 @@ export default function App() {
 
       // If completing an active scheduled task
       if (taskToComplete) {
-        let frequency = 'none';
-        let days = 21;
+        let existingCustomFields = {};
         if (typeof taskToComplete.custom_fields === 'object' && taskToComplete.custom_fields) {
-          frequency = taskToComplete.custom_fields.repeat_frequency || 'none';
-          days = parseInt(taskToComplete.custom_fields.custom_repeat_days) || 21;
+          existingCustomFields = { ...taskToComplete.custom_fields };
         } else if (typeof taskToComplete.custom_fields === 'string') {
           try {
-            const parsed = JSON.parse(taskToComplete.custom_fields);
-            if (parsed) {
-              frequency = parsed.repeat_frequency || 'none';
-              days = parseInt(parsed.custom_repeat_days) || 21;
-            }
-          } catch (e) {}
-        } else if (taskToComplete.repeat_frequency) {
-          frequency = taskToComplete.repeat_frequency;
+            existingCustomFields = JSON.parse(taskToComplete.custom_fields) || {};
+          } catch (e) {
+            existingCustomFields = {};
+          }
         }
+
+        const frequency = existingCustomFields.repeat_frequency || taskToComplete.repeat_frequency || 'none';
+        const days = parseInt(existingCustomFields.custom_repeat_days) || 21;
 
         if (frequency && frequency !== 'none') {
           const actualCompletionDate = (Array.isArray(eventData) ? eventData[0]?.date : eventData?.date) || new Date().toISOString();
@@ -439,14 +436,22 @@ export default function App() {
           await updateTimelineEvent(taskToComplete.id, {
             date: nextDueDate,
             status: 'pending',
-            is_scheduled: true
+            custom_fields: {
+              ...existingCustomFields,
+              is_scheduled: true,
+              status: 'pending'
+            }
           });
           const nextDateStr = new Date(nextDueDate).toLocaleDateString();
           showToast(`Event logged to history! Next reminder scheduled for ${nextDateStr}.`);
         } else {
           await updateTimelineEvent(taskToComplete.id, {
             status: 'completed',
-            is_scheduled: false
+            custom_fields: {
+              ...existingCustomFields,
+              is_scheduled: false,
+              status: 'completed'
+            }
           });
           showToast(`Event logged to history and task completed.`);
         }
