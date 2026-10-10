@@ -1,3 +1,4 @@
+import { farmDate, farmDayStart, farmDayEnd, farmCalendarDate, addFarmDays, beirutInputToISO } from '../../supabase/functions/_shared/farmTime.js';
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, X, TrendingUp, Milk, Wheat, DollarSign, Activity, Award, BarChart2, PieChart, Sliders, Calendar } from 'lucide-react';
 import { getPenMilkEntries, getPenFeedingEntries, getTimelineEvents, getBeirutDateString, isNurseryPenCheck } from '../services/goatService';
@@ -49,12 +50,12 @@ export function calculateDailyFeedCarryover({
     return (totalKg * avgPrice);
   };
 
-  const end = timeRange === 'custom' && customEndDate ? new Date(customEndDate) : new Date();
-  end.setHours(23, 59, 59, 999);
+  const end = timeRange === 'custom' && customEndDate ? farmDayEnd(customEndDate) : farmDayEnd();
+
 
   let start = new Date(end);
   if (timeRange === 'custom' && customStartDate) {
-    start = new Date(customStartDate);
+    start = farmDayStart(customStartDate);
   } else if (timeRange === 'all') {
     const earliest = feedingEntries.reduce((earliestDate, entry) => {
       const d = new Date(entry.date);
@@ -63,15 +64,15 @@ export function calculateDailyFeedCarryover({
     start = earliest;
   } else {
     const days = parseInt(timeRange) || 30;
-    start.setDate(start.getDate() - (days - 1));
+    start = farmDayStart(addFarmDays(end, -(days - 1)));
   }
-  start.setHours(0, 0, 0, 0);
+  start = farmDayStart(start);
 
   const dayList = [];
-  let curr = new Date(start);
-  while (curr <= end) {
-    dayList.push(new Date(curr));
-    curr.setDate(curr.getDate() + 1);
+  let curr = farmDate(start);
+  while (curr <= farmDate(end)) {
+    dayList.push(curr);
+    curr = addFarmDays(curr, 1);
   }
 
   const sortedEntries = [...feedingEntries].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -83,8 +84,7 @@ export function calculateDailyFeedCarryover({
   allPens.forEach(p => { penMap[p.id] = { feedKg: 0, feedCost: 0, daysCount: 0 }; });
 
   dayList.forEach(day => {
-    const dayEnd = new Date(day);
-    dayEnd.setHours(23, 59, 59, 999);
+    const dayEnd = farmDayEnd(day);
 
     allPens.forEach(p => {
       const penEntries = sortedEntries.filter(e => e.barn_area_id === p.id && new Date(e.date) <= dayEnd);
@@ -124,10 +124,10 @@ export function calculateDailyMilkCarryover({
 
   // Generate list of days
   const dayList = [];
-  let curr = new Date(startDate);
-  while (curr <= endDate) {
-    dayList.push(new Date(curr));
-    curr.setDate(curr.getDate() + 1);
+  let curr = farmDate(startDate);
+  while (curr <= farmDate(endDate)) {
+    dayList.push(curr);
+    curr = addFarmDays(curr, 1);
   }
 
   let totalLiters = 0;
@@ -144,8 +144,7 @@ export function calculateDailyMilkCarryover({
   });
 
   dayList.forEach(day => {
-    const dayEnd = new Date(day);
-    dayEnd.setHours(23, 59, 59, 999);
+    const dayEnd = farmDayEnd(day);
 
     let anyPenHas = false;
 
@@ -156,11 +155,11 @@ export function calculateDailyMilkCarryover({
         anyPenHas = true;
         // Carry over the active daily milk from the last date milk was recorded
         const lastEntry = penEntries[penEntries.length - 1];
-        const lastEntryDateStr = getBeirutDateString(new Date(lastEntry.date));
+        const lastEntryDateStr = getBeirutDateString(lastEntry.date);
 
         // Get all entries for that active day (Morning + Night shifts summed)
-        const activeDayEntries = penEntries.filter(e => getBeirutDateString(new Date(e.date)) === lastEntryDateStr);
-        
+        const activeDayEntries = penEntries.filter(e => getBeirutDateString(e.date) === lastEntryDateStr);
+
         const dayTotal = activeDayEntries.reduce((sum, e) => sum + (parseFloat(e.amount_liters) || 0), 0);
         const daySellable = activeDayEntries
           .filter(e => e.destination !== 'home_use' && e.destination !== 'farm_use')
@@ -205,7 +204,7 @@ export function calculateMonthlySnapshots({
   strawPricePerKg = 0.20
 }) {
   const monthsMap = {};
-  const now = new Date();
+  const now = farmCalendarDate();
 
   const getMonthObj = (year, monthZeroIndexed) => {
     const key = `${year}-${String(monthZeroIndexed + 1).padStart(2, '0')}`;
@@ -227,15 +226,15 @@ export function calculateMonthlySnapshots({
 
   // Register months from milk entries
   milkEntries.forEach(e => {
-    const d = new Date(e.date);
-    getMonthObj(d.getFullYear(), d.getMonth());
+    const d = farmCalendarDate(e.date);
+    getMonthObj(d.getUTCFullYear(), d.getUTCMonth());
   });
 
   // Register months from individual milking/sale timeline events
   timelineEvents.forEach(e => {
     if (e.type === 'Milking' || e.type === 'Sale') {
-      const d = new Date(e.date);
-      const mObj = getMonthObj(d.getFullYear(), d.getMonth());
+      const d = farmCalendarDate(e.date);
+      const mObj = getMonthObj(d.getUTCFullYear(), d.getUTCMonth());
       if (e.type === 'Sale') {
         const val = parseFloat(e.custom_fields?.sale_price || e.custom_fields?.price || 0);
         mObj.salesRevenue += val;
@@ -245,10 +244,10 @@ export function calculateMonthlySnapshots({
 
   // Register months from feeding entries
   feedingEntries.forEach(e => {
-    const d = new Date(e.date);
-    getMonthObj(d.getFullYear(), d.getMonth());
+    const d = farmCalendarDate(e.date);
+    getMonthObj(d.getUTCFullYear(), d.getUTCMonth());
   });
-  getMonthObj(now.getFullYear(), now.getMonth());
+  getMonthObj(now.getUTCFullYear(), now.getUTCMonth());
 
   const sortedMonthKeys = Object.keys(monthsMap).sort((a, b) => a.localeCompare(b));
 
@@ -257,10 +256,10 @@ export function calculateMonthlySnapshots({
     const year = mObj.year;
     const month = mObj.monthZeroIndexed;
 
-    const lastDayOfMonth = new Date(year, month + 1, 0);
-    const endDayNum = (year === now.getFullYear() && month === now.getMonth())
-      ? now.getDate()
-      : lastDayOfMonth.getDate();
+    const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0));
+    const endDayNum = (year === now.getUTCFullYear() && month === now.getUTCMonth())
+      ? now.getUTCDate()
+      : lastDayOfMonth.getUTCDate();
 
     const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
     const endStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(endDayNum).padStart(2, '0')}`;
@@ -269,17 +268,16 @@ export function calculateMonthlySnapshots({
     const milkResult = calculateDailyMilkCarryover({
       milkEntries,
       barnAreas,
-      startDate: new Date(startStr),
-      endDate: new Date(endStr)
+      startDate: startStr,
+      endDate: endStr
     });
     mObj.milk = milkResult.totalMilkLiters;
     mObj.sellableMilk = milkResult.totalSellableLiters;
     mObj.sessions = milkResult.sessionsCount;
 
     // Add any individual timeline milking events for this month
-    const monthStart = new Date(startStr);
-    const monthEnd = new Date(endStr);
-    monthEnd.setHours(23, 59, 59, 999);
+    const monthStart = farmDayStart(startStr);
+    const monthEnd = farmDayEnd(endStr);
 
     const monthIndividualMilking = timelineEvents.filter(e => {
       if (e.type !== 'Milking') return false;
@@ -315,8 +313,8 @@ export function calculateMonthlySnapshots({
   return sortedMonthKeys.map(key => {
     const v = monthsMap[key];
     const [year, month] = key.split('-');
-    const label = new Date(Number(year), Number(month) - 1, 1)
-      .toLocaleString('en-US', { month: 'short', year: '2-digit' });
+    const label = new Date(beirutInputToISO(`${year}-${month}-01T12:00:00`))
+      .toLocaleString('en-US', { timeZone: 'Asia/Beirut', month: 'short', year: '2-digit' });
     const milkRevenue = v.sellableMilk * (parseFloat(milkPricePerLiter) || 1.1);
     const feedCost = v.feedCost || 0;
     const grossIncome = milkRevenue + v.salesRevenue;
@@ -336,9 +334,7 @@ export default function FarmAnalyticsModal({
 }) {
   const [timeRange, setTimeRange] = useState('30'); // '7', '30', '90', 'custom', 'all'
   const [customStartDate, setCustomStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return getBeirutDateString(d);
+    return addFarmDays(new Date(), -30);
   });
   const [customEndDate, setCustomEndDate] = useState(() => getBeirutDateString(new Date()));
 
@@ -388,17 +384,16 @@ export default function FarmAnalyticsModal({
     if (timeRange === 'all') return entries;
     if (timeRange === 'custom') {
       if (!customStartDate || !customEndDate) return entries;
-      const start = new Date(customStartDate);
-      const end = new Date(customEndDate);
-      end.setHours(23, 59, 59, 999);
+      const start = farmDayStart(customStartDate);
+      const end = farmDayEnd(customEndDate);
+
       return entries.filter(e => {
         const d = new Date(e[dateKey]);
         return d >= start && d <= end;
       });
     }
     const days = parseInt(timeRange) || 30;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - (days - 1));
+    const cutoff = farmDayStart(addFarmDays(new Date(), -(days - 1)));
     return entries.filter(e => new Date(e[dateKey]) >= cutoff);
   };
 
@@ -433,12 +428,12 @@ export default function FarmAnalyticsModal({
   // 1. MILK PRODUCTION & DYNAMIC CUMULATIVE CARRYOVER METRICS (carrying over pen milk daily if no entries added)
   const { penMilkVolume, penSellableMilk, penMilkPerformanceMap, milkDaysRepresented, penMilkDaysMap } = React.useMemo(() => {
     // Determine start and end date objects matching the selected range
-    const end = timeRange === 'custom' && customEndDate ? new Date(customEndDate) : new Date();
-    end.setHours(23, 59, 59, 999);
+    const end = timeRange === 'custom' && customEndDate ? farmDayEnd(customEndDate) : farmDayEnd();
+
 
     let start = new Date(end);
     if (timeRange === 'custom' && customStartDate) {
-      start = new Date(customStartDate);
+      start = farmDayStart(customStartDate);
     } else if (timeRange === 'all') {
       const earliest = milkEntries.reduce((earliestDate, entry) => {
         const d = new Date(entry.date);
@@ -447,9 +442,9 @@ export default function FarmAnalyticsModal({
       start = earliest;
     } else {
       const days = parseInt(timeRange) || 30;
-      start.setDate(start.getDate() - (days - 1));
+      start = farmDayStart(addFarmDays(end, -(days - 1)));
     }
-    start.setHours(0, 0, 0, 0);
+    start = farmDayStart(start);
 
     const result = calculateDailyMilkCarryover({
       milkEntries,

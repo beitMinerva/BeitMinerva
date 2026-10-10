@@ -1,3 +1,4 @@
+import { farmDisplay } from '../supabase/functions/_shared/farmTime.js';
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
@@ -117,6 +118,20 @@ export default function App() {
     }
   });
   const [toastMessage, setToastMessage] = useState('');
+  const [clockTick, setClockTick] = useState(0);
+
+  useEffect(() => {
+    const refreshClock = () => setClockTick(tick => tick + 1);
+    const timer = setInterval(refreshClock, 60000);
+    window.addEventListener('focus', refreshClock);
+    const onVisible = () => { if (!document.hidden) refreshClock(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', refreshClock);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   // Compute dynamic farm alerts in real-time
   const farmAlerts = React.useMemo(() => {
@@ -128,7 +143,7 @@ export default function App() {
       milkingEntries: penMilkEntries,
       dismissedAlertIds
     });
-  }, [recentEvents, goats, barnAreas, penFeedingEntries, penMilkEntries, dismissedAlertIds]);
+  }, [recentEvents, goats, barnAreas, penFeedingEntries, penMilkEntries, dismissedAlertIds, clockTick]);
 
   const handleDismissAlert = (alertId) => {
     setDismissedAlertIds((prev) => {
@@ -442,7 +457,7 @@ export default function App() {
               status: 'pending'
             }
           });
-          const nextDateStr = new Date(nextDueDate).toLocaleDateString();
+          const nextDateStr = farmDisplay(nextDueDate, { hour: undefined, minute: undefined });
           showToast(`Event logged to history! Next reminder scheduled for ${nextDateStr}.`);
         } else {
           await updateTimelineEvent(taskToComplete.id, {

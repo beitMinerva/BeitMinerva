@@ -1,3 +1,4 @@
+import { beirutInputToISO } from '../../supabase/functions/_shared/farmTime.js';
 import React, { useState } from 'react';
 import { X, Loader2, Wheat, Scale, Clock, FileText, Users, Sparkles, Share2, Layers, Check, Info, Plus, Milk } from 'lucide-react';
 import { parsePenFeeding } from './PenFeedingHistoryModal';
@@ -236,7 +237,7 @@ export default function PenFeedingFormModal({ pen, barnAreas = [], goats = [], o
             schedule: schedule.trim(),
             notes: finalNote,
             shared_trough_metadata: metadata,
-            date: new Date(feedingDate).toISOString()
+            date: beirutInputToISO(feedingDate)
           };
           const isEditingThisPen = Boolean(entryIdForEdit) && item.pen.id === selectedEntry?.barn_area_id;
           await onSave(item.pen.id, feedingData, isEditingThisPen ? entryIdForEdit : null);

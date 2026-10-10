@@ -1,3 +1,4 @@
+import { farmDayStart, farmDayEnd } from '../../supabase/functions/_shared/farmTime.js';
 import React, { useState, useMemo } from 'react';
 import { TrendingUp, Filter, Calendar } from 'lucide-react';
 import { isWeightEvent, isMilkingEvent, getEventMetricValue } from '../utils/metricEventUtils';
@@ -56,11 +57,11 @@ export default function GoatMetricsChart({ goat, events = [] }) {
     if (timeRange === 'CUSTOM') {
       let filtered = sorted;
       if (startDate) {
-        const startTs = new Date(startDate).getTime();
+        const startTs = farmDayStart(startDate).getTime();
         filtered = filtered.filter((p) => p.timestamp >= startTs);
       }
       if (endDate) {
-        const endTs = new Date(endDate).getTime() + 24 * 60 * 60 * 1000; // end of day
+        const endTs = farmDayEnd(endDate).getTime(); // end of day
         filtered = filtered.filter((p) => p.timestamp <= endTs);
       }
       return filtered;
@@ -233,7 +234,7 @@ function ChartSVG({ chartData }) {
               fontSize="8"
               fill="var(--text-muted)"
             >
-              {d.date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
+              {d.date.toLocaleDateString(undefined, { timeZone: 'Asia/Beirut', month: 'numeric', day: 'numeric' })}
             </text>
           </g>
         ))}

@@ -1,3 +1,4 @@
+import { beirutInputToISO, farmDateTime } from '../../supabase/functions/_shared/farmTime.js';
 import React, { useState } from 'react';
 import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, FileText, Scissors, Check, Users, Home, CheckSquare, Square, Search, Plus, Trash2, Sparkles, DollarSign } from 'lucide-react';
 import CustomRepeatPicker from './CustomRepeatPicker';
@@ -110,17 +111,10 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
 
   const getInitialDateStr = () => {
     if (initialDate) {
-      if (initialDate.includes('T')) return initialDate.slice(0, 16);
+      if (initialDate.includes('T')) return farmDateTime(initialDate);
       return `${initialDate}T09:00`;
     }
-    const now = new Date();
-    const beirutNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Beirut' }));
-    const yyyy = beirutNow.getFullYear();
-    const mm = String(beirutNow.getMonth() + 1).padStart(2, '0');
-    const dd = String(beirutNow.getDate()).padStart(2, '0');
-    const hh = String(beirutNow.getHours()).padStart(2, '0');
-    const min = String(beirutNow.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+    return farmDateTime();
   };
 
   const [generalTitle, setGeneralTitle] = useState(taskToComplete?.title ? taskToComplete.title.replace(/^Scheduled:\s*/i, '') : '');
@@ -254,7 +248,7 @@ export default function AddEventModal({ goat, goats = [], barnAreas = [], onClos
       goat_id: primaryGoatId,
       type: selectedCategory.id,
       title: eventTitle,
-      date: new Date(date).toISOString(),
+      date: beirutInputToISO(date),
       status: isSchedulingTask ? 'pending' : 'completed',
       notes: notes.trim(),
       custom_fields: {

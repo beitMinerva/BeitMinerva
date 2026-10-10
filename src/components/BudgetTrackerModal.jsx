@@ -1,3 +1,4 @@
+import { farmDate, beirutInputToISO } from '../../supabase/functions/_shared/farmTime.js';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ArrowLeft,
@@ -156,8 +157,7 @@ export default function BudgetTrackerModal({
   
   // Month selector - format: 'YYYY-MM' or 'ALL'
   const currentMonthStr = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return farmDate().slice(0, 7);
   }, []);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
 
@@ -166,7 +166,7 @@ export default function BudgetTrackerModal({
   const [editingEntry, setEditingEntry] = useState(null);
   const [formData, setFormData] = useState({
     entry_type: 'expense',
-    date: new Date().toISOString().split('T')[0],
+    date: farmDate(),
     category: DEFAULT_EXPENSE_CATEGORIES[0].nameAr,
     custom_category: '',
     usd_amount: '',
@@ -215,8 +215,8 @@ export default function BudgetTrackerModal({
   const formatMonthName = (monthStr) => {
     if (monthStr === 'ALL') return 'All Time';
     const [y, m] = monthStr.split('-');
-    const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
-    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const date = new Date(beirutInputToISO(`${y}-${m}-01T12:00:00`));
+    return date.toLocaleDateString('en-US', { timeZone: 'Asia/Beirut', month: 'long', year: 'numeric' });
   };
 
   // DYNAMIC CATEGORIES: Extract all custom and predefined categories from entries
@@ -413,7 +413,7 @@ export default function BudgetTrackerModal({
     setEditingEntry(null);
     setFormData({
       entry_type: determinedType,
-      date: new Date().toISOString().split('T')[0],
+      date: farmDate(),
       category: determinedCategory,
       custom_category: '',
       usd_amount: '',
@@ -433,7 +433,7 @@ export default function BudgetTrackerModal({
 
     setFormData({
       entry_type: entry.entry_type || 'expense',
-      date: entry.date || new Date().toISOString().split('T')[0],
+      date: entry.date || farmDate(),
       category: isPredefined ? entry.category : 'غيرها',
       custom_category: isPredefined ? '' : entry.category,
       usd_amount: entry.usd_amount ? String(entry.usd_amount) : '',

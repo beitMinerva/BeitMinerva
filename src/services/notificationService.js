@@ -1,3 +1,4 @@
+import { farmDate, farmDateTime, addFarmDays, farmDisplay } from '../../supabase/functions/_shared/farmTime.js';
 // Web Notifications Service & Due Tasks Checker for Goat Farm Management (iOS Safari & Android PWA Compatible)
 import { supabase } from '../config/supabase';
 
@@ -256,9 +257,8 @@ export function generateDynamicFarmAlerts({
 } = {}) {
   const alerts = [];
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
-  const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-  const threeDaysLaterStr = threeDaysLater.toISOString().split('T')[0];
+  const todayStr = farmDate(now);
+  const threeDaysLaterStr = addFarmDays(now, 3);
 
   const dismissedSet = new Set(dismissedAlertIds || []);
 
@@ -275,7 +275,7 @@ export function generateDynamicFarmAlerts({
 
     if (!isPendingScheduledTask) return;
 
-    const eventDateStr = ev.date?.split('T')[0];
+    const eventDateStr = farmDate(ev.date || '');
     if (!eventDateStr) return;
 
     const targetGoat = ev.goat_id && ev.goat_id !== 'herd' && !ev.goat_id.startsWith('pen-')
@@ -380,7 +380,7 @@ export function generateDynamicFarmAlerts({
 
     const expectedKiddingTime = matingTime + 150 * 24 * 60 * 60 * 1000;
     const diffDays = Math.round((expectedKiddingTime - now.getTime()) / (24 * 60 * 60 * 1000));
-    const expectedDateStr = new Date(expectedKiddingTime).toISOString().split('T')[0];
+    const expectedDateStr = farmDate(expectedKiddingTime);
 
     const alertId = `kidding-${doe.id}-${ev.id}`;
     if (dismissedSet.has(alertId)) return;
@@ -482,7 +482,7 @@ export function generateDynamicFarmAlerts({
               category: 'Safety',
               severity: 'urgent',
               title: `Milk/Meat Withdrawal: ${goatName}`,
-              description: `Active withdrawal for ~${daysLeft} more day(s) until ${new Date(withdrawalEndTime).toLocaleDateString()}. Do not sell milk or meat.`,
+              description: `Active withdrawal for ~${daysLeft} more day(s) until ${farmDisplay(withdrawalEndTime, { hour: undefined, minute: undefined })}. Do not sell milk or meat.`,
               date: new Date(withdrawalEndTime).toISOString(),
               goatId: goat?.id || ev.goat_id,
               targetName: goatName,
@@ -496,7 +496,7 @@ export function generateDynamicFarmAlerts({
   });
 
   // 5. DAILY BARN ROUTINE: MISSING FEEDING LOG CHECK (Mid-day alert)
-  const currentHour = now.getHours();
+  const currentHour = Number(farmDateTime(now).slice(11, 13));
   if (currentHour >= 12 && Array.isArray(barnAreas) && barnAreas.length > 0) {
     barnAreas.forEach((area) => {
       // Find goats in this pen
@@ -505,7 +505,7 @@ export function generateDynamicFarmAlerts({
 
       const hasFeedingToday = (feedingEntries || []).some((fe) => {
         if (fe.barn_area_id !== area.id) return false;
-        const entryDateStr = fe.date?.split('T')[0];
+        const entryDateStr = farmDate(fe.date || '');
         return entryDateStr === todayStr;
       });
 
@@ -557,7 +557,7 @@ export async function checkUpcomingTasksAndNotify(events = [], goats = [], barnA
   if (alerts.length === 0) return [];
 
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
+  const todayStr = farmDate(now);
 
   // Daily rate-limit: Only show in-app browser notification summary once per day to prevent spam
   const lastNotifyDate = localStorage.getItem('last_inapp_notify_date');

@@ -244,16 +244,16 @@ describe('Daily Feed Carryover & Shift Validation', () => {
     const result1 = calculateDailyMilkCarryover({
       milkEntries,
       barnAreas,
-      startDate: new Date('2026-08-11T00:00:00Z'),
-      endDate: new Date('2026-08-11T23:59:59Z')
+      startDate: '2026-08-11',
+      endDate: '2026-08-11'
     });
     expect(result1.totalMilkLiters).toBe(10);
 
     const result2 = calculateDailyMilkCarryover({
       milkEntries,
       barnAreas,
-      startDate: new Date('2026-08-11T00:00:00Z'),
-      endDate: new Date('2026-08-12T23:59:59Z')
+      startDate: '2026-08-11',
+      endDate: '2026-08-12'
     });
     expect(result2.totalMilkLiters).toBe(20); // 10 L from Aug 11 + 10 L carried to Aug 12
   });

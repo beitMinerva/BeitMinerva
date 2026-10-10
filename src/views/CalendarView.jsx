@@ -1,3 +1,5 @@
+import { farmCalendarDate } from '../../supabase/functions/_shared/farmTime.js';
+import { farmDate, beirutInputToISO, farmDisplay } from '../../supabase/functions/_shared/farmTime.js';
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Bell, Syringe, Pill, Milk, Weight, Heart, Scissors, X, Loader2, Trash2, Edit2, RotateCw, Users, Home, CheckSquare, Square, Search, Filter, History } from 'lucide-react';
 import ReminderDetailModal from '../components/ReminderDetailModal';
@@ -75,14 +77,14 @@ export function getEventTargetBadge(event, goats = [], barnAreas = []) {
 
 export function doesEventOccurOnDate(event, targetDateStr) {
   if (!event || !event.date) return false;
-  const startDateStr = event.date.split('T')[0];
+  const startDateStr = farmDate(event.date);
   if (startDateStr === targetDateStr) return true;
 
   const { frequency, days } = getRepeatFrequency(event);
   if (!frequency || frequency === 'none') return false;
 
-  const startDate = new Date(startDateStr + 'T00:00:00');
-  const targetDate = new Date(targetDateStr + 'T00:00:00');
+  const startDate = new Date(startDateStr + 'T12:00:00Z');
+  const targetDate = new Date(targetDateStr + 'T12:00:00Z');
 
   if (targetDate < startDate) return false;
 
@@ -100,26 +102,26 @@ export function doesEventOccurOnDate(event, targetDateStr) {
   }
 
   if (frequency === 'monthly') {
-    return targetDate.getDate() === startDate.getDate();
+    return targetDate.getUTCDate() === startDate.getUTCDate();
   }
 
   if (frequency === 'every_2_months') {
-    const monthsDiff = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + (targetDate.getMonth() - startDate.getMonth());
-    return targetDate.getDate() === startDate.getDate() && monthsDiff >= 0 && monthsDiff % 2 === 0;
+    const monthsDiff = (targetDate.getUTCFullYear() - startDate.getUTCFullYear()) * 12 + (targetDate.getUTCMonth() - startDate.getUTCMonth());
+    return targetDate.getUTCDate() === startDate.getUTCDate() && monthsDiff >= 0 && monthsDiff % 2 === 0;
   }
 
   if (frequency === 'every_3_months') {
-    const monthsDiff = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + (targetDate.getMonth() - startDate.getMonth());
-    return targetDate.getDate() === startDate.getDate() && monthsDiff >= 0 && monthsDiff % 3 === 0;
+    const monthsDiff = (targetDate.getUTCFullYear() - startDate.getUTCFullYear()) * 12 + (targetDate.getUTCMonth() - startDate.getUTCMonth());
+    return targetDate.getUTCDate() === startDate.getUTCDate() && monthsDiff >= 0 && monthsDiff % 3 === 0;
   }
 
   if (frequency === 'every_6_months') {
-    const monthsDiff = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + (targetDate.getMonth() - startDate.getMonth());
-    return targetDate.getDate() === startDate.getDate() && monthsDiff >= 0 && monthsDiff % 6 === 0;
+    const monthsDiff = (targetDate.getUTCFullYear() - startDate.getUTCFullYear()) * 12 + (targetDate.getUTCMonth() - startDate.getUTCMonth());
+    return targetDate.getUTCDate() === startDate.getUTCDate() && monthsDiff >= 0 && monthsDiff % 6 === 0;
   }
 
   if (frequency === 'yearly') {
-    return targetDate.getDate() === startDate.getDate() && targetDate.getMonth() === startDate.getMonth();
+    return targetDate.getUTCDate() === startDate.getUTCDate() && targetDate.getUTCMonth() === startDate.getUTCMonth();
   }
 
   return false;
@@ -137,7 +139,7 @@ export default function CalendarView({
   onCompleteTimelineEvent,
   onOpenAddEvent
 }) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => farmCalendarDate());
   const [selectedDateStr, setSelectedDateStr] = useState(() => getBeirutDateString());
 
   const [showAddReminderModal, setShowAddReminderModal] = useState(false);
@@ -209,12 +211,12 @@ export default function CalendarView({
   const activeTargetCount = getTargetGoats().length;
 
   // Calendar Math
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
+  const year = currentDate.getUTCFullYear();
+  const month = currentDate.getUTCMonth();
 
-  const firstDayOfMonth = new Date(year, month, 1);
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const startingDayOfWeek = firstDayOfMonth.getDay(); // 0 = Sun
+  const firstDayOfMonth = new Date(Date.UTC(year, month, 1));
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const startingDayOfWeek = firstDayOfMonth.getUTCDay(); // 0 = Sun
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -222,11 +224,11 @@ export default function CalendarView({
   ];
 
   const prevMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1));
+    setCurrentDate(new Date(Date.UTC(year, month - 1, 1)));
   };
 
   const nextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1));
+    setCurrentDate(new Date(Date.UTC(year, month + 1, 1)));
   };
 
   const handleDateClick = (dayNum) => {
@@ -247,13 +249,13 @@ export default function CalendarView({
     }
 
     setSubmitting(true);
-    const targetDate = selectedDateStr || new Date().toISOString().split('T')[0];
+    const targetDate = selectedDateStr || farmDate();
 
     const payload = targetGoatsList.map((g) => ({
       goat_id: g.id,
       type: selectedCategory.id,
       title: `Scheduled: ${reminderTitle || selectedCategory.label}`,
-      date: new Date(targetDate + 'T09:00:00').toISOString(),
+      date: beirutInputToISO(targetDate + 'T09:00:00'),
       notes: `Target: ${g.name} (${g.tag_id}) ${reminderNotes ? `/ ${reminderNotes}` : ''}`,
       custom_fields: {
         repeat_frequency: reminderRepeat,
@@ -438,7 +440,7 @@ export default function CalendarView({
       {selectedDateStr && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ecfdf5', border: '1px solid var(--primary-border)', padding: '8px 12px', borderRadius: '10px' }}>
           <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary-dark)' }}>
-            Showing records for {new Date(selectedDateStr + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+            Showing records for {farmDisplay(selectedDateStr, { month: 'short', day: 'numeric', year: 'numeric', hour: undefined, minute: undefined })}
           </span>
           <button
             className="btn btn-secondary btn-xs"

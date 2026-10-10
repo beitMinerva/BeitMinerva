@@ -1,3 +1,5 @@
+import { farmDayStart, farmDayEnd } from '../../supabase/functions/_shared/farmTime.js';
+import { beirutInputToISO, farmDate, farmDateTime } from '../../supabase/functions/_shared/farmTime.js';
 import React, { useState, useMemo } from 'react';
 import { X, Wheat, Scale, Clock, Sparkles, History, Calendar, Milk, TrendingUp, Filter, Pencil, Trash2, Loader2, FileText } from 'lucide-react';
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -56,18 +58,12 @@ function PenMilkChart({ entries = [], groupBy = 'day' }) {
   if (!entries || entries.length === 0) return null;
 
   const getBucketKey = (dateInput, mode) => {
-    const d = new Date(dateInput);
-    if (Number.isNaN(d.getTime())) return null;
-    const beirutDate = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Beirut' }));
-    const yyyy = beirutDate.getFullYear();
-    const mm = String(beirutDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(beirutDate.getDate()).padStart(2, '0');
-
-    if (mode === 'entry') return `${yyyy}-${mm}-${dd}T${String(beirutDate.getHours()).padStart(2, '0')}:${String(beirutDate.getMinutes()).padStart(2, '0')}`;
-    if (mode === 'day') return `${yyyy}-${mm}-${dd}`;
-    if (mode === 'month') return `${yyyy}-${mm}`;
-    if (mode === 'year') return `${yyyy}`;
-    return `${yyyy}-${mm}-${dd}`;
+    const date = farmDate(dateInput);
+    if (!date) return null;
+    if (mode === 'entry') return farmDateTime(dateInput);
+    if (mode === 'month') return date.slice(0, 7);
+    if (mode === 'year') return date.slice(0, 4);
+    return date;
   };
 
   const formatBucketLabel = (bucketKey, mode) => {
@@ -82,7 +78,7 @@ function PenMilkChart({ entries = [], groupBy = 'day' }) {
     }
     if (mode === 'month') {
       const [year, month] = bucketKey.split('-');
-      const d = new Date(Number(year), Number(month) - 1, 1);
+      const d = new Date(beirutInputToISO(`${year}-${month}-01T12:00:00`));
       return d.toLocaleString('en-US', { timeZone: 'Asia/Beirut', month: 'short', year: '2-digit' });
     }
     if (mode === 'year') {
@@ -256,8 +252,8 @@ export default function PenFeedingHistoryModal({
       }
       if (timeRange === 'CUSTOM') {
         let pass = true;
-        if (startDate) pass = pass && itemTime >= new Date(startDate).getTime();
-        if (endDate) pass = pass && itemTime <= new Date(endDate).getTime() + 24 * 60 * 60 * 1000;
+        if (startDate) pass = pass && itemTime >= farmDayStart(startDate).getTime();
+        if (endDate) pass = pass && itemTime <= farmDayEnd(endDate).getTime();
         return pass;
       }
       return true;
@@ -294,7 +290,7 @@ export default function PenFeedingHistoryModal({
     setSubmittingMilk(true);
     try {
       await onSaveMilkEntry(pen.id, {
-        date: new Date(milkDate).toISOString(),
+        date: beirutInputToISO(milkDate),
         amount_liters: Number(milkAmount) || 0,
         shift: milkShift,
         destination: milkDestination,

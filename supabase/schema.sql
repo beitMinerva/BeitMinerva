@@ -28,39 +28,22 @@ CREATE POLICY "Allow public delete access to push_subscriptions"
 -- Optional Table Migration for timeline_events:
 ALTER TABLE public.timeline_events ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'completed';
 
--- =========================================================================
--- 24/7 BEIRUT FARM SCHEDULER (pg_cron + pg_net)
--- Runs at 7:30 AM, 12:00 PM, and 5:00 PM Beirut Time (UTC+3)
--- =========================================================================
-
+-- Beirut wall-clock notification schedule, including daylight-saving changes.
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Unschedules old test jobs if any
-SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname LIKE 'farm-push-%' OR jobname LIKE 'check-farm-push-%';
+SELECT cron.unschedule(jobid) FROM cron.job
+WHERE jobname IN ('farm-push-morning-730am', 'farm-push-midday-evening', 'farm-push-beirut');
 
--- 1. Morning Briefing: 7:30 AM Beirut Time (4:30 AM UTC)
 SELECT cron.schedule(
-    'farm-push-morning-730am',
-    '30 4 * * *',
+    'farm-push-beirut',
+    '* * * * *',
     $$
     SELECT net.http_post(
         url := 'https://tlneqawnaifeipudbwjq.supabase.co/functions/v1/send-push-notifications',
         headers := '{"Content-Type": "application/json", "Authorization": "Bearer sb_publishable_HtzmJ9d-NTPVUfUByceSbw_PtajHP1A"}'::jsonb,
         body := '{}'::jsonb
-    );
-    $$
-);
-
--- 2. Midday Briefing & Evening Check: 12:00 PM & 5:00 PM Beirut Time (9:00 AM & 2:00 PM UTC)
-SELECT cron.schedule(
-    'farm-push-midday-evening',
-    '0 9,14 * * *',
-    $$
-    SELECT net.http_post(
-        url := 'https://tlneqawnaifeipudbwjq.supabase.co/functions/v1/send-push-notifications',
-        headers := '{"Content-Type": "application/json", "Authorization": "Bearer sb_publishable_HtzmJ9d-NTPVUfUByceSbw_PtajHP1A"}'::jsonb,
-        body := '{}'::jsonb
-    );
+    )
+    WHERE to_char(now() AT TIME ZONE 'Asia/Beirut', 'HH24:MI') IN ('07:30', '12:00', '17:00');
     $$
 );

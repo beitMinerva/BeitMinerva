@@ -76,12 +76,14 @@ export default function EventDetailModal({ event, goat, goats = [], barnAreas = 
 
   const dateObj = new Date(event.date);
   const formattedDate = dateObj.toLocaleDateString(undefined, {
+    timeZone: 'Asia/Beirut',
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric'
   });
   const formattedTime = dateObj.toLocaleTimeString(undefined, {
+    timeZone: 'Asia/Beirut',
     hour: '2-digit',
     minute: '2-digit'
   });

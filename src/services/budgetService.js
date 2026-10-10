@@ -1,3 +1,4 @@
+import { farmDate } from '../../supabase/functions/_shared/farmTime.js';
 import { supabase } from '../config/supabase';
 
 export const DEFAULT_EXPENSE_CATEGORIES = [
@@ -55,7 +56,7 @@ export async function addBudgetEntry(entry) {
   try {
     const payload = {
       entry_type: entry.entry_type || 'expense',
-      date: entry.date || new Date().toISOString().split('T')[0],
+      date: entry.date || farmDate(),
       category: entry.category || 'غيرها',
       usd_amount: parseFloat(entry.usd_amount) || 0,
       lbp_amount: parseFloat(entry.lbp_amount) || 0,

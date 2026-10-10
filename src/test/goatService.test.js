@@ -28,14 +28,14 @@ describe('goatService & Helper Functions Unit Tests', () => {
     it('calculates 3-month recurrence for Hoof Trimming correctly', () => {
       const base = '2026-08-10T09:00:00.000Z';
       const next = calculateNextDueDate(base, 'every_3_months');
-      const expected = new Date('2026-11-10T09:00:00.000Z').toISOString();
+      const expected = new Date('2026-11-10T10:00:00.000Z').toISOString();
       expect(next).toBe(expected);
     });
 
     it('calculates 6-month recurrence correctly', () => {
       const base = '2026-08-10T09:00:00.000Z';
       const next = calculateNextDueDate(base, 'every_6_months');
-      const expected = new Date('2027-02-10T09:00:00.000Z').toISOString();
+      const expected = new Date('2027-02-10T10:00:00.000Z').toISOString();
       expect(next).toBe(expected);
     });
 

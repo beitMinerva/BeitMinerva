@@ -1,3 +1,4 @@
+import { farmDate, beirutInputToISO } from '../../supabase/functions/_shared/farmTime.js';
 import React, { useState, useRef } from 'react';
 import BarcodeSVG from './BarcodeSVG';
 import GoatMetricsChart from './GoatMetricsChart';
@@ -46,6 +47,7 @@ export function formatBeirutDateTime(dateStr) {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '';
   return d.toLocaleString(undefined, {
+    timeZone: 'Asia/Beirut',
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -82,7 +84,7 @@ export default function GoatDetailModal({
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [isReminderModalClosing, setIsReminderModalClosing] = useState(false);
   const [reminderCategory, setReminderCategory] = useState('Vaccination');
-  const [reminderDate, setReminderDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reminderDate, setReminderDate] = useState(farmDate());
   const [reminderTitle, setReminderTitle] = useState('');
   const [reminderNotes, setReminderNotes] = useState('');
   const [savingReminder, setSavingReminder] = useState(false);
@@ -138,7 +140,7 @@ export default function GoatDetailModal({
           goat_id: goat.id,
           type: reminderCategory,
           title: `Scheduled: ${reminderTitle || reminderCategory}`,
-          date: new Date(reminderDate).toISOString(),
+          date: beirutInputToISO(reminderDate),
           notes: `Target: ${goat.name} (${goat.tag_id})${reminderNotes ? ` • ${reminderNotes}` : ''}`,
           custom_fields: {
             repeat_frequency: reminderRepeatFrequency,

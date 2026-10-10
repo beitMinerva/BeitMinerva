@@ -1,13 +1,14 @@
+import { farmDate } from '../../supabase/functions/_shared/farmTime.js';
 import { supabase } from '../config/supabase';
 
 export function calculateGoatAge(birthDate) {
   if (!birthDate) return 'Age unknown';
-  const birth = new Date(birthDate);
-  const now = new Date();
+  const birth = new Date(`${farmDate(birthDate)}T12:00:00Z`);
+  const now = new Date(`${farmDate()}T12:00:00Z`);
   if (isNaN(birth.getTime())) return 'Age unknown';
 
-  let years = now.getFullYear() - birth.getFullYear();
-  let months = now.getMonth() - birth.getMonth();
+  let years = now.getUTCFullYear() - birth.getUTCFullYear();
+  let months = now.getUTCMonth() - birth.getUTCMonth();
   if (months < 0) {
     years--;
     months += 12;
@@ -400,7 +401,7 @@ export async function addGoat(goatData) {
     breed: goatData.breed || 'Alpine',
     gender: goatData.gender || 'Female',
     neutered_status: goatData.neutered_status || 'Intact',
-    birth_date: goatData.birth_date || new Date().toISOString().split('T')[0],
+    birth_date: goatData.birth_date || farmDate(),
     weight: goatData.weight ? parseFloat(goatData.weight) : 45.0,
     status: goatData.status || 'Healthy',
     area_id: goatData.area_id || null,
@@ -673,74 +674,5 @@ export async function removeGoatFromTimelineEvent(eventId, goatId, allGoats = []
   return { action: 'updated', data };
 }
 
-export function calculateNextDueDate(baseDateStr, frequency, customDays = 21) {
-  const date = new Date(baseDateStr || Date.now());
-  if (isNaN(date.getTime())) return null;
-
-  switch (frequency) {
-    case 'daily':
-      date.setUTCDate(date.getUTCDate() + 1);
-      break;
-    case 'weekly':
-      date.setUTCDate(date.getUTCDate() + 7);
-      break;
-    case 'monthly':
-      date.setUTCMonth(date.getUTCMonth() + 1);
-      break;
-    case 'every_2_months':
-      date.setUTCMonth(date.getUTCMonth() + 2);
-      break;
-    case 'every_3_months':
-      date.setUTCMonth(date.getUTCMonth() + 3);
-      break;
-    case 'every_6_months':
-      date.setUTCMonth(date.getUTCMonth() + 6);
-      break;
-    case 'yearly':
-      date.setUTCFullYear(date.getUTCFullYear() + 1);
-      break;
-    case 'custom':
-      date.setUTCDate(date.getUTCDate() + (parseInt(customDays) || 21));
-      break;
-    default:
-      return null;
-  }
-  return date.toISOString();
-}
-
-export function getBeirutDateTimeString(dateInput = new Date()) {
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return '';
-  const beirutDate = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Beirut' }));
-  const yyyy = beirutDate.getFullYear();
-  const mm = String(beirutDate.getMonth() + 1).padStart(2, '0');
-  const dd = String(beirutDate.getDate()).padStart(2, '0');
-  const hh = String(beirutDate.getHours()).padStart(2, '0');
-  const min = String(beirutDate.getMinutes()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
-}
-
-export function getBeirutDateString(dateInput = new Date()) {
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return '';
-  const beirutDate = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Beirut' }));
-  const yyyy = beirutDate.getFullYear();
-  const mm = String(beirutDate.getMonth() + 1).padStart(2, '0');
-  const dd = String(beirutDate.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-export function formatBeirutDisplay(dateInput, options = {}) {
-  if (!dateInput) return '';
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleString('en-US', {
-    timeZone: 'Asia/Beirut',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    ...options
-  });
-}
+export { nextFarmDueDate as calculateNextDueDate, farmDateTime as getBeirutDateTimeString,
+  farmDate as getBeirutDateString, farmDisplay as formatBeirutDisplay } from '../../supabase/functions/_shared/farmTime.js';

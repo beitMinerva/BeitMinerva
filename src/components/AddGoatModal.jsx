@@ -1,3 +1,4 @@
+import { farmDate } from '../../supabase/functions/_shared/farmTime.js';
 import React, { useState } from 'react';
 import imageCompression from 'browser-image-compression';
 import BarcodeSVG from './BarcodeSVG';
@@ -13,7 +14,7 @@ export default function AddGoatModal({ goatToEdit = null, barnAreas = [], initia
   const [breed, setBreed] = useState(goatToEdit ? goatToEdit.breed : 'Alpine');
   const [gender, setGender] = useState(goatToEdit ? (goatToEdit.gender === 'Doe' ? 'Female' : goatToEdit.gender === 'Buck' ? 'Male' : goatToEdit.gender) : 'Female');
   const [neuteredStatus, setNeuteredStatus] = useState(goatToEdit ? (goatToEdit.neutered_status || 'Intact') : 'Intact');
-  const [birthDate, setBirthDate] = useState(goatToEdit ? goatToEdit.birth_date : new Date().toISOString().split('T')[0]);
+  const [birthDate, setBirthDate] = useState(goatToEdit ? goatToEdit.birth_date : farmDate());
   const [weight, setWeight] = useState(goatToEdit ? (goatToEdit.weight || 45) : 45);
   const [status, setStatus] = useState(goatToEdit ? goatToEdit.status : 'Healthy');
   const [areaId, setAreaId] = useState(() => {

@@ -1,3 +1,4 @@
+import { beirutInputToISO } from '../../supabase/functions/_shared/farmTime.js';
 import React, { useState } from 'react';
 import { X, Loader2, Syringe, Pill, Milk, Weight, Heart, Bell, Scissors, Sparkles, Plus, Trash2, Users, Home, CheckSquare, Square } from 'lucide-react';
 import { getBeirutDateTimeString } from '../services/goatService';
@@ -48,13 +49,7 @@ export default function EditReminderModal({ reminder, goats = [], barnAreas = []
   const initialCatId = resolveCategoryId();
   const initialCat = categories.find((c) => c.id === initialCatId) || categories[0];
 
-  const formatLocalDatetime = (dateStr) => {
-    if (!dateStr) return new Date().toISOString().slice(0, 16);
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 16);
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  };
+  const formatLocalDatetime = (dateStr) => getBeirutDateTimeString(dateStr) || getBeirutDateTimeString();
 
   // Parse existing custom_fields
   const parsedFields = (() => {
@@ -195,7 +190,7 @@ export default function EditReminderModal({ reminder, goats = [], barnAreas = []
           goat_id: primaryGoatId,
           type: selectedCategory.id,
           title: `${titlePrefix}${eventTitle}`,
-          date: new Date(reminderDate).toISOString(),
+          date: beirutInputToISO(reminderDate),
           notes: reminderNotes.trim(),
           custom_fields: customFields
         });
